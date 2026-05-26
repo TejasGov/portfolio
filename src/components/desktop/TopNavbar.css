@@ -1,0 +1,9 @@
+/* ==========================================
+   TOP NAVBAR
+   ========================================== */
+
+/* Nav item hover state — used on nav text links */
+.nav-item-hover:hover {
+  opacity: 0.6;
+  transition: opacity 0.15s ease;
+}

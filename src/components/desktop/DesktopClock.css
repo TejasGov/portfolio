@@ -1,0 +1,11 @@
+/* ==========================================
+   DESKTOP CLOCK — Analog + Digital widget
+   ========================================== */
+
+@keyframes blink {
+  50% { opacity: 0; }
+}
+
+.blink-colon {
+  animation: blink 2s step-start infinite;
+}

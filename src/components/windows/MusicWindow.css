@@ -1,0 +1,256 @@
+/* =====================================================
+   Music Window — Apple Music sidebar layout
+   ===================================================== */
+
+.music-window {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #111113;
+}
+
+/* ── Sidebar ── */
+
+.music-sidebar {
+  width: 206px;
+  min-width: 206px;
+  background: #161618;
+  border-right: 1px solid rgba(255, 255, 255, 0.055);
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 16px 0 20px;
+  overflow-y: auto;
+}
+
+.music-search-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 12px;
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.065);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 9px;
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 13px;
+  font-family: inherit;
+  cursor: text;
+  user-select: none;
+}
+
+.music-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 0 8px;
+}
+
+.music-section-label {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.32);
+  padding: 2px 8px 7px;
+  margin: 0;
+}
+
+.music-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 11px;
+  width: 100%;
+  background: none;
+  border: none;
+  border-radius: 9px;
+  color: rgba(255, 255, 255, 0.58);
+  font-size: 13.5px;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.14s ease, color 0.14s ease;
+}
+
+.music-nav-item:hover {
+  background: rgba(255, 255, 255, 0.065);
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.music-nav-item.active {
+  background: rgba(252, 60, 68, 0.13);
+  color: #fc3c44;
+  font-weight: 600;
+}
+
+.music-nav-item.active:hover {
+  background: rgba(252, 60, 68, 0.19);
+}
+
+/* ── Main content ── */
+
+.music-main {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 28px 24px;
+  overflow: auto;
+  background: #111113;
+}
+
+.music-spotify-container {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 600px;
+  height: 100%;
+  max-height: 800px;
+  padding: 10px;
+  gap: 20px;
+}
+
+.music-spotify-header {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.music-spotify-title {
+  font-size: 24px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.95);
+  margin: 0;
+  letter-spacing: -0.5px;
+}
+
+.music-spotify-subtitle {
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.6);
+  margin: 0;
+  line-height: 1.4;
+}
+
+.music-iframe-wrapper {
+  flex: 1;
+  width: 100%;
+  min-height: 380px;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.music-spotify-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.music-spotify-note {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.4);
+  margin: 0;
+}
+
+.music-spotify-button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  background: #1DB954; /* Spotify Green */
+  color: white;
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  border-radius: 20px;
+  transition: all 0.2s ease;
+}
+
+.music-spotify-button:hover {
+  background: #1ed760;
+  transform: scale(1.02);
+}
+
+/* ── Placeholder screens ── */
+
+.music-coming-soon {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  color: rgba(255, 255, 255, 0.35);
+  text-align: center;
+  padding: 40px;
+}
+
+.music-coming-soon-icon {
+  font-size: 52px;
+  margin-bottom: 8px;
+  display: block;
+}
+
+.music-coming-soon-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.65);
+  margin: 0;
+}
+
+.music-coming-soon-sub {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.35);
+  margin: 0;
+}
+
+/* =====================================================
+   Light Mode Overrides
+   ===================================================== */
+body:not(.dark-mode) .music-window {
+  background: #ffffff;
+}
+body:not(.dark-mode) .music-sidebar {
+  background: #f5f5f7;
+  border-right-color: rgba(0, 0, 0, 0.08);
+}
+body:not(.dark-mode) .music-search-bar {
+  background: rgba(0, 0, 0, 0.05);
+  border-color: rgba(0, 0, 0, 0.05);
+  color: rgba(0, 0, 0, 0.6);
+}
+body:not(.dark-mode) .music-section-label {
+  color: rgba(0, 0, 0, 0.4);
+}
+body:not(.dark-mode) .music-nav-item {
+  color: rgba(0, 0, 0, 0.6);
+}
+body:not(.dark-mode) .music-nav-item:hover {
+  background: rgba(0, 0, 0, 0.05);
+  color: #1d1d1f;
+}
+body:not(.dark-mode) .music-main {
+  background: #ffffff;
+}
+body:not(.dark-mode) .music-spotify-title {
+  color: #1d1d1f;
+}
+body:not(.dark-mode) .music-spotify-subtitle {
+  color: rgba(0, 0, 0, 0.6);
+}
+body:not(.dark-mode) .music-spotify-footer {
+  border-top-color: rgba(0, 0, 0, 0.08);
+}
+body:not(.dark-mode) .music-spotify-note {
+  color: rgba(0, 0, 0, 0.5);
+}
+body:not(.dark-mode) .music-coming-soon-title {
+  color: #1d1d1f;
+}
+body:not(.dark-mode) .music-coming-soon-sub {
+  color: rgba(0, 0, 0, 0.5);
+}
