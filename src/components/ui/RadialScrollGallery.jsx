@@ -131,7 +131,7 @@ export const RadialScrollGallery = forwardRef(function RadialScrollGallery(
           pin: true,
           start: startTrigger,
           end: `+=${scrollDuration}`,
-          scrub: 1,
+          scrub: true, // 1:1 direct binding, completely eliminates bouncy smoothing
           invalidateOnRefresh: true,
           scroller: scrollerEl,
         },
@@ -143,7 +143,8 @@ export const RadialScrollGallery = forwardRef(function RadialScrollGallery(
   if (count === 0) return null;
 
   const itemH = childSize?.h ?? 280;
-  const visibleH = circleDiameter * visibleFrac + itemH / 2 + 100;
+  // Cap the container height to max 550px so it doesn't create massive blank scroll space
+  const visibleH = Math.min(550, radius + itemH);
 
   return (
     <div
@@ -167,8 +168,8 @@ export const RadialScrollGallery = forwardRef(function RadialScrollGallery(
           width: '100%',
           overflow: 'hidden',
           height: `${visibleH}px`,
-          maskImage: 'linear-gradient(to top, transparent 0%, black 35%, black 100%)',
-          WebkitMaskImage: 'linear-gradient(to top, transparent 0%, black 35%, black 100%)',
+          maskImage: 'linear-gradient(to top, transparent 0%, black 15%, black 100%)',
+          WebkitMaskImage: 'linear-gradient(to top, transparent 0%, black 15%, black 100%)',
         }}
       >
         <ul
@@ -181,7 +182,7 @@ export const RadialScrollGallery = forwardRef(function RadialScrollGallery(
             margin: 0, padding: 0, listStyle: 'none',
             width: circleDiameter,
             height: circleDiameter,
-            bottom: -(circleDiameter * hiddenFrac),
+            top: itemH / 2 + 20, // Anchor the top edge of the circle
             opacity: mounted ? 1 : 0,
             transition: 'opacity 0.4s ease',
             ...(disabled ? { opacity: 0.4, pointerEvents: 'none', filter: 'grayscale(1)' } : {}),

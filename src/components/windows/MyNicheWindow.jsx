@@ -2,6 +2,8 @@ import React, { useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { RadialScrollGallery } from '../ui/RadialScrollGallery';
 import { MOVIES, SHOWS, GENRE_COLOR } from '../../data/movieData';
+import CarShowcaseSection from '../cars/CarShowcaseSection';
+import MarvelSection from './MarvelSection';
 
 // ─── IMDb Arrow Button ────────────────────────────────────────────────────────
 function ImdbArrow({ href }) {
@@ -130,9 +132,109 @@ function ShowCard({ show }) {
   );
 }
 
+// ─── Genre Filter Pills ───────────────────────────────────────────────────────
+function GenrePills({ genres, active, onSelect }) {
+  return (
+    <div style={{
+      display: 'flex',
+      flexWrap: 'wrap',
+      gap: '7px',
+      justifyContent: 'center',
+      padding: '0 16px 4px',
+    }}>
+      {/* "All" pill */}
+      <button
+        onClick={() => onSelect(null)}
+        style={{
+          border: 'none',
+          cursor: 'pointer',
+          padding: '5px 14px',
+          borderRadius: '999px',
+          fontSize: '11px',
+          fontWeight: '700',
+          letterSpacing: '0.4px',
+          transition: 'all 0.2s ease',
+          background: active === null ? 'var(--text-main)' : 'var(--badge-bg)',
+          color: active === null ? 'var(--bg-color)' : 'var(--text-muted)',
+          boxShadow: active === null ? '0 2px 12px rgba(0,0,0,0.25)' : 'none',
+          backdropFilter: 'blur(8px)',
+        }}
+      >
+        All
+      </button>
+      {genres.map(genre => {
+        const accent = GENRE_COLOR[genre] ?? '#aaa';
+        const isActive = active === genre;
+        return (
+          <button
+            key={genre}
+            onClick={() => onSelect(isActive ? null : genre)}
+            style={{
+              border: isActive ? `1.5px solid ${accent}` : '1.5px solid transparent',
+              cursor: 'pointer',
+              padding: '4px 13px',
+              borderRadius: '999px',
+              fontSize: '11px',
+              fontWeight: '700',
+              letterSpacing: '0.4px',
+              transition: 'all 0.2s ease',
+              background: isActive ? accent + '28' : 'var(--badge-bg)',
+              color: isActive ? accent : 'var(--text-muted)',
+              boxShadow: isActive ? `0 0 12px ${accent}44` : 'none',
+              backdropFilter: 'blur(8px)',
+            }}
+          >
+            {genre}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 // ─── Movies View ─────────────────────────────────────────────────────────────
 function MoviesView() {
   const [scrollerEl, setScrollerEl] = React.useState(null);
+  const [activeGenre, setActiveGenre] = React.useState(null);
+
+  // Derive sorted unique genres from MOVIES + SHOWS combined
+  const allGenres = React.useMemo(() => {
+    const set = new Set([...MOVIES.map(m => m.genre), ...SHOWS.map(s => s.genre)]);
+    return [...set].sort();
+  }, []);
+
+  const filteredMovies = React.useMemo(
+    () => activeGenre ? MOVIES.filter(m => m.genre === activeGenre) : MOVIES,
+    [activeGenre]
+  );
+  const filteredShows = React.useMemo(
+    () => activeGenre ? SHOWS.filter(s => s.genre === activeGenre) : SHOWS,
+    [activeGenre]
+  );
+
+  // scrollDuration scales with card count so rotation feels consistent
+  const movieScrollDuration = React.useMemo(
+    () => Math.max(1500, filteredMovies.length * 280),
+    [filteredMovies.length]
+  );
+
+  // For small counts, use angleStep to keep cards close together;
+  // for large counts, fall back to full-circle layout (angleStep = null)
+  const FULL_CIRCLE_THRESHOLD = 7; // below this, use fixed angular spacing
+  const CARD_ANGLE_DEG = 32;       // degrees between adjacent cards
+
+  const movieAngleStep = React.useMemo(
+    () => filteredMovies.length < FULL_CIRCLE_THRESHOLD ? CARD_ANGLE_DEG : null,
+    [filteredMovies.length]
+  );
+
+  // Radius: tight for tiny sets, bigger for large sets
+  const movieRadius = React.useMemo(
+    () => filteredMovies.length < FULL_CIRCLE_THRESHOLD
+      ? Math.max(280, filteredMovies.length * 60)   // compact layout
+      : Math.max(500, filteredMovies.length * 28),   // full-circle layout
+    [filteredMovies.length]
+  );
 
   // Stop wheel events from bubbling to Framer Motion's window drag handler
   useEffect(() => {
@@ -145,69 +247,86 @@ function MoviesView() {
   return (
     <div
       ref={setScrollerEl}
-      style={{
-        flex: 1,
-        overflowY: 'auto',
-        position: 'relative',
-      }}
+      style={{ flex: 1, overflowY: 'auto', position: 'relative' }}
     >
-      {/* Radial gallery — scroller={scrollerEl} drives it from this inner scroll */}
-      <RadialScrollGallery
-        scroller={scrollerEl}
-        radius={900}
-        scrollDuration={9000}
-        visiblePercentage={40}
-        startTrigger="top top"
-        onItemSelect={(i) => console.log('selected', MOVIES[i].title)}
-        header={
-          <div style={{
-            height: '200px',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '8px',
-          }}>
-            <div style={{ fontSize: '10px', fontWeight: '700', letterSpacing: '3px', textTransform: 'uppercase', color: 'var(--text-muted)' }}>
-              My Picks
-            </div>
-            <div style={{ fontSize: '32px', fontWeight: '800', color: 'var(--text-main)', letterSpacing: '-1px' }}>
-              Movies
-            </div>
-            <motion.div
-              animate={{ y: [0, 6, 0] }}
-              transition={{ repeat: Infinity, duration: 1.6, ease: 'easeInOut' }}
-              style={{ fontSize: '12px', color: 'var(--text-muted)' }}
-            >
-              ↓ Scroll to spin
-            </motion.div>
-          </div>
-        }
-      >
-        {(hoveredIndex) =>
-          MOVIES.map((movie, i) => (
-            <MovieCard key={movie.title} movie={movie} isHovered={hoveredIndex === i} />
-          ))
-        }
-      </RadialScrollGallery>
-
-      {/* ─── Shows Section ────────────────────────────────────────── */}
-      <div style={{ padding: '32px 24px 40px' }}>
-        {/* Section header */}
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', marginBottom: '28px' }}>
-          <div style={{ fontSize: '10px', fontWeight: '700', letterSpacing: '3px', textTransform: 'uppercase', color: 'var(--text-muted)' }}>My Picks</div>
-          <div style={{ fontSize: '28px', fontWeight: '800', color: 'var(--text-main)', letterSpacing: '-1px' }}>Shows</div>
-        </div>
-        {/* Responsive rail: wraps on small, single row on big */}
-        <div style={{
-          display: 'flex',
-          flexWrap: 'wrap',
-          gap: '14px',
-          justifyContent: 'center',
-        }}>
-          {SHOWS.map((show) => <ShowCard key={show.title} show={show} />)}
-        </div>
+      {/* ── Genre filter bar (sticky at top) ─────────────────────── */}
+      <div style={{
+        position: 'sticky',
+        top: 0,
+        zIndex: 20,
+        paddingTop: '10px',
+        paddingBottom: '8px',
+        backdropFilter: 'blur(20px)',
+        WebkitBackdropFilter: 'blur(20px)',
+        background: 'var(--navbar-bg)',
+        borderBottom: '1px solid var(--navbar-border)',
+      }}>
+        <GenrePills genres={allGenres} active={activeGenre} onSelect={setActiveGenre} />
       </div>
+
+      {/* ── Radial gallery ─────────────────────────────────────────── */}
+      {filteredMovies.length > 0 ? (
+        <RadialScrollGallery
+          key={`movies-${activeGenre}`}   /* re-mount when filter changes so GSAP re-initialises */
+          scroller={scrollerEl}
+          radius={movieRadius}
+          scrollDuration={movieScrollDuration}
+          angleStep={movieAngleStep}
+          visiblePercentage={50}
+          startTrigger="top top"
+          onItemSelect={(i) => console.log('selected', filteredMovies[i].title)}
+          header={
+            <div style={{
+              height: '100px',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '6px',
+            }}>
+              <div style={{ fontSize: '10px', fontWeight: '700', letterSpacing: '3px', textTransform: 'uppercase', color: 'var(--text-muted)' }}>
+                My Picks
+              </div>
+              <div style={{ fontSize: '32px', fontWeight: '800', color: 'var(--text-main)', letterSpacing: '-1px' }}>
+                {activeGenre ? `${activeGenre} Movies` : 'Movies'}
+              </div>
+              <motion.div
+                animate={{ y: [0, 6, 0] }}
+                transition={{ repeat: Infinity, duration: 1.6, ease: 'easeInOut' }}
+                style={{ fontSize: '12px', color: 'var(--text-muted)' }}
+              >
+                ↓ Scroll to spin
+              </motion.div>
+            </div>
+          }
+        >
+          {(hoveredIndex) =>
+            filteredMovies.map((movie, i) => (
+              <MovieCard key={movie.title} movie={movie} isHovered={hoveredIndex === i} />
+            ))
+          }
+        </RadialScrollGallery>
+      ) : (
+        <div style={{ height: '280px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '10px', opacity: 0.45 }}>
+          <div style={{ fontSize: '36px' }}>🎬</div>
+          <div style={{ fontSize: '13px', color: 'var(--text-muted)', fontWeight: 600 }}>No movies in this genre yet</div>
+        </div>
+      )}
+
+      {/* ─── Shows Section ──────────────────────────────────────────── */}
+      {filteredShows.length > 0 && (
+        <div style={{ padding: '24px 24px 40px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', marginBottom: '24px' }}>
+            <div style={{ fontSize: '10px', fontWeight: '700', letterSpacing: '3px', textTransform: 'uppercase', color: 'var(--text-muted)' }}>My Picks</div>
+            <div style={{ fontSize: '28px', fontWeight: '800', color: 'var(--text-main)', letterSpacing: '-1px' }}>
+              {activeGenre ? `${activeGenre} Shows` : 'Shows'}
+            </div>
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '14px', justifyContent: 'center' }}>
+            {filteredShows.map((show) => <ShowCard key={show.title} show={show} />)}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -277,8 +396,9 @@ function CarsScrollArea({ cars }) {
 
 // ─── Root Component ───────────────────────────────────────────────────────────
 export default function MyNicheWindow({ viewMode }) {
+  const carsScrollerRef = React.useRef(null);
   return (
-    <div style={{ width: '100%', height: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+    <div style={{ width: '100%', height: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column', position: 'relative' }}>
       <AnimatePresence mode="wait">
 
         {viewMode === 'movies' && (
@@ -293,23 +413,22 @@ export default function MyNicheWindow({ viewMode }) {
 
         {viewMode === 'cars' && (
           <motion.div key="cars"
+            ref={carsScrollerRef}
             initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -12 }} transition={{ duration: 0.25 }}
-            style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}
+            style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}
           >
-            <CarsScrollArea cars={CARS} />
+            <CarShowcaseSection scrollerEl={carsScrollerRef} />
           </motion.div>
         )}
 
-        {viewMode === 'fragrances' && (
-          <motion.div key="fragrances"
+        {viewMode === 'marvel' && (
+          <motion.div key="marvel"
             initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -12 }} transition={{ duration: 0.25 }}
-            style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}
+            style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}
           >
-            <div style={{ fontSize: '48px', marginBottom: '12px' }}>✨</div>
-            <div style={{ fontSize: '16px', fontWeight: '600', marginBottom: '6px', color: 'var(--text-main)' }}>Fragrances</div>
-            <div style={{ fontSize: '13px', color: 'var(--text-muted)' }}>My scent collection — coming soon.</div>
+            <MarvelSection />
           </motion.div>
         )}
 

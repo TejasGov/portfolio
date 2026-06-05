@@ -183,14 +183,10 @@ export default function WindowModal({ id, onClose, onMinimize, zIndex, onFocus, 
                     <line x1="3" y1="11" x2="21" y2="11"></line>
                   </svg> <span className="sw-text">Cars</span>
                 </button>
-                <button className={`sw ${viewMode === 'fragrances' ? 'on' : ''}`} onClick={() => setViewMode('fragrances')}>
+                <button className={`sw ${viewMode === 'marvel' ? 'on' : ''}`} onClick={() => setViewMode('marvel')}>
                   <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" strokeWidth="2.5" fill="none" style={{ marginRight: '4px', verticalAlign: '-1.5px', display: 'inline-block' }}>
-                    <path d="M10 2v7.31"></path>
-                    <path d="M14 9.3V1.99"></path>
-                    <path d="M8.5 2h7"></path>
-                    <path d="M14 9.3a6.5 6.5 0 1 1-4 0"></path>
-                    <line x1="5.52" y1="16" x2="18.48" y2="16"></line>
-                  </svg> <span className="sw-text">Fragrances</span>
+                    <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"></path>
+                  </svg> <span className="sw-text">Marvel</span>
                 </button>
               </>
             ) : id === 'blog' ? (

@@ -1,6 +1,6 @@
 export const MOVIES = [
   { title: 'Goodfellas', year: 1990, genre: 'Crime', poster: '/movies/goodfellas.webp', imdb: 'https://www.imdb.com/title/tt0099685/' },
-  { title: 'Dhurandhar', year: 2025, genre: 'Action', poster: '/movies/dhurandhar.webp', imdb: 'https://www.imdb.com/title/tt33014583/' },
+  { title: 'Dhurandhar 2', year: 2025, genre: 'Action', poster: '/movies/dhurandhar.webp', imdb: 'https://www.imdb.com/title/tt33014583/' },
   { title: 'The Godfather', year: 1972, genre: 'Crime', poster: '/movies/godfather.webp', imdb: 'https://www.imdb.com/title/tt0068646/' },
   { title: 'The Prestige', year: 2006, genre: 'Thriller', poster: '/movies/theprestige.webp', imdb: 'https://www.imdb.com/title/tt0482571/' },
   { title: 'The Dark Knight', year: 2008, genre: 'Action', poster: '/movies/darkknight.webp', imdb: 'https://www.imdb.com/title/tt0468569/' },
@@ -18,7 +18,7 @@ export const MOVIES = [
   { title: 'Ratatouille', year: 2007, genre: 'Animation', poster: '/movies/rata.webp', imdb: 'https://www.imdb.com/title/tt0382932/' },
   { title: 'Animal', year: 2023, genre: 'Action', poster: '/movies/animal.webp', imdb: 'https://www.imdb.com/title/tt13751694/' },
   { title: 'Bullet Train', year: 2022, genre: 'Action', poster: '/movies/bullettrain.webp', imdb: 'https://www.imdb.com/title/tt12593682/' },
-  { title: 'Interstellar', year: 2014, genre: 'Drama', poster: '/movies/interstellar.webp', imdb: 'https://www.imdb.com/title/tt0816692/' },
+
   { title: 'Top Gun: Maverick', year: 2022, genre: 'Action', poster: '/movies/topgun.webp', imdb: 'https://www.imdb.com/title/tt1745960/' },
   { title: 'Skyfall', year: 2012, genre: 'Action', poster: '/movies/skyfall.webp', imdb: 'https://www.imdb.com/title/tt1074638/' },
   { title: 'Coco', year: 2017, genre: 'Animation', poster: '/movies/coco.webp', imdb: 'https://www.imdb.com/title/tt2380307/' },
@@ -33,6 +33,41 @@ export const MOVIES = [
   { title: 'Bajrangi Bhaijaan', year: 2015, genre: 'Drama', poster: '/movies/bajrangi.webp', imdb: 'https://www.imdb.com/title/tt3863552/' },
   { title: 'M.S. Dhoni: The Untold Story', year: 2016, genre: 'Drama', poster: '/movies/msdhoni.webp', imdb: 'https://www.imdb.com/title/tt4169250/' },
   { title: 'Welcome', year: 2007, genre: 'Comedy', poster: '/movies/welcome.webp', imdb: 'https://www.imdb.com/title/tt0488798/' },
+  { title: 'Gangs of Wasseypur', year: 2012, genre: 'Crime', poster: '/movies/gowass.jpg', imdb: 'https://www.imdb.com/title/tt1954470/' },
+  { title: 'Chak De! India', year: 2007, genre: 'Drama', poster: '/movies/chakde.jpeg', imdb: 'https://www.imdb.com/title/tt0871510/' },
+  { title: 'Lagaan: Once Upon a Time in India', year: 2001, genre: 'Drama', poster: '/movies/lagaan.webp', imdb: 'https://www.imdb.com/title/tt0169102/' },
+  { title: 'Dil Dhadakne Do', year: 2015, genre: 'Drama', poster: '/movies/dildd.jpg', imdb: 'https://www.imdb.com/title/tt4110568/' },
+  { title: 'Inception', year: 2010, genre: 'Thriller', poster: '/movies/inception.webp', imdb: 'https://www.imdb.com/title/tt1375666/' },
+  { title: 'The Wolf of Wall Street', year: 2013, genre: 'Crime', poster: '/movies/wowstreet.webp', imdb: 'https://www.imdb.com/title/tt0993846/' },
+  { title: 'Inglourious Basterds', year: 2009, genre: 'Drama', poster: '/movies/ingbast.jpg', imdb: 'https://www.imdb.com/title/tt0361748/' },
+  { title: 'The Big Short', year: 2015, genre: 'Drama', poster: '/movies/bigshort.jpg', imdb: 'https://www.imdb.com/title/tt1596363/' },
+  { title: 'How to Lose a Guy in 10 Days', year: 2003, genre: 'Romance', poster: '/movies/htlg10.jpg', imdb: 'https://www.imdb.com/title/tt0251127/' },
+  { title: 'Jumbo', year: 2008, genre: 'Animation', poster: '/movies/jumbo.jpg', imdb: 'https://www.imdb.com/title/tt30397483/' },
+  { title: 'Return of Hanuman', year: 2007, genre: 'Animation', poster: '/movies/hanuman.jpg', imdb: 'https://www.imdb.com/title/tt1169841/' },
+
+  { title: 'Kesari Chapter 2: The Untold Story of Jallianwala Bagh', year: 2025, genre: 'Drama', poster: '/movies/kesari2.jpg', imdb: 'https://www.imdb.com/title/tt3562110/' },
+  { title: 'Gladiator', year: 2000, genre: 'Action', poster: '/movies/gladiator.png', imdb: 'https://www.imdb.com/title/tt0172495/' },
+  { title: 'The Conjuring', year: 2013, genre: 'Horror', poster: '/movies/conjuring.jpg', imdb: 'https://www.imdb.com/title/tt1457767/' },
+  { title: 'Lights Out', year: 2016, genre: 'Horror', poster: '/movies/lightsout.webp', imdb: 'https://www.imdb.com/title/tt4786282/' },
+  { title: 'Bhool Bhulaiyaa', year: 2007, genre: 'Comedy', poster: '/movies/bhool.jpg', imdb: 'https://www.imdb.com/title/tt0995031/' },
+  { title: 'Casino Royale', year: 2006, genre: 'Action', poster: '/movies/casinoroyale.jpg', imdb: 'https://www.imdb.com/title/tt0381061/' },
+  { title: 'Inside Out', year: 2015, genre: 'Animation', poster: '/movies/insideout.jpg', imdb: 'https://www.imdb.com/title/tt2096673/' },
+  { title: 'Insidious', year: 2010, genre: 'Horror', poster: '/movies/insidious.jpg', imdb: 'https://www.imdb.com/title/tt1591095/' },
+  { title: 'Toy Story', year: 1995, genre: 'Animation', poster: '/movies/toystory.jpg', imdb: 'https://www.imdb.com/title/tt0114709/' },
+  { title: 'Sinister', year: 2012, genre: 'Horror', poster: '/movies/sinister.jpg', imdb: 'https://www.imdb.com/title/tt1922777/' },
+  { title: 'OMG: Oh My God!', year: 2012, genre: 'Comedy', poster: '/movies/omg.jpg', imdb: 'https://www.imdb.com/title/tt2283748/' },
+  { title: 'Yeh Jawaani Hai Deewani', year: 2013, genre: 'Romance', poster: '/movies/yjhd.jpg', imdb: 'https://www.imdb.com/title/tt2178470/' },
+  { title: 'Jab We Met', year: 2007, genre: 'Romance', poster: '/movies/jabwemet.jpg', imdb: 'https://www.imdb.com/title/tt1093370/' },
+  { title: 'Hindi Medium', year: 2017, genre: 'Comedy', poster: '/movies/hindimedium.jpg', imdb: 'https://www.imdb.com/title/tt5764096/' },
+  { title: 'Jurassic World', year: 2015, genre: 'Action', poster: '/movies/jurassic.jpg', imdb: 'https://www.imdb.com/title/tt0369610/' },
+  { title: 'Thank You', year: 2011, genre: 'Comedy', poster: '/movies/thankyou.jpg', imdb: 'https://www.imdb.com/title/tt1720254/' },
+  { title: 'Billu', year: 2009, genre: 'Comedy', poster: '/movies/billu.jpg', imdb: 'https://www.imdb.com/title/tt1230448/' },
+  { title: 'The Proposal', year: 2009, genre: 'Romance', poster: '/movies/proposal.jpg', imdb: 'https://www.imdb.com/title/tt1041829/' },
+  { title: 'Sherlock Holmes', year: 2009, genre: 'Action', poster: '/movies/sherlock.jpg', imdb: 'https://www.imdb.com/title/tt0988045/' },
+  { title: 'Oppenheimer', year: 2023, genre: 'Drama', poster: '/movies/oppenheimer.jpg', imdb: 'https://www.imdb.com/title/tt15398776/' },
+  { title: 'Godzilla: King of the Monsters', year: 2019, genre: 'Sci-Fi', poster: '/movies/godzilla.png', imdb: 'https://www.imdb.com/title/tt3741700/' },
+  { title: 'Interstellar', year: 2014, genre: 'Thriller', poster: '/movies/interstellar.webp', imdb: 'https://www.imdb.com/title/tt0816692/' },
+  { title: 'Bhoothnath', year: 2008, genre: 'Comedy', poster: '/movies/bhootnath.jpg', imdb: 'https://www.imdb.com/title/tt0991346/' },
 ];
 
 export const SHOWS = [
@@ -45,6 +80,11 @@ export const SHOWS = [
   { title: 'Invincible', genre: 'Animation', poster: '/shows/invincible.webp', imdb: 'https://www.imdb.com/title/tt6741278/' },
   { title: 'Rick and Morty', genre: 'Animation', poster: '/shows/rickandmorty.webp', imdb: 'https://www.imdb.com/title/tt2861424/' },
   { title: "Jack Ryan", genre: 'Action', poster: '/shows/jackryan.webp', imdb: 'https://www.imdb.com/title/tt5057054/' },
+  { title: 'Modern Family', year: 2009, genre: 'Comedy', poster: '/shows/modernfamily.jpg', imdb: 'https://www.imdb.com/title/tt1442437/' },
+  { title: 'Special OPS', year: 2020, genre: 'Thriller', poster: '/shows/specialops.jpg', imdb: 'https://www.imdb.com/title/tt11854694/' },
+  { title: 'Parks and Recreation', year: 2009, genre: 'Comedy', poster: '/shows/parks.jpg', imdb: 'https://www.imdb.com/title/tt1266020/' },
+  { title: 'Taarak Mehta Ka Ooltah Chashmah', year: 2008, genre: 'Comedy', poster: '/shows/tmkoc.jpg', imdb: 'https://www.imdb.com/title/tt1708446/' },
+  { title: 'Peacemaker', year: 2022, genre: 'Action', poster: '/shows/peacemaker.jpg', imdb: 'https://www.imdb.com/title/tt13146488/' },
 ];
 
 export const GENRE_COLOR = {
@@ -56,4 +96,5 @@ export const GENRE_COLOR = {
   Romance: '#f48fb1',
   Horror: '#90a4ae',
   Animation: '#81c784',
+  Sports: '#ffb74d',
 };
