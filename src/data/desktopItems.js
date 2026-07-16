@@ -41,4 +41,11 @@ export const desktopItems = [
     x: '72vw',
     y: '15vh',
   },
+  {
+    id: "my-library",
+    title: "My Library",
+    color: "linear-gradient(135deg, #E0C3FC 0%, #8EC5FC 100%)",
+    x: '45vw',
+    y: '22vh',
+  },
 ];

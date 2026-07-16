@@ -43,7 +43,7 @@ function ImdbArrow({ href }) {
 }
 
 // ─── Movie Card ───────────────────────────────────────────────────────────────
-function MovieCard({ movie, isHovered }) {
+function MovieCard({ movie, isHovered, index }) {
   const accent = GENRE_COLOR[movie.genre] ?? '#aaa';
   return (
     <div style={{
@@ -58,7 +58,7 @@ function MovieCard({ movie, isHovered }) {
       transition: 'box-shadow 0.4s ease',
       flexShrink: 0,
     }}>
-      <img src={movie.poster} alt={movie.title} style={{
+      <img src={movie.poster} alt={movie.title} loading={index < 5 ? "eager" : "lazy"} style={{
         width: '100%', height: '100%', objectFit: 'cover', display: 'block',
         transition: 'transform 0.6s ease, filter 0.4s ease',
         transform: isHovered ? 'scale(1.08)' : 'scale(1)',
@@ -86,7 +86,7 @@ function MovieCard({ movie, isHovered }) {
 }
 
 // ─── Show Card (2:3 ratio poster) ────────────────────────────────────────────
-function ShowCard({ show }) {
+function ShowCard({ show, index }) {
   const [hovered, setHovered] = React.useState(false);
   const accent = GENRE_COLOR[show.genre] ?? '#aaa';
   return (
@@ -108,7 +108,7 @@ function ShowCard({ show }) {
         cursor: 'pointer',
       }}
     >
-      <img src={show.poster} alt={show.title} style={{
+      <img src={show.poster} alt={show.title} loading={index < 5 ? "eager" : "lazy"} style={{
         width: '100%', height: '100%', objectFit: 'cover', display: 'block',
         transition: 'transform 0.5s ease, filter 0.35s ease',
         transform: hovered ? 'scale(1.08)' : 'scale(1)',
@@ -302,7 +302,7 @@ function MoviesView() {
         >
           {(hoveredIndex) =>
             filteredMovies.map((movie, i) => (
-              <MovieCard key={movie.title} movie={movie} isHovered={hoveredIndex === i} />
+              <MovieCard key={movie.title} movie={movie} isHovered={hoveredIndex === i} index={i} />
             ))
           }
         </RadialScrollGallery>
@@ -323,7 +323,7 @@ function MoviesView() {
             </div>
           </div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '14px', justifyContent: 'center' }}>
-            {filteredShows.map((show) => <ShowCard key={show.title} show={show} />)}
+            {filteredShows.map((show, i) => <ShowCard key={show.title} show={show} index={i} />)}
           </div>
         </div>
       )}

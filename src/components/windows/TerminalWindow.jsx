@@ -27,6 +27,7 @@ const COMMANDS = {
     { text: '  education   →  Academic background', color: '#94a3b8' },
     { text: '  contact     →  Get in touch', color: '#94a3b8' },
     { text: '  open <win>  →  Open a window (e.g. open projects)', color: '#94a3b8' },
+    { text: '                 Windows: projects, work-ex, photography, niche, sound, library', color: '#64748b' },
     { text: '  date        →  Current date & time', color: '#94a3b8' },
     { text: '  uname       →  System info', color: '#94a3b8' },
     { text: '  echo <txt>  →  Echo text', color: '#94a3b8' },
@@ -99,6 +100,26 @@ const COMMANDS = {
     { text: 'Tejas OS v1.0 (darwin-portfolio)  React 18  Vite', color: '#f1f5f9' },
     { text: '', color: '' },
   ],
+  library: () => [
+    { text: "Tip: type 'open library' to open the bookshelf.", color: '#64748b' },
+    { text: '', color: '' },
+  ],
+  books: () => [
+    { text: "Tip: type 'open library' to open the bookshelf.", color: '#64748b' },
+    { text: '', color: '' },
+  ],
+  niche: () => [
+    { text: "Tip: type 'open niche' to view my movie, car, and marvel shelf.", color: '#64748b' },
+    { text: '', color: '' },
+  ],
+  sound: () => [
+    { text: "Tip: type 'open sound' to launch the music player.", color: '#64748b' },
+    { text: '', color: '' },
+  ],
+  music: () => [
+    { text: "Tip: type 'open sound' to launch the music player.", color: '#64748b' },
+    { text: '', color: '' },
+  ],
 };
 
 // Char-per-ms speed — shorter lines type faster, blank lines are instant
@@ -115,7 +136,7 @@ function TypewriterLine({ text, color, onDone, instant }) {
   const doneFired = useRef(false);
 
   useEffect(() => {
-    if (doneFired.current) return; // Prevent StrictMode double-fire
+    if (doneFired.current) return;
 
     if (instant || !text) {
       setDisplayed(text);
@@ -123,22 +144,18 @@ function TypewriterLine({ text, color, onDone, instant }) {
       onDone?.();
       return;
     }
-    let i = 0;
-    setDisplayed('');
+    
+    // Instantly display the full line
+    setDisplayed(text);
 
-    const tick = () => {
-      i++;
-      setDisplayed(text.slice(0, i));
-      if (i < text.length) {
-        timerRef.current = setTimeout(tick, CHAR_SPEED);
-      } else {
-        if (!doneFired.current) {
-          doneFired.current = true;
-          onDone?.();
-        }
+    // Short delay before printing the next line to simulate terminal line-by-line printing
+    timerRef.current = setTimeout(() => {
+      if (!doneFired.current) {
+        doneFired.current = true;
+        onDone?.();
       }
-    };
-    timerRef.current = setTimeout(tick, CHAR_SPEED);
+    }, 40);
+
     return () => clearTimeout(timerRef.current);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [text, instant]);
@@ -241,6 +258,9 @@ export default function TerminalWindow({ onOpenWindow }) {
         projects: 'projects', 'work-ex': 'work-ex', workex: 'work-ex',
         photography: 'photography', about: 'about', terminal: 'terminal',
         certificates: 'certificates', contact: 'contact',
+        library: 'my-library', books: 'my-library',
+        niche: 'my-niche', 'my-niche': 'my-niche',
+        sound: 'my-sound', music: 'my-sound', 'my-sound': 'my-sound'
       };
       const target = windowMap[args[0]];
       if (target && onOpenWindow) {

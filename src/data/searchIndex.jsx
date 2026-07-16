@@ -1,5 +1,5 @@
 import React from 'react';
-import { Globe, FileText, Instagram, Command, Mic, Mail } from 'lucide-react';
+import { Globe, FileText, Instagram, Command, Mic, Mail, Book, Film, Music } from 'lucide-react';
 import memojiImg from '../assets/memoji.png';
 
 export const searchIndex = [
@@ -12,4 +12,8 @@ export const searchIndex = [
   { id: 'talk-to-me', title: 'Talk to Me', synonyms: ['ai', 'voice', 'chat'], icon: <Mic size={18} /> },
   { id: 'contact', title: 'Contact Me', synonyms: ['email', 'message', 'connect'], icon: <Mail size={18} /> },
   { id: 'blog', title: 'Blog', synonyms: ['posts', 'articles', 'writing', 'pages', 'blog'], icon: <FileText size={18} /> },
+  { id: 'my-tech', title: 'My Tech', synonyms: ['setup', 'gear', 'equipment', 'tech'], icon: <Globe size={18} /> },
+  { id: 'my-library', title: 'My Library', synonyms: ['books', 'shelf', 'reading', 'library'], icon: <Book size={18} /> },
+  { id: 'my-niche', title: 'My Niche', synonyms: ['movies', 'cars', 'marvel', 'niche', 'hobbies'], icon: <Film size={18} /> },
+  { id: 'my-sound', title: 'My Sound', synonyms: ['music', 'playlist', 'songs', 'sound', 'artists'], icon: <Music size={18} /> },
 ];

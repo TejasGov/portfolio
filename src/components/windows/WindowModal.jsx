@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, useDragControls, useAnimation } from 'framer-motion';
-import { photographyData, memojiImg } from '../../data';
+import { photographyData } from '../../data';
 import MorphingPhotoGallery from './MorphingPhotoGallery';
 import TerminalWindow from './TerminalWindow';
 import WorkExperience from './WorkExperience';
@@ -8,6 +8,9 @@ import ProjectsWindow from './ProjectsWindow';
 import MusicWindow from './MusicWindow';
 import BlogWindow from './BlogWindow';
 import MyNicheWindow from './MyNicheWindow';
+import MyTechWindow from './MyTechWindow';
+import AboutWindow from './AboutWindow';
+import TheLibrary from './TheLibrary';
 import './WindowModal.css';
 
 export default function WindowModal({ id, onClose, onMinimize, zIndex, onFocus, constraintsRef, onOpenWindow }) {
@@ -16,6 +19,7 @@ export default function WindowModal({ id, onClose, onMinimize, zIndex, onFocus, 
   const [viewMode, setViewMode] = useState(id === 'blog' ? 'pages' : (id === 'photography' ? 'grid' : (id === 'my-niche' ? 'movies' : 'tl')));
   const controls = useDragControls();
   const animControls = useAnimation();
+  const windowRef = useRef(null);
 
   useEffect(() => {
     // Initial entrance animation
@@ -55,26 +59,10 @@ export default function WindowModal({ id, onClose, onMinimize, zIndex, onFocus, 
     content = <WorkExperience viewMode={viewMode} />;
   } else if (id === 'photography') {
     title = "Photography";
-    content = <MorphingPhotoGallery photos={photographyData} layout={viewMode} />;
+    content = <MorphingPhotoGallery photos={photographyData} layout={viewMode} windowRef={windowRef} />;
   } else if (id === 'about') {
     title = "About Me";
-    content = (
-      <div style={{ display: 'flex', gap: '24px', alignItems: 'flex-start' }}>
-        <img src={memojiImg} alt="Memoji" style={{ width: '120px', height: '120px', borderRadius: '50%', background: 'var(--badge-bg)', border: '1px solid var(--card-border)' }} />
-        <div>
-          <h1 style={{ fontSize: '32px', fontWeight: '700', marginBottom: '8px' }}>Tejas Govind</h1>
-          <p style={{ fontSize: '16px', color: 'var(--text-muted)', marginBottom: '16px', lineHeight: '1.5' }}>
-            Computer Science student at University at Buffalo (Expected May 2027).<br/>
-            Passionate about Web Development, Machine Learning, and creating beautiful, intuitive interfaces.
-          </p>
-          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-            {['React', 'Node.js', 'Python', 'TypeScript', 'MediaPipe', 'YOLOv8', 'Figma'].map(skill => (
-              <span key={skill} style={{ padding: '4px 12px', background: 'var(--badge-bg)', border: '1px solid var(--badge-border)', color: 'var(--badge-text)', borderRadius: '16px', fontSize: '12px' }}>{skill}</span>
-            ))}
-          </div>
-        </div>
-      </div>
-    );
+    content = <AboutWindow />;
   } else if (id === 'terminal') {
     title = "Terminal";
     content = <TerminalWindow onOpenWindow={onOpenWindow} />;
@@ -89,13 +77,7 @@ export default function WindowModal({ id, onClose, onMinimize, zIndex, onFocus, 
     content = <div style={{ color: 'var(--text-main)', opacity: 0.6, textAlign: 'center', marginTop: '40px' }}>Contact forms loading...</div>;
   } else if (id === 'my-tech') {
     title = "My Tech";
-    content = (
-      <div style={{ color: 'var(--text-main)', textAlign: 'center', marginTop: '40px' }}>
-        <div style={{ fontSize: '48px', marginBottom: '16px' }}>🖥️</div>
-        <div style={{ fontSize: '18px', fontWeight: '600', marginBottom: '8px' }}>My Setup</div>
-        <div style={{ opacity: 0.5, fontSize: '14px' }}>The gear I use every day — coming soon.</div>
-      </div>
-    );
+    content = <MyTechWindow />;
   } else if (id === 'my-niche') {
     title = "My Niche";
     content = <MyNicheWindow viewMode={viewMode} />;
@@ -105,6 +87,9 @@ export default function WindowModal({ id, onClose, onMinimize, zIndex, onFocus, 
   } else if (id === 'blog') {
     title = "Blog";
     content = <BlogWindow viewMode={viewMode} />;
+  } else if (id === 'my-library') {
+    title = "My Library";
+    content = <TheLibrary />;
   }
 
   return (
@@ -120,6 +105,7 @@ export default function WindowModal({ id, onClose, onMinimize, zIndex, onFocus, 
       onPointerDown={onFocus}
       className={`glass-panel window-modal ${isMaximized ? 'maximized' : ''} ${isFilled ? 'filled' : ''}`}
       style={{ zIndex, position: 'absolute' }}
+      ref={windowRef}
     >
       <div 
         className="window-header" 
@@ -242,9 +228,9 @@ export default function WindowModal({ id, onClose, onMinimize, zIndex, onFocus, 
         style={{ 
           display: 'flex', 
           flexDirection: 'column', 
-          gap: (id === 'terminal' || id === 'work-ex' || id === 'projects' || id === 'my-sound' || id === 'blog' || id === 'my-niche') ? '0' : '24px',
-          padding: (id === 'terminal' || id === 'work-ex' || id === 'projects' || id === 'my-sound' || id === 'blog' || id === 'my-niche') ? '0' : undefined,
-          overflow: (id === 'terminal' || id === 'work-ex' || id === 'projects' || id === 'my-sound' || id === 'blog' || id === 'my-niche') ? 'hidden' : undefined,
+          gap: (id === 'terminal' || id === 'work-ex' || id === 'projects' || id === 'my-sound' || id === 'blog' || id === 'my-niche' || id === 'about' || id === 'my-library') ? '0' : '24px',
+          padding: (id === 'terminal' || id === 'work-ex' || id === 'projects' || id === 'my-sound' || id === 'blog' || id === 'my-niche' || id === 'about' || id === 'my-library') ? '0' : undefined,
+          overflow: (id === 'terminal' || id === 'work-ex' || id === 'projects' || id === 'my-sound' || id === 'blog' || id === 'my-niche' || id === 'about' || id === 'my-library') ? 'hidden' : undefined,
           cursor: 'auto',
           touchAction: 'auto'
         }} 

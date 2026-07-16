@@ -235,14 +235,6 @@ export default function WorkExperience({ viewMode }) {
   let horizonInserted = false;
 
   workData.forEach((j, i) => {
-    if (j.future && !horizonInserted) {
-      timelineElements.push({
-        type: 'horizon',
-        key: `horizon-${i}`
-      });
-      horizonInserted = true;
-      lastYear = '';
-    }
     if (j.year !== lastYear) {
       timelineElements.push({
         type: 'year',
@@ -263,23 +255,34 @@ export default function WorkExperience({ viewMode }) {
   const renderCard = (j, isLit) => {
     return (
       <div className={`card ${j.future ? 'future' : ''} ${isLit ? 'lit' : ''}`}>
-        <div className="c-period" style={{ color: getContrastColor(j.color, isDark) }}>{j.period}</div>
-        <div className="c-role">{j.role}</div>
-        <div className="c-org">{j.org}</div>
-        <div className="c-type">
-          <span className={`c-pill ${j.future ? 'future-pill' : ''}`}>{j.type}</span>
-          {j.future && <span className="c-pill future-pill">✦ Incoming</span>}
+        <div className="c-logo-placeholder">
+          {j.logo && (
+            <img 
+              src={j.logo} 
+              alt={`${j.org} logo`} 
+              style={{ width: '100%', height: '100%', objectFit: 'contain', borderRadius: '8px', padding: '2px' }} 
+            />
+          )}
         </div>
-        <div className="c-detail">
-          {j.bullets.map((b, idx) => (
-            <div key={idx} className="c-bullet">· {b}</div>
-          ))}
-          <div className="c-tags">
-            {j.skills.map((s, idx) => (
-              <span key={idx} className="c-tag">{s}</span>
-            ))}
+        <div className="c-content">
+          <div className="c-period" style={{ color: getContrastColor(j.color, isDark) }}>{j.period}</div>
+          <div className="c-role">{j.role}</div>
+          <div className="c-org">{j.org}</div>
+          <div className="c-type">
+            <span className={`c-pill ${j.future ? 'future-pill' : ''}`}>{j.type}</span>
+            {j.future && <span className="c-pill future-pill">✦ Upcoming</span>}
           </div>
-          {j.impact && <div className="c-impact">{j.impact}</div>}
+          <div className="c-detail">
+            {j.bullets.map((b, idx) => (
+              <div key={idx} className="c-bullet">· {b}</div>
+            ))}
+            <div className="c-tags">
+              {j.skills.map((s, idx) => (
+                <span key={idx} className="c-tag">{s}</span>
+              ))}
+            </div>
+            {j.impact && <div className="c-impact">{j.impact}</div>}
+          </div>
         </div>
       </div>
     );
@@ -374,7 +377,13 @@ export default function WorkExperience({ viewMode }) {
                     className={`sb-row ${isSelected ? 'on' : ''}`} 
                     onClick={() => setStSel(idx)}
                   >
-                    <div className="sb-ico" style={{ background: j.bg }}>{j.emoji}</div>
+                    <div className="sb-ico" style={{ background: j.bg }}>
+                      {j.logo ? (
+                        <img src={j.logo} alt={`${j.org} logo`} style={{ width: '100%', height: '100%', objectFit: 'contain', borderRadius: '6px', padding: '3px' }} />
+                      ) : (
+                        j.emoji
+                      )}
+                    </div>
                     <div className="sb-text">
                       <div className="sb-role">{j.role}</div>
                       <div className="sb-org">{j.org}</div>
@@ -398,7 +407,13 @@ export default function WorkExperience({ viewMode }) {
                     className={`sb-row future-row ${isSelected ? 'on' : ''}`} 
                     onClick={() => setStSel(idx)}
                   >
-                    <div className="sb-ico future-ico">{j.emoji}</div>
+                    <div className="sb-ico future-ico">
+                      {j.logo ? (
+                        <img src={j.logo} alt={`${j.org} logo`} style={{ width: '100%', height: '100%', objectFit: 'contain', borderRadius: '6px', padding: '3px' }} />
+                      ) : (
+                        j.emoji
+                      )}
+                    </div>
                     <div className="sb-text">
                       <div className="sb-role">{j.role}</div>
                       <div className="sb-org">{j.org}</div>
@@ -428,7 +443,11 @@ export default function WorkExperience({ viewMode }) {
                       border: selectedJob.future ? '1px dashed rgba(255,217,90,0.3)' : undefined 
                     }}
                   >
-                    {selectedJob.emoji}
+                    {selectedJob.logo ? (
+                      <img src={selectedJob.logo} alt={`${selectedJob.org} logo`} style={{ width: '100%', height: '100%', objectFit: 'contain', borderRadius: '10px', padding: '4px' }} />
+                    ) : (
+                      selectedJob.emoji
+                    )}
                   </div>
                   <div>
                     <div className="d-name" style={{ color: isDark ? '#ffffff' : '#000000' }}>{selectedJob.role}</div>
@@ -441,7 +460,7 @@ export default function WorkExperience({ viewMode }) {
                   <MapPin size={12} style={{ color: isDark ? '#aaaaaa' : '#555555', marginRight: '4px' }} />
                   <span className="d-per" style={{ color: isDark ? '#aaaaaa' : '#555555' }}>{selectedJob.period} · {selectedJob.location}</span>
                   {selectedJob.future ? (
-                    <span className="badge" style={{ background: isDark ? '#2d2a1e' : '#fef3cd', color: isDark ? '#e0c040' : '#856404', border: isDark ? '0.5px dashed #b89930' : '0.5px dashed #856404' }}>✦ Incoming</span>
+                    <span className="badge" style={{ background: isDark ? '#2d2a1e' : '#fef3cd', color: isDark ? '#e0c040' : '#856404', border: isDark ? '0.5px dashed #b89930' : '0.5px dashed #856404' }}>✦ Upcoming</span>
                   ) : selectedJob.current ? (
                     <span className="badge" style={{ background: isDark ? '#1a2e1a' : '#d4edda', color: '#28C840', border: '0.5px solid #28C840' }}>● Active</span>
                   ) : (

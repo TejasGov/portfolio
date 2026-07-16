@@ -73,6 +73,7 @@ export default function TopNavbar({ activeWindowId, onToggleHelp, toggleTheme, i
   else if (activeWindowId === 'my-niche') windowTitle = "My Niche";
   else if (activeWindowId === 'my-sound') windowTitle = "My Sound";
   else if (activeWindowId === 'blog') windowTitle = "Blog";
+  else if (activeWindowId === 'my-library') windowTitle = "My Library";
 
   const dispatchCommand = (cmd) => {
     window.dispatchEvent(new CustomEvent('window-command', { detail: { id: activeWindowId, cmd } }));

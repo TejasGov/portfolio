@@ -1,8 +1,33 @@
 import React, { useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { GradientBackground } from '../ui/paper-design-shader-background';
-
 export default function BootScreen({ onComplete }) {
+  const words = "Hi, I am Tejas".split(" ");
+
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: {
+        staggerChildren: 0.18,
+        delayChildren: 0.2,
+      }
+    }
+  };
+
+  const wordVariants = {
+    hidden: { opacity: 0, y: 10 },
+    visible: {
+      opacity: 1,
+      y: 0,
+      transition: {
+        type: 'spring',
+        stiffness: 180,
+        damping: 18,
+      }
+    }
+  };
+
   // Exit the boot screen after 3 seconds
   useEffect(() => {
     const t = setTimeout(() => onComplete(), 3000);
@@ -21,7 +46,8 @@ export default function BootScreen({ onComplete }) {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        overflow: 'hidden'
+        overflow: 'hidden',
+        backgroundColor: '#0a0a0a' // Solid dark background to prevent flashing during WebGL compilation
       }}
     >
       <GradientBackground />
@@ -29,21 +55,34 @@ export default function BootScreen({ onComplete }) {
       {/* Dark overlay to make text pop */}
       <div style={{ position: 'absolute', inset: 0, zIndex: -5, background: 'rgba(0, 0, 0, 0.2)' }} />
 
-      <section style={{ padding: '0 24px' }}>
+      <motion.section
+        variants={containerVariants}
+        initial="hidden"
+        animate="visible"
+        style={{ padding: '0 24px' }}
+      >
         <h1
           style={{
             color: 'white',
             textAlign: 'center',
-            fontWeight: 300,
+            fontWeight: 400,
             letterSpacing: '-0.02em',
-            fontSize: '3rem',
+            fontSize: '2.8rem',
             margin: 0,
-            fontFamily: 'inherit'
+            fontFamily: "'JetBrains Mono', 'Fira Code', monospace"
           }}
         >
-          Hi, I am Tejas
+          {words.map((word, idx) => (
+            <motion.span
+              key={idx}
+              variants={wordVariants}
+              style={{ display: 'inline-block', marginRight: '0.3em' }}
+            >
+              {word}
+            </motion.span>
+          ))}
         </h1>
-      </section>
+      </motion.section>
     </motion.div>
   );
 }

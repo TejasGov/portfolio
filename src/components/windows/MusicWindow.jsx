@@ -15,10 +15,7 @@ export default function MusicWindow() {
     <div className="music-window">
       {/* ── Sidebar ── */}
       <aside className="music-sidebar">
-        <div className="music-search-bar">
-          <Search size={13} strokeWidth={2.5} />
-          <span>Search</span>
-        </div>
+
 
         <nav className="music-nav">
           <p className="music-section-label">Library</p>
@@ -36,7 +33,7 @@ export default function MusicWindow() {
       </aside>
 
       {/* ── Main ── */}
-      <main className="music-main" style={active === 'artists' ? { padding: 0, overflow: 'hidden' } : undefined}>
+      <main className="music-main" style={active === 'artists' ? { padding: 0, overflow: 'hidden', display: 'block' } : undefined}>
         {active === 'home' ? (
           <div className="music-spotify-container">
             <div className="music-spotify-header">
