@@ -310,7 +310,7 @@ function ResponseContent({ id, onDone }) {
   if (id === 'cinema')   return <CinemaBody onDone={onDone} />;
   if (id === 'skills')   return <SkillsBody onDone={onDone} />;
   if (id === 'fuel')     return <TextBody text={SECTION_TEXT.fuel} after={<PhotoPlaceholder label="photo loading..." />} onDone={onDone} />;
-  if (id === 'football') return <TextBody text={SECTION_TEXT.football} after={<PhotoPlaceholder label="the GOAT loading..." />} onDone={onDone} />;
+  if (id === 'football') return <TextBody text={SECTION_TEXT.football} after={<img src="/messi.webp" alt="Lionel Messi" style={{ width: '180px', borderRadius: '12px', border: '1px solid var(--card-border)', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', marginTop: '14px' }} />} onDone={onDone} />;
   if (id === 'wishes')   return <WishesBody onDone={onDone} />;
   return <TextBody text={SECTION_TEXT[id]} onDone={onDone} />;
 }
