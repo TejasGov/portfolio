@@ -1,33 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import DotMatrixDigit from './DotMatrix';
 import './DesktopClock.css';
-
-const LED_DIGITS = {
-  0: [[0,1,1,1,0],[1,0,0,0,1],[1,0,0,1,1],[1,0,1,0,1],[1,1,0,0,1],[1,0,0,0,1],[0,1,1,1,0]],
-  1: [[0,0,1,0,0],[0,1,1,0,0],[0,0,1,0,0],[0,0,1,0,0],[0,0,1,0,0],[0,0,1,0,0],[0,1,1,1,0]],
-  2: [[0,1,1,1,0],[1,0,0,0,1],[0,0,0,0,1],[0,0,1,1,0],[0,1,0,0,0],[1,0,0,0,0],[1,1,1,1,1]],
-  3: [[1,1,1,1,1],[0,0,0,1,0],[0,0,1,0,0],[0,0,0,1,0],[0,0,0,0,1],[1,0,0,0,1],[0,1,1,1,0]],
-  4: [[0,0,0,1,0],[0,0,1,1,0],[0,1,0,1,0],[1,0,0,1,0],[1,1,1,1,1],[0,0,0,1,0],[0,0,0,1,0]],
-  5: [[1,1,1,1,1],[1,0,0,0,0],[1,1,1,1,0],[0,0,0,0,1],[0,0,0,0,1],[1,0,0,0,1],[0,1,1,1,0]],
-  6: [[0,1,1,1,0],[1,0,0,0,0],[1,1,1,1,0],[1,0,0,0,1],[1,0,0,0,1],[1,0,0,0,1],[0,1,1,1,0]],
-  7: [[1,1,1,1,1],[0,0,0,0,1],[0,0,0,1,0],[0,0,1,0,0],[0,1,0,0,0],[0,1,0,0,0],[0,1,0,0,0]],
-  8: [[0,1,1,1,0],[1,0,0,0,1],[1,0,0,0,1],[0,1,1,1,0],[1,0,0,0,1],[1,0,0,0,1],[0,1,1,1,0]],
-  9: [[0,1,1,1,0],[1,0,0,0,1],[1,0,0,0,1],[1,0,0,0,1],[0,1,1,1,1],[0,0,0,0,1],[0,1,1,1,0]],
-  ':': [[0],[0],[1],[0],[1],[0],[0]]
-};
-
-const DotMatrixDigit = ({ char, color }) => {
-  const matrix = LED_DIGITS[char];
-  if (!matrix) return null;
-  const w = matrix[0].length * 10;
-  const h = matrix.length * 10;
-  return (
-    <svg viewBox={`0 0 ${w} ${h}`} style={{ height: '64px', fill: color }}>
-      {matrix.map((row, y) => 
-        row.map((val, x) => val ? <circle key={`${x}-${y}`} cx={x * 10 + 5} cy={y * 10 + 5} r="4.5" /> : null)
-      )}
-    </svg>
-  );
-};
 
 export default function DesktopClock() {
   const [time, setTime] = useState(new Date());
@@ -51,21 +24,9 @@ export default function DesktopClock() {
   const dayStr = time.toLocaleDateString('en-GB', { weekday: 'short' }).toUpperCase();
 
   return (
-    <div style={{
-      position: 'absolute', 
-      top: '48px', 
-      right: '24px',
-      display: 'flex',
-      flexDirection: 'column',
-      alignItems: 'center',
-      gap: '16px',
-      transform: 'scale(0.55)',
-      transformOrigin: 'top right',
-      zIndex: 50,
-      pointerEvents: 'none'
-    }}>
+    <>
       {/* Analog Clock */}
-      <div className="glass-panel" style={{
+      <div className="glass-panel widget-card" style={{
         width: '160px', 
         height: '160px', 
         borderRadius: '36px',
@@ -122,8 +83,8 @@ export default function DesktopClock() {
       </div>
 
       {/* Digital Clock */}
-      <div className="glass-panel" style={{
-        width: '320px', 
+      <div className="glass-panel widget-card" style={{
+        width: '320px',
         height: '180px', 
         borderRadius: '32px',
         display: 'flex',
@@ -143,7 +104,7 @@ export default function DesktopClock() {
           <DotMatrixDigit char={minutesStr[1]} color="var(--clock-digital-text)" />
         </div>
 
-        <div style={{
+        <div className="widget-label" style={{
           fontFamily: '"DotGothic16", sans-serif',
           fontSize: '18px',
           letterSpacing: '3px',
@@ -157,6 +118,6 @@ export default function DesktopClock() {
           <span>{dayStr}</span>
         </div>
       </div>
-    </div>
+    </>
   );
 }

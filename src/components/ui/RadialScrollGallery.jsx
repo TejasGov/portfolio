@@ -42,6 +42,7 @@ export const RadialScrollGallery = forwardRef(function RadialScrollGallery(
     scroller,           // ref to the scrollable container
     style,
     angleStep = null,   // custom spacing between cards in degrees (optional)
+    maxVisibleHeight = 550, // cap on the visible arc strip, lowered on small screens
     ...rest
   },
   ref
@@ -143,8 +144,8 @@ export const RadialScrollGallery = forwardRef(function RadialScrollGallery(
   if (count === 0) return null;
 
   const itemH = childSize?.h ?? 280;
-  // Cap the container height to max 550px so it doesn't create massive blank scroll space
-  const visibleH = Math.min(550, radius + itemH);
+  // Cap the container height so it doesn't create massive blank scroll space
+  const visibleH = Math.min(maxVisibleHeight, radius + itemH);
 
   return (
     <div

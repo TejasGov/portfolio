@@ -96,8 +96,8 @@ export function DockIcon({ icon, label, isActive, onClick, hoverColor = 'rgba(25
               width: '4px',
               height: '4px',
               borderRadius: '50%',
-              background: '#fff',
-              boxShadow: '0 0 4px rgba(255,255,255,0.8)'
+              background: 'var(--dock-icon-color)',
+              boxShadow: '0 0 4px var(--dock-indicator-glow)'
             }}
           />
         )}

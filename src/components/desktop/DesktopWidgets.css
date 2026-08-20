@@ -1,0 +1,81 @@
+/* ==========================================
+   DESKTOP WIDGETS — clock + weather cluster
+   ========================================== */
+
+.desktop-widgets {
+  position: absolute;
+  top: 48px;
+  right: 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  transform: scale(0.55);
+  transform-origin: top right;
+  z-index: 50;
+  pointer-events: none;
+}
+
+/* iPad — the three cards sit in one horizontal strip across the top, scaled
+   down to fit the viewport. */
+@media (min-width: 601px) and (max-width: 1024px) {
+  .desktop-widgets {
+    top: calc(38px + env(safe-area-inset-top));
+    right: 0;
+    left: 0;
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
+    gap: 20px;
+    transform: scale(0.6);
+    transform-origin: top center;
+  }
+
+  /* The strip is scaled down, so the labels are sized back up here to stay
+     legible once the transform is applied. nowrap keeps a long label from
+     breaking onto a second line, which would grow the card and knock the row
+     out of vertical alignment. */
+  .widget-label {
+    font-size: 24px !important;
+    letter-spacing: 1.5px !important;
+    gap: 12px !important;
+    white-space: nowrap;
+  }
+}
+
+/* iPhone — clock and time card share the top row, weather spans the full width
+   beneath them. Three cards across a phone would leave each one too small to
+   read, so the strip wraps instead and everything renders noticeably larger.
+   The container is laid out at a fixed 494px (160 clock + 14 gap + 320 card)
+   and scaled down as one unit, which keeps the row exactly two cards wide. */
+@media (max-width: 600px) {
+  .desktop-widgets {
+    top: calc(38px + env(safe-area-inset-top));
+    left: 50%;
+    right: auto;
+    width: 494px;
+    margin-left: -247px;
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: center;
+    gap: 14px;
+    transform: scale(0.7);
+    transform-origin: top center;
+  }
+
+  .weather-card {
+    width: 100% !important;
+  }
+
+  .widget-label {
+    white-space: nowrap;
+  }
+}
+
+/* Small phones — same layout, scaled a little further so it still fits. */
+@media (max-width: 365px) {
+  .desktop-widgets {
+    transform: scale(0.62);
+  }
+}

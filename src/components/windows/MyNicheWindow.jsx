@@ -1,9 +1,9 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { RadialScrollGallery } from '../ui/RadialScrollGallery';
 import { MOVIES, SHOWS, GENRE_COLOR } from '../../data/movieData';
-import CarShowcaseSection from '../cars/CarShowcaseSection';
 import MarvelSection from './MarvelSection';
+import useIsPhone from '../../hooks/useIsPhone';
 
 // ─── IMDb Arrow Button ────────────────────────────────────────────────────────
 function ImdbArrow({ href }) {
@@ -43,12 +43,12 @@ function ImdbArrow({ href }) {
 }
 
 // ─── Movie Card ───────────────────────────────────────────────────────────────
-function MovieCard({ movie, isHovered, index }) {
+function MovieCard({ movie, isHovered, index, compact }) {
   const accent = GENRE_COLOR[movie.genre] ?? '#aaa';
   return (
     <div style={{
-      width: '165px',
-      height: '248px',
+      width: compact ? '124px' : '165px',
+      height: compact ? '186px' : '248px',
       borderRadius: '10px',
       overflow: 'hidden',
       position: 'relative',
@@ -86,7 +86,7 @@ function MovieCard({ movie, isHovered, index }) {
 }
 
 // ─── Show Card (2:3 ratio poster) ────────────────────────────────────────────
-function ShowCard({ show, index }) {
+function ShowCard({ show, index, compact }) {
   const [hovered, setHovered] = React.useState(false);
   const accent = GENRE_COLOR[show.genre] ?? '#aaa';
   return (
@@ -95,8 +95,8 @@ function ShowCard({ show, index }) {
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       style={{
-        width: '150px',
-        height: '225px',      // 2:3
+        width: compact ? '108px' : '150px',
+        height: compact ? '162px' : '225px',      // 2:3
         borderRadius: '10px',
         overflow: 'hidden',
         position: 'relative',
@@ -196,6 +196,7 @@ function GenrePills({ genres, active, onSelect }) {
 function MoviesView() {
   const [scrollerEl, setScrollerEl] = React.useState(null);
   const [activeGenre, setActiveGenre] = React.useState(null);
+  const isPhone = useIsPhone();
 
   // Derive sorted unique genres from MOVIES + SHOWS combined
   const allGenres = React.useMemo(() => {
@@ -221,20 +222,29 @@ function MoviesView() {
   // For small counts, use angleStep to keep cards close together;
   // for large counts, fall back to full-circle layout (angleStep = null)
   const FULL_CIRCLE_THRESHOLD = 7; // below this, use fixed angular spacing
-  const CARD_ANGLE_DEG = 32;       // degrees between adjacent cards
+  // Cards are narrower on a phone, so they can sit closer together in angle
+  // before they start to overlap.
+  const CARD_ANGLE_DEG = isPhone ? 42 : 32;
 
   const movieAngleStep = React.useMemo(
     () => filteredMovies.length < FULL_CIRCLE_THRESHOLD ? CARD_ANGLE_DEG : null,
-    [filteredMovies.length]
+    [filteredMovies.length, CARD_ANGLE_DEG]
   );
 
-  // Radius: tight for tiny sets, bigger for large sets
-  const movieRadius = React.useMemo(
-    () => filteredMovies.length < FULL_CIRCLE_THRESHOLD
+  // Radius: tight for tiny sets, bigger for large sets. The desktop radii draw a
+  // circle far wider than a phone screen, which pushes every card but the
+  // centre one outside the viewport, so phones get a much tighter arc.
+  const movieRadius = React.useMemo(() => {
+    const small = filteredMovies.length < FULL_CIRCLE_THRESHOLD;
+    if (isPhone) {
+      return small
+        ? Math.max(200, filteredMovies.length * 40)
+        : Math.max(340, filteredMovies.length * 20);
+    }
+    return small
       ? Math.max(280, filteredMovies.length * 60)   // compact layout
-      : Math.max(500, filteredMovies.length * 28),   // full-circle layout
-    [filteredMovies.length]
-  );
+      : Math.max(500, filteredMovies.length * 28);  // full-circle layout
+  }, [filteredMovies.length, isPhone]);
 
   // Stop wheel events from bubbling to Framer Motion's window drag handler
   useEffect(() => {
@@ -273,11 +283,12 @@ function MoviesView() {
           scrollDuration={movieScrollDuration}
           angleStep={movieAngleStep}
           visiblePercentage={50}
+          maxVisibleHeight={isPhone ? 360 : 550}
           startTrigger="top top"
           onItemSelect={(i) => console.log('selected', filteredMovies[i].title)}
           header={
             <div style={{
-              height: '100px',
+              height: isPhone ? '78px' : '100px',
               display: 'flex',
               flexDirection: 'column',
               alignItems: 'center',
@@ -287,7 +298,7 @@ function MoviesView() {
               <div style={{ fontSize: '10px', fontWeight: '700', letterSpacing: '3px', textTransform: 'uppercase', color: 'var(--text-muted)' }}>
                 My Picks
               </div>
-              <div style={{ fontSize: '32px', fontWeight: '800', color: 'var(--text-main)', letterSpacing: '-1px' }}>
+              <div style={{ fontSize: isPhone ? '22px' : '32px', fontWeight: '800', color: 'var(--text-main)', letterSpacing: '-1px', textAlign: 'center' }}>
                 {activeGenre ? `${activeGenre} Movies` : 'Movies'}
               </div>
               <motion.div
@@ -302,7 +313,7 @@ function MoviesView() {
         >
           {(hoveredIndex) =>
             filteredMovies.map((movie, i) => (
-              <MovieCard key={movie.title} movie={movie} isHovered={hoveredIndex === i} index={i} />
+              <MovieCard key={movie.title} movie={movie} isHovered={hoveredIndex === i} index={i} compact={isPhone} />
             ))
           }
         </RadialScrollGallery>
@@ -315,15 +326,15 @@ function MoviesView() {
 
       {/* ─── Shows Section ──────────────────────────────────────────── */}
       {filteredShows.length > 0 && (
-        <div style={{ padding: '24px 24px 40px' }}>
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', marginBottom: '24px' }}>
+        <div style={{ padding: isPhone ? '16px 12px 32px' : '24px 24px 40px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', marginBottom: isPhone ? '16px' : '24px' }}>
             <div style={{ fontSize: '10px', fontWeight: '700', letterSpacing: '3px', textTransform: 'uppercase', color: 'var(--text-muted)' }}>My Picks</div>
-            <div style={{ fontSize: '28px', fontWeight: '800', color: 'var(--text-main)', letterSpacing: '-1px' }}>
+            <div style={{ fontSize: isPhone ? '20px' : '28px', fontWeight: '800', color: 'var(--text-main)', letterSpacing: '-1px', textAlign: 'center' }}>
               {activeGenre ? `${activeGenre} Shows` : 'Shows'}
             </div>
           </div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '14px', justifyContent: 'center' }}>
-            {filteredShows.map((show, i) => <ShowCard key={show.title} show={show} index={i} />)}
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: isPhone ? '10px' : '14px', justifyContent: 'center' }}>
+            {filteredShows.map((show, i) => <ShowCard key={show.title} show={show} index={i} compact={isPhone} />)}
           </div>
         </div>
       )}
@@ -331,72 +342,22 @@ function MoviesView() {
   );
 }
 
-// ─── Cars Data ────────────────────────────────────────────────────────────────
-const ACTUAL_CARS = [
-  { name: 'Ferrari F8 Tributo', img: '/cars/ferrari.png', tag: 'Italy · V8 Biturbo · 710 hp' },
-  { name: 'Mercedes-AMG G63',   img: '/cars/g63.png',     tag: 'Germany · V8 Biturbo · 577 hp' },
-  { name: 'Lamborghini Aventador', img: '/cars/lambo.png', tag: 'Italy · V12 NA · 769 hp' },
-];
-
-const CARS = Array.from({ length: 25 }).map((_, i) => {
-  if (i < ACTUAL_CARS.length) return { ...ACTUAL_CARS[i], placeholder: false };
-  return { name: 'Coming Soon', img: '', tag: `Slot ${i + 1}`, placeholder: true };
-});
-
-function CarCard({ car, index }) {
+// ─── Football Section ────────────────────────────────────────────────────────
+function FootballSection() {
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 16 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.25, delay: Math.min(index * 0.04, 0.5) }}
-      whileHover={{ scale: 1.04, y: -4 }}
-      style={{
-        width: '200px',
-        background: car.placeholder ? 'rgba(255,255,255,0.03)' : 'var(--card-bg)',
-        border: '1px solid var(--card-border)',
-        borderRadius: '14px',
-        padding: '16px',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '10px',
-        cursor: car.placeholder ? 'default' : 'pointer',
-        opacity: car.placeholder ? 0.22 : 1,
-        boxShadow: car.placeholder ? 'none' : '0 4px 20px rgba(0,0,0,0.15)',
-        flexShrink: 0,
-      }}
-    >
-      {car.img ? (
-        <img src={car.img} alt={car.name} style={{ width: '100%', height: '110px', objectFit: 'contain', borderRadius: '8px' }} />
-      ) : (
-        <div style={{ width: '100%', height: '110px', borderRadius: '8px', background: 'rgba(255,255,255,0.04)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '32px' }}>🚗</div>
-      )}
-      <div>
-        <div style={{ fontWeight: '600', fontSize: '13px', color: 'var(--text-main)', marginBottom: '3px' }}>{car.name}</div>
-        <div style={{ fontSize: '11px', color: 'var(--text-muted)', lineHeight: 1.4 }}>{car.tag}</div>
-      </div>
-    </motion.div>
-  );
-}
-
-function CarsScrollArea({ cars }) {
-  const ref = useRef(null);
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const stop = (e) => e.stopPropagation();
-    el.addEventListener('wheel', stop, { passive: true });
-    return () => el.removeEventListener('wheel', stop);
-  }, []);
-  return (
-    <div ref={ref} style={{ flex: 1, display: 'flex', flexWrap: 'wrap', alignItems: 'flex-start', alignContent: 'flex-start', justifyContent: 'flex-start', gap: '16px', overflowY: 'auto', padding: '20px 20px 32px' }}>
-      {cars.map((car, i) => <CarCard key={i} car={car} index={i} />)}
+    <div style={{ flex: 1, width: '100%', height: '100%', overflow: 'hidden' }}>
+      <iframe
+        title="Messi's 600th — Camp Nou, May 2019"
+        src="/football.html"
+        style={{ width: '100%', height: '100%', border: 'none', display: 'block' }}
+        loading="lazy"
+      />
     </div>
   );
 }
 
 // ─── Root Component ───────────────────────────────────────────────────────────
 export default function MyNicheWindow({ viewMode }) {
-  const carsScrollerRef = React.useRef(null);
   return (
     <div style={{ width: '100%', height: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column', position: 'relative' }}>
       <AnimatePresence mode="wait">
@@ -411,14 +372,13 @@ export default function MyNicheWindow({ viewMode }) {
           </motion.div>
         )}
 
-        {viewMode === 'cars' && (
-          <motion.div key="cars"
-            ref={carsScrollerRef}
+        {viewMode === 'football' && (
+          <motion.div key="football"
             initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -12 }} transition={{ duration: 0.25 }}
             style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}
           >
-            <CarShowcaseSection scrollerEl={carsScrollerRef} />
+            <FootballSection />
           </motion.div>
         )}
 

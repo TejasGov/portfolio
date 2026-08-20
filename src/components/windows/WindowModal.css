@@ -168,3 +168,91 @@ body:not(.dark-mode) .sw.on {
   }
 }
 
+/* ==========================================
+   PHONE — windows become full-screen sheets
+   A 70vw floating window offset by left:20% overflows a phone screen, and
+   dragging a window around is meaningless on touch. Windows instead fill the
+   space between the navbar and the dock, the way an app does on iOS.
+   ========================================== */
+
+@media (max-width: 600px) {
+  .window-modal,
+  .window-modal.maximized,
+  .window-modal.filled {
+    top: 28px !important;
+    left: 0 !important;
+    right: 0 !important;
+    width: 100vw !important;
+    min-width: 0 !important;
+    max-width: none !important;
+    /* Stops above the dock so it stays reachable while a window is open. */
+    height: calc(100dvh - 132px) !important;
+    max-height: none !important;
+    border-radius: 14px 14px 0 0;
+  }
+
+  .window-header {
+    height: 44px;
+    padding: 0 12px;
+    gap: 8px;
+  }
+
+  /* Centred absolute positioning collides with the view switcher once the
+     header is this narrow, so the title flows inline and truncates instead. */
+  .window-title {
+    position: static !important;
+    transform: none !important;
+    flex-shrink: 1;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* Traffic lights are 12px hit targets — too small to tap reliably. */
+  .traffic-light {
+    width: 15px;
+    height: 15px;
+  }
+  .traffic-light svg {
+    opacity: 1;
+    width: 9px;
+    height: 9px;
+  }
+
+  .window-content {
+    padding: 16px;
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+/* ==========================================
+   LOADING SPINNER
+   ========================================== */
+.window-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  width: 100%;
+  color: var(--text-main);
+  opacity: 0.6;
+  font-size: 14px;
+}
+
+.spinner {
+  width: 24px;
+  height: 24px;
+  border: 2.5px solid var(--timeline-line);
+  border-top-color: var(--text-main);
+  border-radius: 50%;
+  margin-bottom: 12px;
+  animation: window-spin 1s linear infinite;
+}
+
+@keyframes window-spin {
+  to { transform: rotate(360deg); }
+}
+
+

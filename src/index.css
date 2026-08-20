@@ -24,6 +24,11 @@
   --dock-item-bg: rgba(255, 255, 255, 0.5);
   --dock-item-hover: rgba(255, 255, 255, 0.8);
   --dock-icon-color: #1d1d1f;
+  --dock-indicator-glow: rgba(0, 0, 0, 0.4);
+  --desktop-label-text: #1d1d1f;
+  --desktop-label-shadow: 0 1px 4px rgba(255, 255, 255, 0.7);
+  /* 30% white veil keeps the light wallpaper at 70% strength so dark text reads over it */
+  --desktop-bg-veil: linear-gradient(rgba(255, 255, 255, 0.3), rgba(255, 255, 255, 0.3));
   --clock-bg: rgba(255, 255, 255, 0.6);
   --clock-border: rgba(0, 0, 0, 0.1);
   --clock-tick-major: rgba(0, 0, 0, 0.8);
@@ -54,6 +59,10 @@ body.dark-mode {
   --dock-item-bg: rgba(255, 255, 255, 0.1);
   --dock-item-hover: rgba(255, 255, 255, 0.2);
   --dock-icon-color: #ffffff;
+  --dock-indicator-glow: rgba(255, 255, 255, 0.8);
+  --desktop-label-text: #ffffff;
+  --desktop-label-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+  --desktop-bg-veil: none;
   --clock-bg: rgba(255, 255, 255, 0.05);
   --clock-border: rgba(255, 255, 255, 0.1);
   --clock-tick-major: rgba(255, 255, 255, 0.8);
@@ -86,6 +95,20 @@ body {
 }
 
 /* ==========================================
+   DESKTOP ROOT
+   ========================================== */
+
+.desktop-root {
+  width: 100vw;
+  height: 100vh;
+  /* dvh tracks the visible area as mobile Safari's URL bar shows/hides, so the
+     dock never ends up behind the browser chrome on iPhone. */
+  height: 100dvh;
+  overflow: hidden;
+  position: relative;
+}
+
+/* ==========================================
    DESKTOP BACKGROUND
    ========================================== */
 
@@ -93,8 +116,8 @@ body {
   position: fixed;
   inset: 0;
   z-index: -1;
-  background-color: #1a1a1a;
-  background-image: url('./assets/bgimg.png');
+  background-color: var(--bg-color);
+  background-image: var(--desktop-bg-veil), url('./assets/bgimg.jpg');
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
@@ -102,6 +125,89 @@ body {
 
 body.dark-mode .desktop-bg {
   background-image: url('./assets/bgimgdark.png');
+}
+
+.desktop-icon-label {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--desktop-label-text);
+  text-shadow: var(--desktop-label-shadow);
+}
+
+/* ==========================================
+   DESKTOP ICON GRID
+   Auto-flows into columns when the viewport is short/wide
+   (monitors, laptops) and stays a single column when it's
+   tall/narrow (iPad, iPhone) — same behavior as macOS Finder.
+   ========================================== */
+
+.desktop-icons-grid {
+  position: absolute;
+  top: calc(44px + env(safe-area-inset-top));
+  bottom: calc(100px + env(safe-area-inset-bottom));
+  left: 0;
+  padding-left: calc(20px + env(safe-area-inset-left));
+  display: grid;
+  grid-auto-flow: column;
+  grid-template-rows: repeat(auto-fill, minmax(96px, 1fr));
+  justify-content: start;
+  align-content: start;
+  column-gap: 28px;
+  row-gap: 4px;
+}
+
+.desktop-icon {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  width: 90px;
+  cursor: pointer;
+}
+
+/* iPad / iPhone — icons flow left-to-right in fixed-column rows like the iOS
+   home screen, sitting below the widget strip instead of beside it. */
+@media (max-width: 1024px) {
+  .desktop-icons-grid {
+    top: calc(174px + env(safe-area-inset-top));
+    left: 0;
+    right: 0;
+    padding: 0 calc(24px + env(safe-area-inset-left)) 0 calc(24px + env(safe-area-inset-right));
+    grid-auto-flow: row;
+    grid-template-rows: none;
+    grid-auto-rows: min-content;
+    grid-template-columns: repeat(6, 1fr);
+    justify-content: stretch;
+    column-gap: 12px;
+    row-gap: 24px;
+  }
+
+  .desktop-icon {
+    width: 100%;
+  }
+}
+
+@media (max-width: 600px) {
+  .desktop-icons-grid {
+    /* Clears the taller two-row widget strip, and the icons sit at the bottom
+       of that space so they stay within thumb reach above the dock. */
+    top: calc(320px + env(safe-area-inset-top));
+    bottom: calc(128px + env(safe-area-inset-bottom));
+    padding: 0 calc(16px + env(safe-area-inset-left)) 0 calc(16px + env(safe-area-inset-right));
+    grid-template-columns: repeat(4, 1fr);
+    align-content: end;
+    column-gap: 8px;
+    row-gap: 20px;
+  }
+
+  .desktop-icon > div:first-child {
+    width: 64px !important;
+    height: 54px !important;
+  }
+
+  .desktop-icon span {
+    font-size: 12px !important;
+  }
 }
 
 /* ==========================================

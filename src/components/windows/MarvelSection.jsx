@@ -124,13 +124,15 @@ export default function MarvelSection() {
       <div style={{
         flex: 1,
         overflowY: 'auto',
-        padding: '12px 24px 32px'
+        padding: 'clamp(12px, 3vw, 24px)'
       }}>
         <div style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
-          gap: '24px',
-          padding: '12px'
+          /* min() keeps the track from forcing a 320px column — and horizontal
+             overflow — inside a container narrower than that. */
+          gridTemplateColumns: 'repeat(auto-fit, minmax(min(320px, 100%), 1fr))',
+          gap: 'clamp(14px, 3vw, 24px)',
+          padding: '12px 0'
         }}>
           {MARVEL_HEROES.map((hero, i) => (
             <motion.div

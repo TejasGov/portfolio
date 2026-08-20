@@ -1,19 +1,23 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import { motion, useDragControls, useAnimation } from 'framer-motion';
 import { photographyData } from '../../data';
-import MorphingPhotoGallery from './MorphingPhotoGallery';
-import TerminalWindow from './TerminalWindow';
-import WorkExperience from './WorkExperience';
-import ProjectsWindow from './ProjectsWindow';
-import MusicWindow from './MusicWindow';
-import BlogWindow from './BlogWindow';
-import MyNicheWindow from './MyNicheWindow';
-import MyTechWindow from './MyTechWindow';
-import AboutWindow from './AboutWindow';
-import TheLibrary from './TheLibrary';
+import useIsPhone from '../../hooks/useIsPhone';
+
+// Lazy load window contents to optimize bundle size
+const MorphingPhotoGallery = lazy(() => import('./MorphingPhotoGallery'));
+const TerminalWindow = lazy(() => import('./TerminalWindow'));
+const WorkExperience = lazy(() => import('./WorkExperience'));
+const ProjectsWindow = lazy(() => import('./ProjectsWindow'));
+const MusicWindow = lazy(() => import('./MusicWindow'));
+const BlogWindow = lazy(() => import('./BlogWindow'));
+const MyNicheWindow = lazy(() => import('./MyNicheWindow'));
+const MyTechWindow = lazy(() => import('./MyTechWindow'));
+const AboutWindow = lazy(() => import('./AboutWindow'));
+const TheLibrary = lazy(() => import('./TheLibrary'));
 import './WindowModal.css';
 
 export default function WindowModal({ id, onClose, onMinimize, zIndex, onFocus, constraintsRef, onOpenWindow }) {
+  const isPhone = useIsPhone();
   const [isMaximized, setIsMaximized] = useState(false);
   const [isFilled, setIsFilled] = useState(false);
   const [viewMode, setViewMode] = useState(id === 'blog' ? 'pages' : (id === 'photography' ? 'grid' : (id === 'my-niche' ? 'movies' : 'tl')));
@@ -97,7 +101,7 @@ export default function WindowModal({ id, onClose, onMinimize, zIndex, onFocus, 
       initial={{ opacity: 0, scale: 0.85, y: 30 }}
       animate={animControls}
       exit={{ opacity: 0, scale: 0.85, y: 30 }}
-      drag={!isMaximized && !isFilled}
+      drag={!isPhone && !isMaximized && !isFilled}
       dragListener={false}
       dragControls={controls}
       dragConstraints={constraintsRef}
@@ -111,7 +115,7 @@ export default function WindowModal({ id, onClose, onMinimize, zIndex, onFocus, 
         className="window-header" 
         style={{ position: 'relative' }}
         onPointerDown={(e) => {
-          if (!isMaximized && !isFilled) {
+          if (!isPhone && !isMaximized && !isFilled) {
             controls.start(e);
           }
           onFocus();
@@ -129,7 +133,7 @@ export default function WindowModal({ id, onClose, onMinimize, zIndex, onFocus, 
             <svg viewBox="0 0 10 10"><path d="M1.5 8.5L8.5 1.5M1.5 1.5h7v7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none"/></svg>
           </div>
         </div>
-        <div style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)', fontSize: '13px', fontWeight: '600', color: 'var(--text-main)', opacity: 0.85, letterSpacing: '0.3px', cursor: 'default' }}>
+        <div className="window-title" style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)', fontSize: '13px', fontWeight: '600', color: 'var(--text-main)', opacity: 0.85, letterSpacing: '0.3px', cursor: 'default' }}>
           {title}
         </div>
         {(id === 'work-ex' || id === 'blog' || id === 'photography' || id === 'my-niche') ? (
@@ -161,13 +165,12 @@ export default function WindowModal({ id, onClose, onMinimize, zIndex, onFocus, 
                     <line x1="17" y1="7" x2="22" y2="7"></line>
                   </svg> <span className="sw-text">Movies</span>
                 </button>
-                <button className={`sw ${viewMode === 'cars' ? 'on' : ''}`} onClick={() => setViewMode('cars')}>
+                <button className={`sw ${viewMode === 'football' ? 'on' : ''}`} onClick={() => setViewMode('football')}>
                   <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" strokeWidth="2.5" fill="none" style={{ marginRight: '4px', verticalAlign: '-1.5px', display: 'inline-block' }}>
-                    <circle cx="7" cy="17" r="2"></circle>
-                    <circle cx="17" cy="17" r="2"></circle>
-                    <path d="M5 17H3v-6l2-5h14l2 5v6h-2"></path>
-                    <line x1="3" y1="11" x2="21" y2="11"></line>
-                  </svg> <span className="sw-text">Cars</span>
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <path d="M12 8l3.5 2.5-1.3 4.1H9.8L8.5 10.5 12 8z"></path>
+                    <path d="M12 8V4.5M15.5 10.5l3.3-1M14.2 14.6l2 3.4M9.8 14.6l-2 3.4M8.5 10.5l-3.3-1"></path>
+                  </svg> <span className="sw-text">Football</span>
                 </button>
                 <button className={`sw ${viewMode === 'marvel' ? 'on' : ''}`} onClick={() => setViewMode('marvel')}>
                   <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" strokeWidth="2.5" fill="none" style={{ marginRight: '4px', verticalAlign: '-1.5px', display: 'inline-block' }}>
@@ -235,7 +238,14 @@ export default function WindowModal({ id, onClose, onMinimize, zIndex, onFocus, 
           touchAction: 'auto'
         }} 
       >
-        {content}
+        <Suspense fallback={
+          <div className="window-loading">
+            <div className="spinner" />
+            <span>Loading...</span>
+          </div>
+        }>
+          {content}
+        </Suspense>
       </div>
     </motion.div>
   );

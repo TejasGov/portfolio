@@ -5,7 +5,7 @@ import { Mail, FileText, Globe, Mic } from 'lucide-react';
 import { desktopItems, memojiImg } from './data';
 
 import BootScreen from './components/overlays/BootScreen';
-import DesktopClock from './components/desktop/DesktopClock';
+import DesktopWidgets from './components/desktop/DesktopWidgets';
 import Dock, { DockIcon } from './components/desktop/Dock';
 import SocialsDrawer from './components/overlays/SocialsDrawer';
 import HelpModal from './components/overlays/HelpModal';
@@ -85,7 +85,7 @@ export default function App() {
         {showBoot && <BootScreen onComplete={() => setShowBoot(false)} />}
       </AnimatePresence>
 
-      <div ref={constraintsRef} style={{ width: '100vw', height: '100vh', overflow: 'hidden', position: 'relative' }}>
+      <div ref={constraintsRef} className="desktop-root">
         <div className="desktop-bg" />
 
         {/* Top Navbar */}
@@ -110,27 +110,28 @@ export default function App() {
         </AnimatePresence>
 
         {/* Desktop Widgets */}
-        <DesktopClock />
+        <DesktopWidgets />
 
         {/* Desktop Folders */}
-        {desktopItems.map((item) => (
-          <motion.div
-            key={item.id}
-            className="desktop-icon"
-            style={{ position: 'absolute', left: item.x, top: item.y, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', cursor: 'pointer' }}
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            onClick={() => toggleWindow(item.id)}
-          >
-            {/* Simple MacOS-like Folder Icon shape using CSS */}
-            <div style={{ width: '80px', height: '65px', borderRadius: '8px', background: item.color, boxShadow: '0 4px 12px rgba(0,0,0,0.2)', position: 'relative' }}>
-              <div style={{ position: 'absolute', top: '-8px', left: '0', width: '35px', height: '15px', background: item.color, borderTopLeftRadius: '8px', borderTopRightRadius: '8px' }} />
-            </div>
-            <span style={{ color: 'white', textShadow: '0 1px 4px rgba(0,0,0,0.5)', fontSize: '14px', fontWeight: '500' }}>
-              {item.title}
-            </span>
-          </motion.div>
-        ))}
+        <div className="desktop-icons-grid">
+          {desktopItems.map((item) => (
+            <motion.div
+              key={item.id}
+              className="desktop-icon"
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => toggleWindow(item.id)}
+            >
+              {/* Simple MacOS-like Folder Icon shape using CSS */}
+              <div style={{ width: '80px', height: '65px', borderRadius: '8px', background: item.color, boxShadow: '0 4px 12px rgba(0,0,0,0.2)', position: 'relative' }}>
+                <div style={{ position: 'absolute', top: '-8px', left: '0', width: '35px', height: '15px', background: item.color, borderTopLeftRadius: '8px', borderTopRightRadius: '8px' }} />
+              </div>
+              <span className="desktop-icon-label">
+                {item.title}
+              </span>
+            </motion.div>
+          ))}
+        </div>
 
         {/* Window Modals */}
         <AnimatePresence>
