@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, lazy, Suspense } from 'react';
 import { Search, Home, Disc3, Mic2, Music, ExternalLink } from 'lucide-react';
-import ArtistGalaxy from './ArtistGalaxy';
 import './MusicWindow.css';
+
+const ArtistGalaxy = lazy(() => import('./ArtistGalaxy'));
 
 const NAV = [
   { id: 'home', label: 'Home', icon: Home },
@@ -71,7 +72,23 @@ export default function MusicWindow() {
             </div>
           </div>
         ) : active === 'artists' ? (
-          <ArtistGalaxy />
+          <Suspense fallback={
+            <div style={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              height: '100%',
+              color: 'var(--text-main)',
+              opacity: 0.6,
+              gap: '12px'
+            }}>
+              <div className="spinner" />
+              <span>Loading interactive galaxy...</span>
+            </div>
+          }>
+            <ArtistGalaxy />
+          </Suspense>
         ) : (
           <div className="music-coming-soon">
             <span className="music-coming-soon-icon">
