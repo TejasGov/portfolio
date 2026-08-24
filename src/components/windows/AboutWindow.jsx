@@ -100,24 +100,33 @@ const bodyText = {
 
 /* ─── primitives ────────────────────────────────────────────── */
 
-function WordStream({ text, speed = 8, onComplete }) {
-  const words = useMemo(() => text.split(' '), [text]);
+function WordStream({ text, speed = 280, onComplete }) {
+  const lines = useMemo(() => {
+    // Split by sentences (. ? !) but keep the punctuation and trailing whitespace
+    return text.match(/[^.!?]+[.!?]+(\s+|$)/g) || [text];
+  }, [text]);
   const [count, setCount] = useState(0);
 
   useEffect(() => {
-    if (count >= words.length) {
+    if (count >= lines.length) {
       const id = setTimeout(() => onComplete?.(), 200);
       return () => clearTimeout(id);
     }
     const id = setTimeout(() => setCount(c => c + 1), speed);
     return () => clearTimeout(id);
-  }, [count, words.length, speed]); // eslint-disable-line
+  }, [count, lines.length, speed, onComplete]);
 
   return (
     <span>
-      {words.slice(0, count).map((word, i) => (
-        <motion.span key={i} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.14 }}>
-          {word}{i < words.length - 1 ? ' ' : ''}
+      {lines.slice(0, count).map((line, i) => (
+        <motion.span 
+          key={i} 
+          initial={{ opacity: 0, y: 4 }} 
+          animate={{ opacity: 1, y: 0 }} 
+          transition={{ duration: 0.25 }}
+          style={{ display: 'inline' }}
+        >
+          {line}
         </motion.span>
       ))}
     </span>
