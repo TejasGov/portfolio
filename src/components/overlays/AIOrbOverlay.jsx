@@ -67,7 +67,7 @@ export default function AIOrbOverlay({ isOpen, onClose }) {
               </div>
 
               {/* Status and instruction copy */}
-              <h2 className="orb-status-text">Apple Intelligence</h2>
+              <h2 className="orb-status-text">Orb</h2>
               <p className="orb-subtitle-text">Click the Orb or press Esc to return</p>
 
               {/* Voice visualizer bars reacting in the background */}
