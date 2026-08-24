@@ -14,6 +14,7 @@ import EmailModal from './components/overlays/EmailModal';
 import WindowModal from './components/windows/WindowModal';
 import TopNavbar from './components/desktop/TopNavbar';
 import AIOrbOverlay from './components/overlays/AIOrbOverlay';
+import { useConversationClientTool } from '@elevenlabs/react';
 
 export default function App() {
   const [activeWindows, setActiveWindows] = useState([]);
@@ -66,6 +67,39 @@ export default function App() {
       setActiveWindows(prev => [...prev, id]);
     }
   };
+
+  const currentActiveWindow = activeWindows.length > 0 ? activeWindows[activeWindows.length - 1] : "desktop";
+
+  useConversationClientTool("open_window", (params) => {
+    const { window_name } = params || {};
+    if (!window_name) return;
+
+    const windowMap = {
+      "projects": "projects",
+      "work ex": "work-ex",
+      "work experience": "work-ex",
+      "workex": "work-ex",
+      "photography": "photography",
+      "my tech": "my-tech",
+      "tech": "my-tech",
+      "my niche": "my-niche",
+      "niche": "my-niche",
+      "my sound": "my-sound",
+      "sound": "my-sound",
+      "my library": "my-library",
+      "library": "my-library",
+      "about": "about",
+      "about me": "about",
+      "terminal": "terminal",
+      "blog": "blog"
+    };
+
+    const normalized = window_name.toLowerCase().trim();
+    const matchedId = windowMap[normalized];
+    if (matchedId) {
+      toggleWindow(matchedId);
+    }
+  });
 
   const closeWindow = (id) => {
     setActiveWindows(prev => prev.filter(wId => wId !== id));
@@ -199,7 +233,7 @@ export default function App() {
         </Dock>
 
         {/* AI Orb Full Screen Viewport Glow & Overlay */}
-        <AIOrbOverlay isOpen={isOrbActive} onClose={() => setIsOrbActive(false)} />
+        <AIOrbOverlay isOpen={isOrbActive} onClose={() => setIsOrbActive(false)} currentActiveWindow={currentActiveWindow} />
       </div>
     </>
   );

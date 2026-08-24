@@ -1,16 +1,20 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useConversationControls, useConversationStatus } from '@elevenlabs/react';
 import './AIOrbOverlay.css';
 
-export default function AIOrbOverlay({ isOpen, onClose }) {
-  const [isVoiceActive, setIsVoiceActive] = useState(false);
+export default function AIOrbOverlay({ isOpen, onClose, currentActiveWindow }) {
+  const { startSession, endSession } = useConversationControls();
+  const { status } = useConversationStatus();
 
-  // Reset visualizer state when opening/closing
+  // Reset/disconnect session when overlay closes
   useEffect(() => {
     if (!isOpen) {
-      setIsVoiceActive(false);
+      if (status === "connected" || status === "connecting") {
+        endSession();
+      }
     }
-  }, [isOpen]);
+  }, [isOpen, status, endSession]);
 
   // Listen for Escape key to close the overlay
   useEffect(() => {
@@ -35,6 +39,13 @@ export default function AIOrbOverlay({ isOpen, onClose }) {
       document.body.style.overflow = '';
     };
   }, [isOpen]);
+
+  // Helper to determine status text copy
+  const getStatusText = () => {
+    if (status === "connected") return "Orb (Connected)";
+    if (status === "connecting") return "Orb (Connecting...)";
+    return "Orb";
+  };
 
   return (
     <AnimatePresence>
@@ -62,16 +73,23 @@ export default function AIOrbOverlay({ isOpen, onClose }) {
                 className="orb-avatar-wrapper"
                 onClick={(e) => {
                   e.stopPropagation(); // prevent backdrop click closing
-                  setIsVoiceActive(prev => !prev); // toggle voice visualizer
+                  if (status === "connected") {
+                    endSession();
+                  } else {
+                    startSession({
+                      agentId: "YOUR_ELEVENLABS_AGENT_ID",
+                      dynamicVariables: { current_active_window: currentActiveWindow }
+                    });
+                  }
                 }}
               >
                 {/* Layered glows and rings simulating Siri focus centered exactly behind the orb */}
-                <div className="orb-glow-layer" />
-                <div className="orb-pulse-ring" />
-                <div className="orb-pulse-ring" />
+                <div className={`orb-glow-layer ${status}`} />
+                <div className={`orb-pulse-ring ${status}`} />
+                <div className={`orb-pulse-ring ${status}`} />
 
                 {/* Glowing Interactive Circle (without border/container styling) */}
-                <div className="orb-avatar-container">
+                <div className={`orb-avatar-container ${status}`}>
                   <img
                     src="/homepage/aiicon.svg"
                     alt="Orb Avatar"
@@ -81,13 +99,13 @@ export default function AIOrbOverlay({ isOpen, onClose }) {
               </div>
 
               {/* Status and instruction copy */}
-              <h2 className="orb-status-text">Orb</h2>
+              <h2 className="orb-status-text">{getStatusText()}</h2>
               <p className="orb-subtitle-text">Click the Orb to speak, click anywhere else to exit</p>
 
               {/* Voice visualizer graph */}
               <div style={{ height: '32px', marginTop: '30px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <AnimatePresence mode="wait">
-                  {isVoiceActive ? (
+                  {status === "connected" ? (
                     <motion.div 
                       key="active-voice"
                       initial={{ opacity: 0, scale: 0.8 }}

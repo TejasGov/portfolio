@@ -221,3 +221,27 @@ body.dark-mode .orb-overlay-backdrop {
   background: var(--dock-item-hover);
   transform: scale(1.05);
 }
+
+/* ElevenLabs WebRTC Connection Status Styles */
+.orb-avatar-container.connecting {
+  animation: orb-connecting-pulse 1.2s ease-in-out infinite alternate;
+}
+
+.orb-avatar-container.connected {
+  filter: drop-shadow(0 0 16px rgba(139, 92, 246, 0.8));
+}
+
+.orb-pulse-ring.connecting {
+  background: rgba(234, 179, 8, 0.08); /* Yellow/Gold glow during handshake */
+  animation-duration: 1.8s;
+}
+
+.orb-pulse-ring.connected {
+  background: rgba(236, 72, 153, 0.08); /* Pink/Purple glow when live */
+  animation-duration: 2.2s;
+}
+
+@keyframes orb-connecting-pulse {
+  0% { transform: scale(0.95); opacity: 0.85; }
+  100% { transform: scale(1.05); opacity: 1; }
+}
