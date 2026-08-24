@@ -1,0 +1,60 @@
+# Tejas Govind - Engineering & System Architecture Map
+
+> Undergraduate Computer Science Major at the University at Buffalo (Graduating May 2027). Specializing in machine learning systems, computer vision pipelines, human-centric AI applications, and high-performance web architectures.
+
+---
+
+## Technical Stack & Core Competencies
+
+- **Languages & Frameworks**: Python, JavaScript/TypeScript, React, Three.js, Next.js, FastAPI, Flask, Node.js, HTML5/CSS3.
+- **Machine Learning & Vision**: PyTorch, YOLOv8, LLaMA-3, MediaPipe, OpenCV, XGBoost, NumPy, Scikit-learn.
+- **Hardware & Embedded**: Raspberry Pi Zero 2 W, I2S Audio Interfaces, Microcontroller Sensors.
+- **Cloud & Tooling**: Google Cloud Platform (GCP), Docker, Vite, GSAP, WebGL, Git, Vercel.
+
+---
+
+## Primary Projects & Engineering Architecture
+
+### 1. CogniFlow (Multimodal Cognitive Support / CogniFight)
+- **Domain**: Machine Learning / Health & Assistive Technology for ADHD.
+- **Frameworks & Tech**: Python, LLaMA-3, YOLOv8, XGBoost, MediaPipe, Google Cloud Platform, FastAPI.
+- **Architecture**: Multimodal ML pipeline designed to predict task abandonment risk in real time for users with ADHD. Combines LLaMA-3 for contextual/linguistic understanding, YOLOv8 for spatial and visual attention tracking, MediaPipe for facial landmark processing, and XGBoost for real-time behavioral classification.
+- **Trade-offs & Decisions**: 
+  - *Real-time Latency vs. Model Ensemble Compute*: High-parameter LLMs like LLaMA-3 introduce latency spikes. To maintain sub-2-second end-to-end system latency, light-weight feature extraction (MediaPipe landmarks and spatial bounding boxes) runs on continuous streams, while LLM calls are asynchronous and triggered only when confidence thresholds in XGBoost drop below safe boundaries.
+  - *Deployment*: Hosted as asynchronous microservices on GCP with fast JSON schemas via FastAPI.
+
+### 2. CineSearch (Intelligent Movie Search & Discovery)
+- **Domain**: Web Application / Recommendation & Search Architecture.
+- **Frameworks & Tech**: React, Web API indexing, Vector-based similarity search, CSS Glassmorphism, WebP Media Pipeline.
+- **Architecture**: A cinematic discovery platform enabling high-speed multi-parametric filtering across genres, ratings, runtime, release eras, and semantic similarity.
+- **Trade-offs & Decisions**:
+  - *Client-side In-memory Indexing vs. Remote API Fetching*: Optimized data structures to allow zero-latency client-side instant filtering across extensive film catalogs without incurring per-query network latency or rate-limiting constraints.
+  - *Asset Pipeline*: Applied aggressive WebP image conversion and responsive lazy loading to maintain high visual aesthetic standards without compromising Initial Page Load (LCP) performance.
+
+### 3. Revere – Wearable AI Smart Glasses Prototype
+- **Domain**: Wearable Hardware / Edge AI / Assistive Healthcare for Alzheimer's.
+- **Frameworks & Tech**: Python, Gemini 2.0 Flash, Raspberry Pi Zero 2 W, I2S Audio Output, Next.js, GSAP, WebGL.
+- **Architecture**: Smart glasses wearable prototype designed for Alzheimer's patient distress reduction. Captures visual inputs, performs facial recognition via Gemini 2.0 Flash multimodal vision API, and delivers discreet audio relationship prompts via I2S audio drivers. Includes a caregiver monitoring dashboard.
+- **Trade-offs & Decisions**:
+  - *Edge Compute Constraints vs. Cloud Multimodal Inference*: The Raspberry Pi Zero 2 W has extreme RAM and thermal boundaries. Raw frame streaming over compressed binary WebSockets to cloud endpoints was selected over local inference to achieve real-time accuracy without thermal throttling on the wearable unit.
+  - *Proactive Alert System*: Implemented proactive wandering detection algorithms that trigger discreet caregiver notifications if motion profiles deviate from scheduled routines.
+
+### 4. Smash Cricket
+- **Domain**: Computer Vision / Interactive Gaming.
+- **Frameworks & Tech**: Python, OpenCV, MediaPipe, NumPy, Flask, TypeScript, React.
+- **Architecture**: A webcam-based hand cricket game performing real-time hand gesture recognition (1–6 fingers) under 500ms latency.
+- **Trade-offs & Decisions**:
+  - Replaced heavy CNN classifiers with MediaPipe 3D hand landmark vectors and custom vector math via NumPy, reducing memory footprint by over 80% and making real-time web deployment seamless.
+
+### 5. Portfolio OS (iOS Desktop Web Application)
+- **Domain**: System UI & Modern Web Performance.
+- **Frameworks & Tech**: React, Framer Motion, GSAP, Three.js, Vanilla CSS Design Tokens.
+- **Architecture**: Interactive OS desktop interface mimicking macOS/iOS window management, dynamic docking, ambient visual shaders, keyboard spotlight search (`Cmd+K`), and accessible semantic data layers for search engines and AI crawlers.
+
+---
+
+## Contact & Links
+
+- **Portfolio**: https://tejasgovind.info
+- **GitHub**: https://github.com/TejasGov
+- **University**: University at Buffalo (B.S. in Computer Science, May 2027)

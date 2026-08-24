@@ -6,29 +6,160 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
     <!-- Primary Meta Tags -->
-    <title>Tejas Govind - Portfolio</title>
-    <meta name="description" content="Tejas Govind's interactive, iOS-inspired portfolio — projects, work experience, and more." />
+    <title>Tejas Govind - Computer Science Major & Systems Engineer Portfolio</title>
+    <meta name="description" content="Tejas Govind is an undergraduate Computer Science major at the University at Buffalo graduating in May 2027. Specializing in machine learning, computer vision, React, Three.js, Python, OpenCV, and XGBoost." />
 
     <!-- Open Graph / Facebook / LinkedIn -->
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://tejasgovind.info" />
-    <meta property="og:title" content="Tejas Govind - Portfolio" />
-    <meta property="og:description" content="Tejas Govind's interactive, iOS-inspired portfolio — projects, work experience, and more." />
+    <meta property="og:title" content="Tejas Govind - Computer Science Major & Systems Engineer" />
+    <meta property="og:description" content="Undergraduate Computer Science major at University at Buffalo (May 2027). Projects include CogniFlow (Multimodal ML), CineSearch, Revere Wearable AI, and Smash Cricket." />
     <meta property="og:image" content="https://tejasgovind.info/thumbnail.jpg" />
 
     <!-- Twitter -->
     <meta property="twitter:card" content="summary_large_image" />
     <meta property="twitter:url" content="https://tejasgovind.info" />
     <meta property="twitter:title" content="Tejas Govind - Portfolio" />
-    <meta property="twitter:description" content="Tejas Govind's interactive, iOS-inspired portfolio — projects, work experience, and more." />
+    <meta property="twitter:description" content="Undergraduate Computer Science major at University at Buffalo (May 2027). Projects include CogniFlow (Multimodal ML), CineSearch, Revere Wearable AI, and Smash Cricket." />
     <meta property="twitter:image" content="https://tejasgovind.info/thumbnail.jpg" />
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=DotGothic16&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- JSON-LD Structured Data Schema -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@graph": [
+        {
+          "@type": "Person",
+          "@id": "https://tejasgovind.info/#person",
+          "name": "Tejas Govind",
+          "jobTitle": "Software Engineer & Machine Learning Student",
+          "description": "Undergraduate Computer Science major at the University at Buffalo graduating in May 2027. Specializing in machine learning pipelines, computer vision, human-centric AI applications, and interactive web architectures.",
+          "url": "https://tejasgovind.info",
+          "sameAs": [
+            "https://github.com/TejasGov"
+          ],
+          "alumniOf": {
+            "@type": "EducationalOrganization",
+            "name": "University at Buffalo",
+            "sameAs": "https://www.buffalo.edu"
+          },
+          "knowsAbout": [
+            "React",
+            "Three.js",
+            "Python",
+            "OpenCV",
+            "XGBoost",
+            "FastAPI",
+            "MediaPipe",
+            "YOLOv8",
+            "LLaMA-3",
+            "Machine Learning",
+            "Computer Vision",
+            "Wearable AI",
+            "GSAP",
+            "Next.js",
+            "TypeScript"
+          ]
+        },
+        {
+          "@type": "SoftwareApplication",
+          "@id": "https://tejasgovind.info/#cogniflow",
+          "name": "CogniFlow (Multimodal Cognitive Support)",
+          "alternateName": "CogniFight",
+          "applicationCategory": "HealthApplication",
+          "operatingSystem": "Cloud / Web",
+          "author": { "@id": "https://tejasgovind.info/#person" },
+          "description": "Multimodal machine learning pipeline to assist users with ADHD by predicting task abandonment risk in real time. Combines LLaMA-3, YOLOv8 visual tracking, XGBoost behavioral classification, and MediaPipe landmark processing on GCP.",
+          "programmingLanguage": ["Python", "FastAPI"]
+        },
+        {
+          "@type": "SoftwareApplication",
+          "@id": "https://tejasgovind.info/#cinesearch",
+          "name": "CineSearch",
+          "applicationCategory": "EntertainmentApplication",
+          "operatingSystem": "Web",
+          "author": { "@id": "https://tejasgovind.info/#person" },
+          "description": "Intelligent movie discovery and recommendation platform featuring vector-based semantic search, parametric multi-filter engine, and webp compressed asset pipeline.",
+          "programmingLanguage": ["JavaScript", "React"]
+        },
+        {
+          "@type": "SoftwareApplication",
+          "@id": "https://tejasgovind.info/#revere",
+          "name": "Revere – Wearable AI Prototype",
+          "applicationCategory": "HealthApplication",
+          "operatingSystem": "Raspberry Pi OS / Web",
+          "author": { "@id": "https://tejasgovind.info/#person" },
+          "description": "Smart glasses prototype performing real-time facial recognition and delivering discreet audio relationship prompts for Alzheimer's patient care, backed by Gemini 2.0 Flash and Raspberry Pi Zero 2 W.",
+          "programmingLanguage": ["Python", "Next.js", "GSAP", "WebGL"]
+        },
+        {
+          "@type": "SoftwareApplication",
+          "@id": "https://tejasgovind.info/#smash-cricket",
+          "name": "Smash Cricket",
+          "applicationCategory": "GameApplication",
+          "operatingSystem": "Web",
+          "author": { "@id": "https://tejasgovind.info/#person" },
+          "description": "Webcam-powered hand cricket game using computer vision and 3D hand landmark gesture recognition under 500ms latency.",
+          "programmingLanguage": ["Python", "TypeScript", "React", "OpenCV", "MediaPipe"]
+        },
+        {
+          "@type": "WebApplication",
+          "@id": "https://tejasgovind.info/#portfolio-os",
+          "name": "Portfolio OS",
+          "applicationCategory": "DeveloperApplication",
+          "operatingSystem": "Web Browser",
+          "author": { "@id": "https://tejasgovind.info/#person" },
+          "description": "Interactive OS-style web interface featuring window management, spotlight search, dynamic docking, ambient shaders, and machine-readable semantic layers.",
+          "programmingLanguage": ["JavaScript", "React", "CSS3"]
+        }
+      ]
+    }
+    </script>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <!-- Pre-rendered Static HTML Payload for Instant Crawler & SSR Context Parsing -->
+      <div id="ssr-initial-payload" style="position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border-width: 0;">
+        <header>
+          <h1>Tejas Govind - Portfolio & Systems Architecture</h1>
+          <p>Undergraduate Computer Science Major at the University at Buffalo graduating in May 2027. Specializing in machine learning pipelines, computer vision systems, human-centric AI tools, and high-performance interactive web interfaces.</p>
+        </header>
+        <main>
+          <section>
+            <h2>Academic Background & Technical Skills</h2>
+            <p>Institution: University at Buffalo (B.S. Computer Science, May 2027)</p>
+            <p>Core Technologies: React, Three.js, Python, OpenCV, XGBoost, MediaPipe, LLaMA-3, YOLOv8, FastAPI, Flask, Node.js, Next.js, GSAP, Tailwind CSS, Docker, GCP.</p>
+          </section>
+          <section>
+            <h2>Primary Engineering Projects</h2>
+            <article>
+              <h3>CogniFlow (Multimodal Cognitive Support / CogniFight)</h3>
+              <p>Multimodal ML pipeline predicting ADHD task abandonment risk in real time. Architecture combines LLaMA-3, YOLOv8 visual attention tracking, XGBoost behavioral classification, and MediaPipe on Google Cloud Platform with FastAPI microservices. Sub-2s end-to-end latency.</p>
+            </article>
+            <article>
+              <h3>CineSearch</h3>
+              <p>Intelligent movie discovery and recommendation platform featuring vector-based semantic search, parametric multi-filter catalog engine, and optimized media compression.</p>
+            </article>
+            <article>
+              <h3>Revere – Wearable AI Prototype</h3>
+              <p>Smart glasses wearable prototype for Alzheimer's patient care. Operates on a Raspberry Pi Zero 2 W streaming camera input to Gemini 2.0 Flash multimodal vision API, delivering I2S audio prompts and proactive wandering detection alerts.</p>
+            </article>
+            <article>
+              <h3>Smash Cricket</h3>
+              <p>Computer vision hand cricket game detecting webcam hand gestures (1-6 fingers) using MediaPipe landmark detection and NumPy vector mathematics under 500ms latency.</p>
+            </article>
+            <article>
+              <h3>Portfolio OS</h3>
+              <p>Interactive iOS-inspired desktop web application with window management, dock items, Spotlight search (Cmd+K), and accessible semantic shadow DOM structure.</p>
+            </article>
+          </section>
+        </main>
+      </div>
+    </div>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

@@ -113,11 +113,12 @@ export default function App() {
         <DesktopWidgets />
 
         {/* Desktop Folders */}
-        <div className="desktop-icons-grid">
+        <ul className="desktop-icons-grid" role="list">
           {desktopItems.map((item) => (
-            <motion.div
+            <motion.li
               key={item.id}
               className="desktop-icon"
+              role="listitem"
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
               onClick={() => toggleWindow(item.id)}
@@ -129,9 +130,9 @@ export default function App() {
               <span className="desktop-icon-label">
                 {item.title}
               </span>
-            </motion.div>
+            </motion.li>
           ))}
-        </div>
+        </ul>
 
         {/* Window Modals */}
         <AnimatePresence>
@@ -160,17 +161,19 @@ export default function App() {
 
         <Dock>
           <DockIcon
-            icon={<img src={memojiImg} alt="Memoji" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />}
+            icon={<img src={memojiImg} alt="Memoji Avatar - About Tejas Govind" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />}
             label="About Me"
+            ariaLabel="Memoji Avatar - Interactive About Me Window"
             isActive={activeWindows.includes('about')}
             onClick={() => toggleWindow('about')}
             hoverColor="rgba(255, 255, 255, 0.3)"
           />
           <div style={{ width: '1px', background: 'var(--timeline-line)', margin: '0 4px' }} />
-          <DockIcon icon={<FileText color="var(--dock-icon-color)" />} label="Resume" hoverColor="var(--dock-item-hover)" />
+          <DockIcon icon={<FileText color="var(--dock-icon-color)" />} label="Resume" ariaLabel="Resume Document Download and View" hoverColor="var(--dock-item-hover)" />
           <DockIcon
             icon={<Globe color="var(--dock-icon-color)" />}
             label="Socials"
+            ariaLabel="Social Media Links Drawer"
             hoverColor="var(--dock-item-hover)"
             onClick={() => setIsSocialsOpen(!isSocialsOpen)}
             isActive={isSocialsOpen}
@@ -178,14 +181,16 @@ export default function App() {
           <DockIcon 
             icon={<Mail color="var(--dock-icon-color)" />} 
             label="Email" 
+            ariaLabel="Email Contact Modal"
             hoverColor="var(--dock-item-hover)" 
             onClick={() => setIsEmailOpen(!isEmailOpen)}
             isActive={isEmailOpen}
           />
           <div style={{ width: '1px', background: 'var(--timeline-line)', margin: '0 4px' }} />
           <DockIcon
-            icon={<img src="/homepage/aiicon.svg" alt="Orb" style={{ width: '100%', height: '100%', objectFit: 'contain', transform: 'scale(1.3)' }} />}
+            icon={<img src="/homepage/aiicon.svg" alt="Orb - AI Voice Assistant" style={{ width: '100%', height: '100%', objectFit: 'contain', transform: 'scale(1.3)' }} />}
             label="Orb"
+            ariaLabel="Orb - Interactive AI Voice & Multimodal Assistant"
             onClick={() => { }}
             hoverColor="var(--dock-item-hover)"
           />

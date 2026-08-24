@@ -26,7 +26,7 @@ export default function Dock({ children }) {
   );
 }
 
-export function DockIcon({ icon, label, isActive, onClick, hoverColor = 'rgba(255,255,255,0.2)', mouseX }) {
+export function DockIcon({ icon, label, ariaLabel, isActive, onClick, hoverColor = 'rgba(255,255,255,0.2)', mouseX }) {
   const ref = useRef(null);
   const [hovered, setHovered] = useState(false);
 
@@ -45,6 +45,9 @@ export function DockIcon({ icon, label, isActive, onClick, hoverColor = 'rgba(25
     <motion.div 
       ref={ref}
       className="dock-item"
+      role="button"
+      tabIndex={0}
+      aria-label={ariaLabel || label}
       onHoverStart={() => setHovered(true)}
       onHoverEnd={() => setHovered(false)}
       style={{ 

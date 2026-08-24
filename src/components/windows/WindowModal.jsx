@@ -16,6 +16,19 @@ const AboutWindow = lazy(() => import('./AboutWindow'));
 const TheLibrary = lazy(() => import('./TheLibrary'));
 import './WindowModal.css';
 
+const WINDOW_SR_DESCRIPTIONS = {
+  projects: "Projects Window: Documents key engineering projects built by Tejas Govind. Highlights include Smash Cricket (Computer Vision gesture game using OpenCV and MediaPipe), CogniFlow/CogniFight (Multimodal ML pipeline predicting ADHD task abandonment using LLaMA-3, YOLOv8, and XGBoost), and Revere (Wearable AI smart glasses for Alzheimer's care utilizing Raspberry Pi Zero 2 W and Gemini 2.0 Flash).",
+  'work-ex': "Work Experience Window: Interactive timeline detailing software engineering internships, research assistantships, and technical leadership roles. Demonstrates full-stack development, cloud architecture on GCP, performance optimization, and collaborative system design.",
+  photography: "Photography Gallery Window: Visual showcase of photography projects rendered in custom morphing glass grids, dynamic layout toggles (Stack, Grid, List), and responsive image pipelines.",
+  about: "About Me Window: Interactive profile detailing Tejas Govind's background as an undergraduate CS major at the University at Buffalo (Class of May 2027), core technical stack (React, Three.js, Python, OpenCV, XGBoost), personal philosophy, and creative pursuits.",
+  terminal: "Terminal Window: Interactive command line emulator supporting custom shell commands (help, projects, skills, contact, clear, bio). Demonstrates system design, keyboard shortcuts, and CLI parsing.",
+  'my-tech': "My Tech Window: Interactive hardware and desk setup diagram mapping hot-spotted components (MacBook Pro, Ultra-wide monitor, custom PC build with GPU/CPU specs) with technical descriptions.",
+  'my-niche': "My Niche Window: Multimodal media showcase spanning film reviews, sports analytics, and pop culture curation (Marvel MCU tier lists, football analytics, movie database).",
+  'my-sound': "My Sound Window: Music player interface showcasing curated soundtracks and sound design projects with audio visualizers.",
+  blog: "Blog Window: Technical writing and engineering articles covering AI pipelines, front-end architecture, user experience design, and software trade-offs.",
+  'my-library': "My Library Window: Comprehensive repository of books, technical literature, research papers, and software design guides."
+};
+
 export default function WindowModal({ id, onClose, onMinimize, zIndex, onFocus, constraintsRef, onOpenWindow }) {
   const isPhone = useIsPhone();
   const [isMaximized, setIsMaximized] = useState(false);
@@ -238,6 +251,9 @@ export default function WindowModal({ id, onClose, onMinimize, zIndex, onFocus, 
           touchAction: 'auto'
         }} 
       >
+        <p className="sr-only">
+          {WINDOW_SR_DESCRIPTIONS[id] || `${title} application window - Tejas Govind Portfolio OS.`}
+        </p>
         <Suspense fallback={
           <div className="window-loading">
             <div className="spinner" />

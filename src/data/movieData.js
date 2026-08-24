@@ -18,7 +18,6 @@ export const MOVIES = [
   { title: 'Ratatouille', year: 2007, genre: 'Animation', poster: '/movies/rata.webp', imdb: 'https://www.imdb.com/title/tt0382932/' },
   { title: 'Animal', year: 2023, genre: 'Action', poster: '/movies/animal.webp', imdb: 'https://www.imdb.com/title/tt13751694/' },
   { title: 'Bullet Train', year: 2022, genre: 'Action', poster: '/movies/bullettrain.webp', imdb: 'https://www.imdb.com/title/tt12593682/' },
-
   { title: 'Top Gun: Maverick', year: 2022, genre: 'Action', poster: '/movies/topgun.webp', imdb: 'https://www.imdb.com/title/tt1745960/' },
   { title: 'Skyfall', year: 2012, genre: 'Action', poster: '/movies/skyfall.webp', imdb: 'https://www.imdb.com/title/tt1074638/' },
   { title: 'Coco', year: 2017, genre: 'Animation', poster: '/movies/coco.webp', imdb: 'https://www.imdb.com/title/tt2380307/' },
