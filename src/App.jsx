@@ -13,6 +13,7 @@ import SpotlightSearch from './components/overlays/SpotlightSearch';
 import EmailModal from './components/overlays/EmailModal';
 import WindowModal from './components/windows/WindowModal';
 import TopNavbar from './components/desktop/TopNavbar';
+import AIOrbOverlay from './components/overlays/AIOrbOverlay';
 
 export default function App() {
   const [activeWindows, setActiveWindows] = useState([]);
@@ -23,6 +24,7 @@ export default function App() {
   const [isHelpOpen, setIsHelpOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [showBoot, setShowBoot] = useState(true);
+  const [isOrbActive, setIsOrbActive] = useState(false);
   const constraintsRef = useRef(null);
 
   useEffect(() => {
@@ -191,10 +193,13 @@ export default function App() {
             icon={<img src="/homepage/aiicon.svg" alt="Orb - AI Voice Assistant" style={{ width: '100%', height: '100%', objectFit: 'contain', transform: 'scale(1.3)' }} />}
             label="Orb"
             ariaLabel="Orb - Interactive AI Voice & Multimodal Assistant"
-            onClick={() => { }}
+            onClick={() => setIsOrbActive(true)}
             hoverColor="var(--dock-item-hover)"
           />
         </Dock>
+
+        {/* AI Orb Full Screen Viewport Glow & Overlay */}
+        <AIOrbOverlay isOpen={isOrbActive} onClose={() => setIsOrbActive(false)} />
       </div>
     </>
   );
