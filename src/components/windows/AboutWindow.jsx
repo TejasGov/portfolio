@@ -11,7 +11,7 @@ const SUMMARY = "Tejas Govind is a CS student at University at Buffalo building 
 const SECTION_TEXT = {
   builder:  "Tejas doesn't just solve problems. He finds them first. Most builders wait for someone to hand them a brief. He's already two steps ahead wondering why the problem exists in the first place. Whether it's a scrappy jugaad fix that somehow actually works, or something genuinely hard like designing for people with ADHD or Alzheimer's, he keeps ending up in the messy, human, underserved corners that most products haven't bothered to look at. He just really likes thinking, and it doesn't really turn off.",
   people:   "Ask Tejas what he actually enjoys and he'll say: talking to people. Not networking. Talking. He'd rather spend an hour in a real conversation than a week guessing what someone needs. It's probably why he builds the way he does. He can't help but wonder who's on the other side of the screen.",
-  fuel:     "Tejas runs on coffee. Specifically, an iced vanilla latte. Always iced. Never negotiable, not even in January. This isn't a casual morning cup situation. It's closer to load-bearing infrastructure for his entire personality. Starbucks knows what they did.",
+  fuel:     "Tejas runs on coffee. Specifically, an iced vanilla latte. Always iced. Never negotiable, not even in January. Introduced by his lovely girlfriend, they now bond over it together each day. This isn't a casual morning cup situation. It's closer to load-bearing infrastructure for his entire personality. Starbucks knows what they did.",
   cinema:   "It started with Interstellar. One film, and something just broke open. Now he's the person who notices the score before the dialogue, who has actual thoughts about aspect ratios, and who somehow has more Marvel opinions than anyone who got into it late really should.",
   football: "Football isn't a hobby, it's a religion. One club. One GOAT. The math is simple.",
 };
@@ -39,7 +39,7 @@ const SKILLS = [
 const TURNS = [
   {
     prompt: "who is tejas?",
-    thinking: `okay. who is tejas.\n\ncs at UB. that's the frame. the actual thing is he just builds stuff. not because someone told him to. because he spots something broken and can't really look away.\n\njugaad fixes. designing for ADHD. for alzheimer's. he keeps ending up in the corners most products skip.\n\ntalks to people. actually talks. not networking. probably why his work tends to feel like it was made for a real person.\n\niced vanilla latte. always iced. even in january. apparently non-negotiable.\n\ninterstellar did something to him. now he has thoughts about aspect ratios.\n\nfootball. one club. one goat.\n\nokay. i think i have enough.`,
+    thinking: `okay. who is tejas.\n\ncs at UB. that's the frame. the actual thing is he just builds stuff. not because someone told him to. because he spots something broken and can't really look away.\n\njugaad fixes. designing for ADHD. for alzheimer's. he keeps ending up in the corners most products skip.\n\ntalks to people. actually talks. not networking. probably why his work tends to feel like it was made for a real person.\n\niced vanilla latte. always iced. even in january. apparently non-negotiable. lovely girlfriend introduced him to it, and they bond over it together each day.\n\ninterstellar did something to him. now he has thoughts about aspect ratios.\n\nfootball. one club. one goat.\n\nokay. i think i have enough.`,
     responseId: 'intro',
     thinkingSpeed: 9,
   },
@@ -394,7 +394,7 @@ function Turn({ data, onComplete }) {
       if (i >= data.prompt.length) {
         clearInterval(id);
         setPromptDone(true);
-        setTimeout(() => setPhase('thinking'), 380);
+        setTimeout(() => setPhase('thinking'), data.responseId === 'intro' ? 100 : 380);
       }
     }, 38);
     return () => clearInterval(id);
