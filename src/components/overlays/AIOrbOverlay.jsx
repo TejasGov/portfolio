@@ -79,7 +79,10 @@ export default function AIOrbOverlay({ isOpen, onClose, currentActiveWindow }) {
                     try {
                       startSession({
                         agentId: "agent_5301m0tx6pz3evjveb5s4e9e33g5",
-                        dynamicVariables: { current_active_window: currentActiveWindow }
+                        dynamicVariables: { current_active_window: currentActiveWindow },
+                        onError: (error) => console.error("ElevenLabs Conversation Error:", error),
+                        onConnect: () => console.log("ElevenLabs Agent Connected!"),
+                        onDisconnect: () => console.log("ElevenLabs Agent Disconnected.")
                       });
                     } catch (err) {
                       console.error("Failed to start ElevenLabs session:", err);
