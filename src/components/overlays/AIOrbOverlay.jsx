@@ -76,10 +76,14 @@ export default function AIOrbOverlay({ isOpen, onClose, currentActiveWindow }) {
                   if (status === "connected") {
                     endSession();
                   } else {
-                    startSession({
-                      agentId: "YOUR_ELEVENLABS_AGENT_ID",
-                      dynamicVariables: { current_active_window: currentActiveWindow }
-                    });
+                    try {
+                      startSession({
+                        agentId: "agent_5301m0tx6pz3evjveb5s4e9e33g5",
+                        dynamicVariables: { current_active_window: currentActiveWindow }
+                      });
+                    } catch (err) {
+                      console.error("Failed to start ElevenLabs session:", err);
+                    }
                   }
                 }}
               >
