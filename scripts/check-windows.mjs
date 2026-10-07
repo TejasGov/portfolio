@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { mkdirSync } from 'node:fs';
 import puppeteer from 'puppeteer';
+import { projectsData } from '../src/data/projectsData.js';
 
 const output = process.env.PORTFOLIO_CHECK_OUTPUT || '/tmp/portfolio-review';
 mkdirSync(`${output}/config`, { recursive: true });
@@ -38,7 +39,7 @@ try {
     await openFolder(title);
     if (title === 'Projects') {
       const rows = await page.$$('.proj-sb-row');
-      assert.equal(rows.length, 7, 'Seven selected projects in the collection');
+      assert.equal(rows.length, projectsData.length, 'Every curated project is in the collection');
       for (const row of rows) {
         await row.click();
         await page.waitForFunction(() => {
@@ -56,8 +57,8 @@ try {
       await page.keyboard.press('ArrowDown');
       assert.equal(await page.$eval('.proj-app-name', e => e.textContent), 'Cohere');
       await page.keyboard.press('End');
-      assert.equal(await page.$eval('.proj-app-name', e => e.textContent), 'Backpack Brain');
-      assert.equal(await page.$('.proj-btn-primary'), null, 'Unverified Backpack demo is not advertised');
+      assert.equal(await page.$eval('.proj-app-name', e => e.textContent), projectsData.at(-1).title);
+      assert.equal(await page.$('.proj-btn-primary'), null, 'Source-only project has no invented demo');
       await page.keyboard.press('Home');
       await rows[0].click();
       assert.equal(await page.$eval('.proj-btn-primary', e => e.getAttribute('href')), 'https://smash-cricket.vercel.app/');

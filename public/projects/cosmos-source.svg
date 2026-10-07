@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="675" viewBox="0 0 1200 675">
+  <defs><pattern id="dots" width="8" height="8" patternUnits="userSpaceOnUse"><circle cx="2" cy="2" r="1" fill="#958e80"/></pattern><linearGradient id="fade"><stop stop-color="white"/><stop offset="1" stop-color="black"/></linearGradient><mask id="dither"><rect width="1200" height="675" fill="url(#fade)"/></mask></defs>
+  <rect width="1200" height="675" fill="#f5f2eb"/>
+  <rect x="860" width="340" height="675" fill="url(#dots)" mask="url(#dither)"/>
+  <g fill="#38352f" font-family="Georgia,serif"><text x="80" y="160" font-size="76" letter-spacing="-3">COSMOS</text><text x="84" y="211" font-size="24">A reading space, built from Markdown.</text></g>
+  <g fill="#786f63" font-family="monospace" font-size="14" letter-spacing="2"><text x="84" y="75">REPOSITORY STUDY / TEJASGOV</text><text x="84" y="618">NEXT.JS · REACT · TAILWIND CSS</text></g>
+  <g fill="none" stroke="#c2b9ac" stroke-width="2"><path d="M358 407H492M492 350V500M492 350H548M492 425H548M492 500H548"/><rect x="84" y="327" width="275" height="174" rx="12"/></g>
+  <g font-family="monospace"><text x="112" y="370" font-size="18" fill="#38352f">content/*.md</text><text x="112" y="412" font-size="15" fill="#786f63">title · date · tag</text><text x="112" y="449" font-size="15" fill="#786f63">Three sample essays</text></g>
+  <g font-family="monospace" font-size="19" fill="#38352f"><text x="574" y="357">Essay index &amp; archive</text><text x="574" y="432">Reading pages &amp; search</text><text x="574" y="507">RSS feed</text></g>
+  <g fill="#9b896e"><rect x="546" y="342" width="10" height="10"/><rect x="546" y="417" width="10" height="10"/><rect x="546" y="492" width="10" height="10"/></g>
+</svg>

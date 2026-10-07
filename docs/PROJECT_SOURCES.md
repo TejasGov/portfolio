@@ -1,6 +1,6 @@
 # Project collection sources
 
-Reviewed October 7, 2026 with a Luna agent at the user's request. The collection contains seven projects. New entries use public repository documentation and package manifests; no popularity, benchmark, completion, or production-readiness claims were inferred.
+Reviewed October 7, 2026 with Luna agents at the user's request. The collection contains nine projects. New entries use public repository documentation and package manifests; no popularity, benchmark, completion, or production-readiness claims were inferred.
 
 | Entry | Source | Presentation |
 | --- | --- | --- |
@@ -9,6 +9,8 @@ Reviewed October 7, 2026 with a Luna agent at the user's request. The collection
 | Stratos | [Repository](https://github.com/TejasGov/Stratos), README and package manifest | Flight-game prototype; source link, without claiming a public deployment. |
 | Backpack Brain | [Repository](https://github.com/TejasGov/Backpack), current main manifest and app tree | Source-only prototype: Next.js, React, Tailwind, Supabase, AI SDK. README's older Lovable demo cannot be confirmed as matching this source revision, so it is not advertised. |
 | CogniFight / Cognitive Support | [CogniFlow repository](https://github.com/TejasGov/cogniflow) | Matching public ADHD cognitive-support pipeline; source link added to existing entry. |
+| Commit City | [Repository](https://github.com/TejasGov/github-isometric-city), README and native JavaScript modules | Canvas contribution-city visualization. Source only; no verified deployment. |
+| COSMOS | [Repository](https://github.com/TejasGov/COSMOS), README, `blog/package.json`, TypeScript pages | Editorial blog prototype. Placeholder biography/URLs require customization, so it is not described as a published personal blog. |
 
 Existing Smash Cricket and Revere entries retain their authored descriptions and imagery. No public Smash Cricket source was found. The public Revere repository describes a cinematic product showcase rather than the wearable implementation, so it is not labelled as the wearable source.
 
@@ -18,6 +20,8 @@ Existing Smash Cricket and Revere entries retain their authored descriptions and
 - `public/projects/stratos.webp`: [docs/images/stratos-banner.svg](https://github.com/TejasGov/Stratos/blob/main/docs/images/stratos-banner.svg), labelled as repository banner artwork.
 - `public/projects/cohere.webp`: [apps/demo-portal/public/cohere-logo-full.png](https://github.com/TejasGov/cohere/blob/main/apps/demo-portal/public/cohere-logo-full.png), labelled as a project logo.
 - `public/projects/backpack.webp`: [public/logo.png](https://github.com/TejasGov/Backpack/blob/main/public/logo.png), labelled as project artwork.
+- `public/projects/commit-city.webp`: actual browser capture of the repository's unmodified local demo, using its built-in sample data and system fonts. This is not Tejas's live contribution history.
+- `public/projects/cosmos-source.svg`: portfolio-authored source-structure illustration based on the repository routes/content loader; labelled as an illustration, not an application screenshot or official logo.
 
 Assets were fetched from each repository's `main` branch, resized and compressed as local WebP files (about 133 KB total). The portfolio does not depend on remote GitHub image loading or runtime scraping.
 

@@ -196,5 +196,29 @@ export const projectsData = [
     },
     "link": null,
     "github": "https://github.com/TejasGov/Backpack"
+  },
+  {
+    id: 'commit-city', type: 'web', title: 'Commit City', shortTitle: 'Commit City',
+    shortCategory: 'Interactive Visualization', category: 'Web · Creative Coding · Data Visualization',
+    emoji: '🏙️', bg: 'linear-gradient(135deg, #192c40, #559b85)', color: '#81d7b4',
+    status: 'Source available', compatibility: 'Web · Mouse & Touch', tech: 'HTML, CSS, JavaScript',
+    description: 'A year of GitHub contributions becomes an interactive isometric city. Daily activity shapes the building heights, with a street grid, moving traffic, and night, day, and monochrome scenes. Built with native JavaScript modules and Canvas, with orbit, pan, zoom, date inspection, and poster export. A built-in sample city works without an API connection.',
+    image: '/projects/commit-city.webp', imageWidth: 1200, imageHeight: 750, imageKind: 'screenshot',
+    imageCaption: 'Commit City · Local capture with built-in sample data',
+    imageAlt: 'Commit City: an isometric contribution city with illuminated buildings and a street grid',
+    info: { Type: 'Interactive Visualization', Domain: 'GitHub Contributions', Frontend: 'Canvas + Native JavaScript' },
+    link: null, github: 'https://github.com/TejasGov/github-isometric-city',
+  },
+  {
+    id: 'cosmos', type: 'web', title: 'COSMOS', shortTitle: 'COSMOS',
+    shortCategory: 'Editorial Blog', category: 'Web · Publishing · Typography',
+    emoji: '✍️', bg: 'linear-gradient(135deg, #3c342c, #a99b83)', color: '#c8b997',
+    status: 'Blog prototype', compatibility: 'Web', tech: 'Next.js, React, TypeScript, Tailwind CSS, Markdown',
+    description: 'An editorial blog built around typography and a compact essay index. Markdown powers the reading pages, with an archive, search, RSS feed, and persistent light and dark themes. The repository includes three sample essays and self-hosted fonts. Author content, project links, and deployment URLs still need customization before publication.',
+    image: '/projects/cosmos-source.svg', imageWidth: 1200, imageHeight: 675, imageKind: 'source',
+    imageCaption: 'COSMOS · Repository structure illustration', imageBackground: '#f5f2eb',
+    imageAlt: 'COSMOS source structure: Markdown essays feed a Next.js essay index, reading pages, search, and RSS',
+    info: { Type: 'Editorial Blog', Domain: 'Publishing', Frontend: 'Next.js + React', Backend: 'Markdown Content' },
+    link: null, github: 'https://github.com/TejasGov/COSMOS',
   }
 ];
