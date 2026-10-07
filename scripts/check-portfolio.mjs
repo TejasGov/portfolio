@@ -57,7 +57,7 @@ try {
 
   await page.click('[aria-label="Open Projects"]');
   await page.waitForSelector('.proj-app-name');
-  await page.click('.proj-sb-list button:last-child');
+  await page.$$eval('.proj-sb-list button', buttons => buttons.find(button => button.textContent.includes('Revere')).click());
   assert.match(await page.$eval('.proj-app-name', e => e.textContent), /Revere/);
   await page.$eval('.proj-detail', e => { e.scrollTop = 150; });
   await page.click('[aria-label="Minimize Projects"]');

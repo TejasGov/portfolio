@@ -11,8 +11,10 @@ export default function ProjectsWindow() {
   const detailRef = useRef(null);
   const project = projectsData[selected];
   const publicLink = hasPublicLink(project.link);
+  const publicSource = hasPublicLink(project.github);
+  const liveLabel = project.linkLabel || 'Visit live project';
   const projectDetails = Object.entries(project.info).filter(([label]) =>
-    ['Type', 'Domain', 'Backend', 'Frontend', 'Hardware'].includes(label)
+    ['Type', 'Domain', 'Backend', 'Frontend', 'Hardware', 'Physics'].includes(label)
   );
 
   useEffect(() => {
@@ -35,6 +37,15 @@ export default function ProjectsWindow() {
               aria-pressed={selected === index}
               aria-controls="project-case-study"
               onClick={() => setSelected(index)}
+              onKeyDown={event => {
+                if (!['ArrowDown', 'ArrowUp', 'ArrowRight', 'ArrowLeft', 'Home', 'End'].includes(event.key)) return;
+                event.preventDefault();
+                const next = event.key === 'Home' ? 0 : event.key === 'End' ? projectsData.length - 1 : Math.max(0, Math.min(projectsData.length - 1, index + (['ArrowDown', 'ArrowRight'].includes(event.key) ? 1 : -1)));
+                setSelected(next);
+                const row = event.currentTarget.closest('nav').querySelectorAll('button')[next];
+                row.focus({ preventScroll: true });
+                row.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+              }}
             >
               <span className="proj-sb-icon" style={{ background: item.bg }} aria-hidden="true">{item.emoji}</span>
               <span className="proj-sb-info">
@@ -65,25 +76,25 @@ export default function ProjectsWindow() {
           </div>
           <h2 className="proj-app-name" id="project-case-title">{project.title}</h2>
           <p className="proj-app-cat">{project.category}</p>
-          {publicLink && (
+          {(publicLink || publicSource) && <div className="proj-actions">{publicLink && (
             <a
               href={project.link}
               target="_blank"
               rel="noopener noreferrer"
               className="proj-btn-primary"
-              aria-label={`Visit ${project.shortTitle} live project (opens in a new tab)`}
+              aria-label={`${liveLabel}: ${project.shortTitle} (opens in a new tab)`}
             >
-              Visit live project <ArrowUpRight size={17} aria-hidden="true" />
+              {liveLabel} <ArrowUpRight size={17} aria-hidden="true" />
             </a>
-          )}
+          )}{publicSource && <a className="proj-btn-source" href={project.github} target="_blank" rel="noopener noreferrer" aria-label={`View source for ${project.shortTitle} (opens in a new tab)`}>View source <ArrowUpRight size={15} aria-hidden="true" /></a>}</div>}
         </header>
 
         <figure className="proj-visual">
-          <div className="proj-visual-frame">
-            <img src={project.image} alt={`${project.shortTitle} project visual`} width="1024" height="1024" />
+          <div className="proj-visual-frame" data-image-kind={project.imageKind} style={{ background: project.imageBackground }}>
+            <img src={project.image} alt={project.imageAlt || `${project.shortTitle} project visual`} width={project.imageWidth || 1024} height={project.imageHeight || 1024} />
           </div>
           <figcaption>
-            <span>{project.shortTitle} / Project visual</span>
+            <span>{project.imageCaption || `${project.shortTitle} / Project visual`}</span>
             <span aria-hidden="true">{projectNumber(selected)} — {String(projectsData.length).padStart(2, '0')}</span>
           </figcaption>
         </figure>
@@ -112,7 +123,7 @@ export default function ProjectsWindow() {
               </div>
             ))}
           </dl>
-          {!publicLink && <p className="proj-access-note">This project is not publicly available.</p>}
+          {!publicLink && <p className="proj-access-note">{publicSource ? 'Explore the implementation in the public repository.' : 'A public demo is not available.'}</p>}
         </section>
       </article>
     </div>

@@ -38,13 +38,27 @@ try {
     await openFolder(title);
     if (title === 'Projects') {
       const rows = await page.$$('.proj-sb-row');
+      assert.equal(rows.length, 7, 'Seven selected projects in the collection');
       for (const row of rows) {
         await row.click();
         await page.waitForFunction(() => {
           const image = document.querySelector('.proj-visual img');
           return image?.complete && image.naturalWidth > 0;
         });
+        const title = await page.$eval('.proj-app-name', e => e.textContent);
+        assert.equal(await page.$$eval('.proj-actions a', links => links.every(link => /^https:\/\//.test(link.getAttribute('href')))), true);
+        if (['Yudhveer', 'Cohere', 'Stratos', 'Backpack Brain'].includes(title)) {
+          assert.match(await page.$eval('.proj-btn-source', e => e.getAttribute('href')), /^https:\/\/github.com\/TejasGov\//);
+          await page.screenshot({ path: `${output}/project-${title.replaceAll(' ', '-')}.png` });
+        }
       }
+      await rows[3].focus();
+      await page.keyboard.press('ArrowDown');
+      assert.equal(await page.$eval('.proj-app-name', e => e.textContent), 'Cohere');
+      await page.keyboard.press('End');
+      assert.equal(await page.$eval('.proj-app-name', e => e.textContent), 'Backpack Brain');
+      assert.equal(await page.$('.proj-btn-primary'), null, 'Unverified Backpack demo is not advertised');
+      await page.keyboard.press('Home');
       await rows[0].click();
       assert.equal(await page.$eval('.proj-btn-primary', e => e.getAttribute('href')), 'https://smash-cricket.vercel.app/');
     }
@@ -97,6 +111,16 @@ try {
   for (const title of titles) {
     await openFolder(title);
     assert.equal(await page.$eval('.window-content', e => e.scrollWidth <= e.clientWidth), true, `${title} phone overflow`);
+    if (title === 'Projects') {
+      const rows = await page.$$('.proj-sb-row');
+      for (const row of rows) {
+        await row.evaluate(e => e.scrollIntoView({ block: 'nearest', inline: 'nearest' }));
+        await row.click();
+        await page.waitForFunction(() => { const image = document.querySelector('.proj-visual img'); return image?.complete && image.naturalWidth > 0; });
+        assert.equal(await page.$eval('.proj-detail', e => e.scrollWidth <= e.clientWidth), true, 'Each project detail fits the phone');
+      }
+      await page.screenshot({ path: `${output}/phone-project-Backpack.png` });
+    }
     if (title === 'My Tech') {
       const initialScale = await page.$eval('.tech-canvas', e => Number(e.dataset.scale));
       const fits = await page.$eval('.tech-canvas', e => {
