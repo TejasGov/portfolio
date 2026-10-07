@@ -1,7 +1,9 @@
-import React, { Suspense, useState, useRef, useMemo, useCallback, useEffect } from 'react';
+import React, { Suspense, useState, useRef, useMemo, useCallback, useEffect, useContext } from 'react';
+import { useReducedMotion } from 'framer-motion';
+import { WindowActivityContext } from '../../contexts/WindowActivity';
 import * as THREE from 'three';
 import { Canvas, useFrame } from '@react-three/fiber';
-import { OrbitControls, Environment, Html, Plane, Sphere } from '@react-three/drei';
+import { OrbitControls, Html, Plane, Sphere } from '@react-three/drei';
 import { ExternalLink, X } from 'lucide-react';
 import { mySoundArtists } from '../../data/musicData';
 import './ArtistGalaxy.css';
@@ -9,8 +11,12 @@ import './ArtistGalaxy.css';
 /* ──────────────────────────────────────────────
    Starfield — standalone Three scene
    ────────────────────────────────────────────── */
-function StarfieldBackground() {
+function StarfieldBackground({ active }) {
   const mountRef = useRef(null);
+  const activeRef = useRef(active);
+  const resumeRef = useRef(null);
+  activeRef.current = active;
+  useEffect(() => { if (active) resumeRef.current?.(); }, [active]);
 
   useEffect(() => {
     const el = mountRef.current;
@@ -40,11 +46,17 @@ function StarfieldBackground() {
 
     let animId = 0;
     const animate = () => {
-      animId = requestAnimationFrame(animate);
+      animId = 0;
+      if (!activeRef.current || document.hidden) return;
       stars.rotation.y += 0.0001;
       stars.rotation.x += 0.00005;
       renderer.render(scene, camera);
+      animId = requestAnimationFrame(animate);
     };
+    const resume = () => { if (!animId) animate(); };
+    resumeRef.current = resume;
+    document.addEventListener('visibilitychange', resume);
+    renderer.render(scene, camera);
     animate();
 
     const obs = new ResizeObserver(() => {
@@ -57,6 +69,8 @@ function StarfieldBackground() {
     return () => {
       obs.disconnect();
       cancelAnimationFrame(animId);
+      document.removeEventListener('visibilitychange', resume);
+      resumeRef.current = null;
       if (el && renderer.domElement && el.contains(renderer.domElement)) {
         el.removeChild(renderer.domElement);
       }
@@ -264,6 +278,8 @@ function FallbackGrid({ onSelect, selected, onClose }) {
    ArtistGalaxy — main export
    ────────────────────────────────────────────── */
 export default function ArtistGalaxy() {
+  const isWindowActive = useContext(WindowActivityContext);
+  const reduceMotion = useReducedMotion();
   const [selected, setSelected] = useState(null);
   const [isNarrow, setIsNarrow] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(() => document.body.classList.contains('dark-mode'));
@@ -309,7 +325,7 @@ export default function ArtistGalaxy() {
         <div className="galaxy-split">
           {/* Left: 3D canvas area */}
           <div className={`galaxy-canvas-area ${selected ? 'with-panel' : ''}`}>
-            <StarfieldBackground />
+            <StarfieldBackground active={isWindowActive && !reduceMotion} />
 
             <div className="galaxy-overlay">
               <h2 className="galaxy-title">Artist Gallery</h2>
@@ -317,13 +333,13 @@ export default function ArtistGalaxy() {
             </div>
 
             <Canvas
+              frameloop={!isWindowActive ? 'never' : reduceMotion ? 'demand' : 'always'}
               className="galaxy-canvas"
               camera={{ position: [0, 0, 18], fov: 60 }}
               style={{ position: 'absolute', inset: 0, zIndex: 10 }}
               onCreated={({ gl }) => { gl.domElement.style.pointerEvents = 'auto'; }}
             >
               <Suspense fallback={null}>
-                <Environment preset="night" />
                 <ambientLight intensity={0.4} />
                 <pointLight position={[10, 10, 10]} intensity={0.6} />
                 <pointLight position={[-10, -10, -10]} intensity={0.3} />

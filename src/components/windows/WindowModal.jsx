@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import { motion, useDragControls, useAnimation, useReducedMotion } from 'framer-motion';
 import { photographyData } from '../../data';
 import useIsPhone from '../../hooks/useIsPhone';
+import { WindowActivityContext } from '../../contexts/WindowActivity';
 
 // Lazy load window contents to optimize bundle size
 const MorphingPhotoGallery = lazy(() => import('./MorphingPhotoGallery'));
@@ -18,7 +19,7 @@ import './WindowModal.css';
 
 // A modal overlay above the desktop owns Escape until it is dismissed.
 function visibleDialogLayer(element) {
-  if (!element.getClientRects().length || getComputedStyle(element).visibility === 'hidden') return -1;
+  if (element.getAttribute('aria-hidden') === 'true' || !element.getClientRects().length || getComputedStyle(element).visibility === 'hidden') return -1;
   const bounds = element.getBoundingClientRect();
   let left = Math.max(0, bounds.left);
   let right = Math.min(window.innerWidth, bounds.right);
@@ -44,16 +45,19 @@ function visibleDialogLayer(element) {
   return right > left && bottom > top ? layer : -1;
 }
 
-export default function WindowModal({ id, onClose, onMinimize, zIndex, onFocus, constraintsRef, onOpenWindow, isActive = true }) {
+export default function WindowModal({ id, onClose, onMinimize, zIndex, onFocus, constraintsRef, onOpenWindow, isActive = true, isMinimized = false }) {
   const isPhone = useIsPhone();
   const reduceMotion = useReducedMotion();
   const [isMaximized, setIsMaximized] = useState(false);
   const [isFilled, setIsFilled] = useState(false);
+  const [isConcealed, setIsConcealed] = useState(isMinimized);
   const [viewMode, setViewMode] = useState(id === 'blog' ? 'pages' : (id === 'photography' ? 'grid' : (id === 'my-niche' ? 'movies' : 'tl')));
   const controls = useDragControls();
   const animControls = useAnimation();
   const windowRef = useRef(null);
   const previousFocusRef = useRef(null);
+  const wasMinimized = useRef(isMinimized);
+  const restoreFocusRef = useRef(false);
   const isActiveRef = useRef(isActive);
   isActiveRef.current = isActive;
 
@@ -93,9 +97,20 @@ export default function WindowModal({ id, onClose, onMinimize, zIndex, onFocus, 
   }, [isActive, onClose]);
 
   useEffect(() => {
-    // Initial entrance animation
-    animControls.start({ opacity: 1, scale: 1, x: 0, y: 0, transition: reduceMotion ? { duration: 0 } : { duration: 0.24, ease: [0.22, 1, 0.36, 1] } });
-  }, [animControls, reduceMotion]);
+    if (!isMinimized) setIsConcealed(false);
+    animControls.start({ opacity: isMinimized ? 0 : 1, scale: isMinimized && !reduceMotion ? 0.9 : 1, transition: reduceMotion ? { duration: 0 } : { type: 'spring', stiffness: 380, damping: 34, mass: 0.8 } });
+    if (!isMinimized && wasMinimized.current) restoreFocusRef.current = true;
+    wasMinimized.current = isMinimized;
+  }, [animControls, reduceMotion, isMinimized]);
+
+  useEffect(() => {
+    if (isMinimized || isConcealed || !restoreFocusRef.current) return;
+    const request = requestAnimationFrame(() => {
+      if (isActiveRef.current && !document.querySelector('dialog[open]')) windowRef.current?.focus({ preventScroll: true });
+      restoreFocusRef.current = false;
+    });
+    return () => cancelAnimationFrame(request);
+  }, [isMinimized, isConcealed]);
 
   useEffect(() => {
     const handler = (e) => {
@@ -165,8 +180,9 @@ export default function WindowModal({ id, onClose, onMinimize, zIndex, onFocus, 
 
   return (
     <motion.div
-      initial={{ opacity: 0, scale: reduceMotion ? 1 : 0.985, y: reduceMotion ? 0 : 14 }}
+      initial={{ opacity: 0, scale: reduceMotion ? 1 : 0.97 }}
       animate={animControls}
+      onAnimationComplete={() => setIsConcealed(isMinimized)}
       exit={{ opacity: 0, scale: reduceMotion ? 1 : 0.985, y: reduceMotion ? 0 : 10, transition: { duration: reduceMotion ? 0 : 0.15 } }}
       drag={!isPhone && !isMaximized && !isFilled}
       dragListener={false}
@@ -176,11 +192,13 @@ export default function WindowModal({ id, onClose, onMinimize, zIndex, onFocus, 
       onPointerDown={() => { if (!isActive) onFocus?.(); }}
       onFocus={() => { if (!isActive) onFocus?.(); }}
       role="dialog"
+      aria-hidden={isMinimized || undefined}
+      inert={isMinimized ? '' : undefined}
       aria-labelledby={`window-title-${id}`}
       tabIndex={-1}
       data-window={id}
       className={`glass-panel window-modal ${isActive ? 'is-active' : ''} ${isMaximized ? 'maximized' : ''} ${isFilled ? 'filled' : ''}`}
-      style={{ zIndex }}
+      style={{ zIndex, visibility: isConcealed ? 'hidden' : undefined, pointerEvents: isMinimized ? 'none' : undefined, transformOrigin: '50% 85%' }}
       ref={windowRef}
     >
       <div 
@@ -312,7 +330,7 @@ export default function WindowModal({ id, onClose, onMinimize, zIndex, onFocus, 
             <span>Opening {title.toLowerCase()}…</span>
           </div>
         }>
-          {content}
+          <WindowActivityContext.Provider value={!isMinimized}>{content}</WindowActivityContext.Provider>
         </Suspense>
       </div>
     </motion.div>
