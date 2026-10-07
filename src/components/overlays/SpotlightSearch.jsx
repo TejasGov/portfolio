@@ -1,115 +1,29 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { motion } from 'framer-motion';
-import { Search } from 'lucide-react';
+import { useMemo, useRef, useState, useEffect, useId } from 'react';
+import { Search, ArrowUpRight } from 'lucide-react';
 import { searchIndex } from '../../data';
+import OverlayDialog from './OverlayDialog';
+import './SpotlightSearch.css';
 
 export default function SpotlightSearch({ isOpen, onClose, onSelect }) {
   const [query, setQuery] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef(null);
-
-  useEffect(() => {
-    if (isOpen) {
-      setQuery('');
-      setSelectedIndex(0);
-      setTimeout(() => inputRef.current?.focus(), 100);
-    }
-  }, [isOpen]);
-
-  if (!isOpen) return null;
-
-  const results = searchIndex.filter(item => {
-    if (!query) return false;
-    const q = query.toLowerCase();
-    if (item.title.toLowerCase().includes(q)) return true;
-    return item.synonyms.some(s => s.toLowerCase().includes(q));
-  });
-
-  const handleKeyDown = (e) => {
-    if (e.key === 'Escape') onClose();
-    if (e.key === 'ArrowDown') {
-      e.preventDefault();
-      setSelectedIndex(prev => Math.min(prev + 1, results.length - 1));
-    }
-    if (e.key === 'ArrowUp') {
-      e.preventDefault();
-      setSelectedIndex(prev => Math.max(prev - 1, 0));
-    }
-    if (e.key === 'Enter' && results.length > 0) {
-      onSelect(results[selectedIndex].id);
-    }
-  };
-
-  return (
-    <motion.div 
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      style={{ position: 'absolute', inset: 0, zIndex: 4000, display: 'flex', justifyContent: 'center', alignItems: 'flex-start', paddingTop: '15vh' }}
-    >
-      <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.2)' }} onClick={onClose} />
-      <motion.div
-        initial={{ opacity: 0, y: -20, scale: 0.95 }}
-        animate={{ opacity: 1, y: 0, scale: 1 }}
-        exit={{ opacity: 0, y: -20, scale: 0.95 }}
-        transition={{ duration: 0.15 }}
-        style={{
-          width: '600px',
-          background: 'var(--glass-bg)',
-          backdropFilter: 'blur(30px)',
-          border: '1px solid var(--glass-border)',
-          borderRadius: '16px',
-          boxShadow: '0 24px 64px rgba(0,0,0,0.4)',
-          position: 'relative',
-          overflow: 'hidden',
-          display: 'flex',
-          flexDirection: 'column'
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', padding: '16px 24px', borderBottom: results.length > 0 ? '1px solid var(--glass-border)' : 'none' }}>
-          <Search size={24} color="var(--text-main)" style={{ opacity: 0.6 }} />
-          <input
-            ref={inputRef}
-            value={query}
-            onChange={(e) => { setQuery(e.target.value); setSelectedIndex(0); }}
-            onKeyDown={handleKeyDown}
-            placeholder="Spotlight Search"
-            style={{
-              background: 'transparent',
-              border: 'none',
-              outline: 'none',
-              color: 'var(--text-main)',
-              fontSize: '24px',
-              fontWeight: '300',
-              marginLeft: '16px',
-              width: '100%'
-            }}
-          />
-        </div>
-        {results.length > 0 && (
-          <div style={{ padding: '8px 0', maxHeight: '300px', overflowY: 'auto' }}>
-            {results.map((res, idx) => (
-              <div
-                key={res.id}
-                onMouseEnter={() => setSelectedIndex(idx)}
-                onClick={() => onSelect(res.id)}
-                style={{
-                  padding: '12px 24px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '16px',
-                  background: idx === selectedIndex ? 'var(--badge-bg)' : 'transparent',
-                  color: 'var(--text-main)',
-                  cursor: 'pointer'
-                }}
-              >
-                <div style={{ opacity: 0.8, display: 'flex' }}>{res.icon}</div>
-                <span style={{ fontSize: '16px', fontWeight: '500' }}>{res.title}</span>
-              </div>
-            ))}
-          </div>
-        )}
-      </motion.div>
-    </motion.div>
-  );
+  const resultsId = useId();
+  const results = useMemo(() => {
+    const value = query.trim().toLowerCase();
+    if (!value) return searchIndex.filter(item => ['projects', 'about', 'work-ex', 'contact', 'blog'].includes(item.id));
+    return searchIndex.filter(item => item.title.toLowerCase().includes(value) || item.synonyms.some(term => term.includes(value)));
+  }, [query]);
+  useEffect(() => { if (isOpen) { setQuery(''); setSelectedIndex(0); } }, [isOpen]);
+  const activeIndex = Math.min(selectedIndex, results.length - 1);
+  return <OverlayDialog isOpen={isOpen} onClose={onClose} title="Spotlight Search" className="search-dialog" initialFocusRef={inputRef}>
+    <div className="search-field"><Search size={18} aria-hidden="true" /><input ref={inputRef} type="search" placeholder="Search Tejas OS" aria-label="Search the portfolio" role="combobox" aria-autocomplete="list" aria-expanded={results.length > 0} aria-controls={resultsId} aria-activedescendant={activeIndex >= 0 ? `${resultsId}-${activeIndex}` : undefined} value={query} onChange={event => { setQuery(event.target.value); setSelectedIndex(0); }} onKeyDown={event => {
+      if (event.key === 'ArrowDown' || event.key === 'ArrowUp') { event.preventDefault(); if (results.length) setSelectedIndex(previous => (previous + (event.key === 'ArrowDown' ? 1 : -1) + results.length) % results.length); }
+      if (event.key === 'Enter' && activeIndex >= 0) { event.preventDefault(); onSelect(results[activeIndex].id); }
+    }} /></div>
+    <p className="search-summary" aria-live="polite">{query.trim() ? `${results.length} ${results.length === 1 ? 'place' : 'places'} to explore` : 'A FEW GOOD PLACES TO START'}</p>
+    <ul className="search-results" id={resultsId} role="listbox" aria-label="Portfolio destinations">{results.map((item, index) => <li id={`${resultsId}-${index}`} key={item.id} role="option" aria-selected={index === activeIndex} onMouseEnter={() => setSelectedIndex(index)}><button onClick={() => onSelect(item.id)} tabIndex={-1}><span className="search-result-icon" aria-hidden="true">{item.icon}</span><span>{item.title}</span><ArrowUpRight size={15} aria-hidden="true" /></button></li>)}</ul>
+    {!results.length && <div className="search-empty"><p>No matches. There’s more to explore.</p><span>Try “projects”, “photography”, “music” or “contact”.</span></div>}
+    <div className="search-footer"><span><kbd>↑ ↓</kbd> navigate <kbd>↵</kbd> open</span><span><kbd>esc</kbd> close</span></div>
+  </OverlayDialog>;
 }

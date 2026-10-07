@@ -20,7 +20,7 @@ Audit and elevate the portfolio in verified, resumable parts. Keep existing cont
 ## Stages
 1. **Audit and foundation — complete:** baseline screenshots/video inspected; asset optimization, typography, tokens and motion preferences.
 2. **Home and navigation — complete:** persistent identity, clear work/about/contact actions, responsive directory, command bar, window recovery.
-3. **Content and interactions — pending:** factual Projects, immediate About, accessible window frame/search/contact, route corrections.
+3. **Content and interactions — in progress:** factual Projects, immediate About, accessible window frame/search/contact, route corrections.
 4. **Verification and handoff — pending:** production build; desktop, phone and short-screen screenshots; keyboard/window/search/contact flows; reduced-motion behavior; error inspection.
 
 ## Working rules / resume
@@ -36,8 +36,8 @@ Audit and elevate the portfolio in verified, resumable parts. Keep existing cont
 ## Branch checkpoints
 - `design/portfolio-foundation` (`fd06d5e`): pushed earlier editorial alternative; **user rejected its visual direction — do not merge alone**.
 - `design/macos-desktop`: corrected macOS shell, folders, widgets, dock and traffic lights; current design checkpoint.
-- `ux/portfolio-navigation`: next — native dialogs, search/contact/assistant feedback and route cleanup; will be based on the corrected macOS branch.
-- `design/portfolio-content`: next — truthful Projects and immediately readable About inside the preserved macOS windows.
+- `ux/macos-navigation`: complete — native dialogs, search/contact/assistant feedback and route cleanup; will be based on the corrected macOS branch.
+- `design/macos-content`: next — truthful Projects and immediately readable About inside the preserved macOS windows.
 Branches are stacked so later branches include earlier completed corrections. Push completed checkpoints. `main` has not been changed.
 
 ## Verification record
@@ -45,3 +45,6 @@ Before screenshots captured at 1440×1000 and 390×844. Baseline production buil
 
 ## Latest checkpoint
 macOS shell restored and desktop/phone screenshots reviewed. Native dialog/search/contact changes and content changes remain local until their separate checkpoint commits. The reusable browser check is being updated for macOS controls (Control Center handles wallpaper motion).
+
+### Interaction verification
+The macOS browser check passed: seven Finder folders; video pause/play and preference persistence; window minimize/restore; dialog focus containment and Escape isolation; keyboard search/empty state/contact routing; theme persistence; 390px/320px phones and short landscape; reduced-motion still wallpaper. No uncaught application errors. Small-screen scroll padding reserves space for the dock. Run `node scripts/check-portfolio.mjs` against a running local server to repeat. Voice connection is not exercised; mic/network failures have visible feedback.

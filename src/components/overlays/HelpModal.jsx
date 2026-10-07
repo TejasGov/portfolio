@@ -1,46 +1,4 @@
-import React from 'react';
-import { motion } from 'framer-motion';
-
-export default function HelpModal({ activeWindowId, onClose }) {
-  let helpText = "Tejas OS is a custom portfolio designed to emulate a native desktop environment. Double click icons to explore!";
-  if (activeWindowId === 'projects') helpText = "Projects Directory: Browse through comprehensive case studies and GitHub repositories of my latest work.";
-  if (activeWindowId === 'work-ex') helpText = "Work Experience: A dynamic timeline charting my professional journey and volunteer work.";
-  if (activeWindowId === 'photography') helpText = "Photography: A curated collection of my favorite captures.";
-  if (activeWindowId === 'about') helpText = "About Me: Learn more about my background, skills, and current academic standing.";
-
-  return (
-    <motion.div 
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      style={{
-        position: 'absolute', inset: 0, zIndex: 3000, display: 'flex', alignItems: 'center', justifyContent: 'center'
-      }}
-    >
-      <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.1)', backdropFilter: 'blur(2px)' }} onClick={onClose} />
-      <motion.div
-        initial={{ opacity: 0, scale: 0.9, y: 20 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.9, y: 20 }}
-        className="glass-panel"
-        style={{
-          width: '320px', padding: '24px', borderRadius: '24px', position: 'relative', zIndex: 1,
-          border: '1px solid var(--glass-border)', boxShadow: '0 24px 48px rgba(0,0,0,0.3)',
-          color: 'var(--text-main)', textAlign: 'center'
-        }}
-      >
-        <h3 style={{ fontSize: '18px', fontWeight: '700', marginBottom: '12px' }}>Tejas OS Help</h3>
-        <p style={{ fontSize: '14px', lineHeight: '1.5', opacity: 0.9, marginBottom: '24px' }}>{helpText}</p>
-        <button 
-          onClick={onClose}
-          style={{
-            background: 'var(--badge-bg)', border: '1px solid var(--badge-border)', color: 'var(--badge-text)',
-            padding: '8px 24px', borderRadius: '16px', fontWeight: '600', cursor: 'pointer'
-          }}
-        >
-          Got it
-        </button>
-      </motion.div>
-    </motion.div>
-  );
+import OverlayDialog from './OverlayDialog';
+export default function HelpModal({ onClose }) {
+  return <OverlayDialog isOpen onClose={onClose} title="Make yourself at home." eyebrow="A FEW SMALL POINTERS" description="This is a portfolio and a personal workspace. Choose a directory entry to explore; your open windows stay within reach."><ul className="help-list"><li><span>Find a project, interest, or contact</span><kbd>⌘ / Ctrl + K</kbd></li><li><span>Move between controls</span><kbd>Tab</kbd></li><li><span>Open a selected control</span><kbd>Enter / Space</kbd></li><li><span>Close the current window or dialog</span><kbd>Esc</kbd></li><li><span>Return to the directory</span><span>Home in the dock</span></li><li><span>Restore a minimized window</span><span>Window tabs above the dock</span></li></ul><p className="overlay-note">On desktop, drag a window by its title bar. On phones, windows fit the screen. Pause the background or switch themes with the dock controls.</p></OverlayDialog>;
 }

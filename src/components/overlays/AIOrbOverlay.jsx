@@ -1,205 +1,32 @@
-import React, { useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { useEffect, useRef, useState } from 'react';
+import { Mic, Square } from 'lucide-react';
 import { useConversationControls, useConversationStatus } from '@elevenlabs/react';
-import './AIOrbOverlay.css';
+import OverlayDialog from './OverlayDialog';
 
 export default function AIOrbOverlay({ isOpen, onClose, currentActiveWindow }) {
   const { startSession, endSession } = useConversationControls();
   const { status } = useConversationStatus();
-
-  // Reset/disconnect session when overlay closes
+  const [error, setError] = useState('');
+  const [starting, setStarting] = useState(false);
+  const openRef = useRef(isOpen);
+  openRef.current = isOpen;
   useEffect(() => {
     if (!isOpen) {
-      if (status === "connected" || status === "connecting") {
-        endSession();
-      }
+      setError('');
+      if (status === 'connected' || status === 'connecting') Promise.resolve(endSession()).catch(() => {});
     }
   }, [isOpen, status, endSession]);
-
-  // Listen for Escape key to close the overlay
-  useEffect(() => {
-    if (!isOpen) return;
-    const handleKeyDown = (e) => {
-      if (e.key === 'Escape') {
-        onClose();
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, onClose]);
-
-  // Prevent background scrolling/interactions while open
-  useEffect(() => {
-    if (isOpen) {
-      document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = '';
-    }
-    return () => {
-      document.body.style.overflow = '';
-    };
-  }, [isOpen]);
-
-  // Helper to determine status text copy
-  const getStatusText = () => {
-    if (status === "connected") return "Orb (Connected)";
-    if (status === "connecting") return "Orb (Connecting...)";
-    return "Orb";
+  const speak = async () => {
+    setError('');
+    if (status === 'connected') { try { await endSession(); } catch { setError('The session could not be stopped. Close this dialog to disconnect.'); } return; }
+    setStarting(true);
+    try {
+      await startSession({ agentId: 'agent_5301m0tx6pz3evjveb5s4e9e33g5', dynamicVariables: { current_active_window: currentActiveWindow }, onError: () => { if (openRef.current) setError('Orb couldn’t connect. Check microphone access and your connection, then try again.'); } });
+      if (!openRef.current) await endSession();
+    } catch (failure) {
+      if (openRef.current) setError(failure?.name === 'NotAllowedError' ? 'Microphone access was denied. Allow access in your browser and try again.' : 'Orb couldn’t connect. Check microphone access and your connection, then try again.');
+    } finally { setStarting(false); }
   };
-
-  return (
-    <AnimatePresence>
-      {isOpen && (
-        <>
-          {/* Subtle Dimmed Backdrop - clicking anywhere closes */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.4 }}
-            className="orb-overlay-backdrop"
-            onClick={onClose}
-          >
-            {/* Centered Orb and Assistive Text */}
-            <motion.div
-              initial={{ scale: 0.8, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.85, opacity: 0 }}
-              transition={{ type: 'spring', stiffness: 260, damping: 25 }}
-              className="orb-center-wrapper"
-            >
-              {/* Centered Orb Avatar wrapper with absolutely positioned centered glows & rings */}
-              <div 
-                className="orb-avatar-wrapper"
-                onClick={(e) => {
-                  e.stopPropagation(); // prevent backdrop click closing
-                  if (status === "connected") {
-                    endSession();
-                  } else {
-                    try {
-                      startSession({
-                        agentId: "agent_5301m0tx6pz3evjveb5s4e9e33g5",
-                        dynamicVariables: { current_active_window: currentActiveWindow },
-                        onError: (error) => console.error("ElevenLabs Conversation Error:", error),
-                        onConnect: () => console.log("ElevenLabs Agent Connected!"),
-                        onDisconnect: () => console.log("ElevenLabs Agent Disconnected.")
-                      });
-                    } catch (err) {
-                      console.error("Failed to start ElevenLabs session:", err);
-                    }
-                  }
-                }}
-              >
-                {/* Layered glows and rings simulating Siri focus centered exactly behind the orb */}
-                <div className={`orb-glow-layer ${status}`} />
-                <div className={`orb-pulse-ring ${status}`} />
-                <div className={`orb-pulse-ring ${status}`} />
-
-                {/* Glowing Interactive Circle (without border/container styling) */}
-                <div className={`orb-avatar-container ${status}`}>
-                  <img
-                    src="/homepage/aiicon.svg"
-                    alt="Orb Avatar"
-                    className="orb-avatar-img"
-                  />
-                </div>
-              </div>
-
-              {/* Status and instruction copy */}
-              <h2 className="orb-status-text">{getStatusText()}</h2>
-              <p className="orb-subtitle-text">Click the Orb to speak, click anywhere else to exit</p>
-
-              {/* Voice visualizer graph */}
-              <div style={{ height: '32px', marginTop: '30px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <AnimatePresence mode="wait">
-                  {status === "connected" ? (
-                    <motion.div 
-                      key="active-voice"
-                      initial={{ opacity: 0, scale: 0.8 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      exit={{ opacity: 0, scale: 0.8 }}
-                      style={{ display: 'flex', gap: '5px', height: '24px', alignItems: 'center' }}
-                    >
-                      {[0.4, 0.9, 0.6, 0.8, 0.5, 0.7, 0.3].map((val, i) => (
-                        <motion.div
-                          key={i}
-                          animate={{
-                            height: ['8px', `${val * 32}px`, '8px'],
-                          }}
-                          transition={{
-                            duration: 1.0 + i * 0.08,
-                            repeat: Infinity,
-                            ease: 'easeInOut',
-                          }}
-                          style={{
-                            width: '3px',
-                            backgroundColor: 'rgba(255, 255, 255, 0.75)',
-                            borderRadius: '2px',
-                          }}
-                        />
-                      ))}
-                    </motion.div>
-                  ) : (
-                    <motion.div
-                      key="inactive-voice"
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 0.4 }}
-                      exit={{ opacity: 0 }}
-                      style={{ display: 'flex', gap: '5px', alignItems: 'center' }}
-                    >
-                      {/* Quiet voice wave (breathing gently) */}
-                      {[0, 0, 0, 0, 0].map((_, i) => (
-                        <motion.div
-                          key={i}
-                          animate={{
-                            height: ['4px', '6px', '4px'],
-                          }}
-                          transition={{
-                            duration: 2.0,
-                            repeat: Infinity,
-                            delay: i * 0.15,
-                            ease: 'easeInOut',
-                          }}
-                          style={{
-                            width: '4px',
-                            height: '4px',
-                            backgroundColor: 'rgba(255, 255, 255, 0.6)',
-                            borderRadius: '50%',
-                          }}
-                        />
-                      ))}
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-            </motion.div>
-          </motion.div>
-
-          {/* Apple Intelligence Full Viewport Edge Bloom Glow */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.5 }}
-            className="apple-intelligence-glow"
-          />
-
-          {/* Floating Close Button */}
-          <motion.button
-            initial={{ opacity: 0, scale: 0.8 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.8 }}
-            transition={{ delay: 0.1 }}
-            className="orb-close-btn"
-            onClick={onClose}
-            aria-label="Close Assistant"
-          >
-            <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" strokeWidth="2.5" fill="none" strokeLinecap="round">
-              <path d="M18 6L6 18M6 6l12 12" />
-            </svg>
-          </motion.button>
-        </>
-      )}
-    </AnimatePresence>
-  );
+  const connecting = starting || status === 'connecting';
+  return <OverlayDialog isOpen={isOpen} onClose={onClose} title="A conversation with Orb." eyebrow="THE VOICE COMPANION" description="Ask about my work, explore a project, or get to know me. Orb can open windows for you."><div className="assistant-display" aria-hidden="true"><div className={`assistant-orb ${status === 'connected' ? 'is-connected' : ''}`} /></div><p className="overlay-note" role="status">{status === 'connected' ? 'Connected. You can speak now.' : connecting ? 'Connecting to Orb…' : 'Ready when you are.'}</p>{error && <p className="assistant-error" role="alert">{error}</p>}<div className="assistant-actions"><button className="primary-button" onClick={speak} disabled={connecting}>{status === 'connected' ? <Square size={14} /> : <Mic size={16} />}{status === 'connected' ? 'End conversation' : connecting ? 'Connecting…' : error ? 'Try again' : 'Start a conversation'}</button></div><p className="overlay-note">Voice conversations use ElevenLabs and need microphone permission. Your microphone starts only when you choose to begin.</p></OverlayDialog>;
 }
