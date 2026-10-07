@@ -35,8 +35,8 @@ Audit and elevate the portfolio in verified, resumable parts. Keep existing cont
 
 ## Branch checkpoints
 - `design/portfolio-foundation` (`fd06d5e`): pushed earlier editorial alternative; **user rejected its visual direction — do not merge alone**.
-- `design/macos-desktop`: corrected macOS shell, folders, widgets, dock and traffic lights; current design checkpoint.
-- `ux/macos-navigation`: complete — native dialogs, search/contact/assistant feedback and route cleanup; will be based on the corrected macOS branch.
+- `design/macos-desktop` (`b49c152`): pushed — corrected macOS shell, folders, widgets, dock and traffic lights.
+- `ux/macos-navigation` (`2d63557` plus app interaction follow-up): pushed — native dialogs, search/contact/assistant feedback and route cleanup; based on the corrected macOS branch.
 - `design/macos-content`: next — truthful Projects and immediately readable About inside the preserved macOS windows.
 Branches are stacked so later branches include earlier completed corrections. Push completed checkpoints. `main` has not been changed.
 
@@ -44,7 +44,9 @@ Branches are stacked so later branches include earlier completed corrections. Pu
 Before screenshots captured at 1440×1000 and 390×844. Baseline production build and basic Projects search passed during onboarding. The earlier foundation production build passed; desktop 1440×1000 and phone 390×844 screenshots reviewed. Home has no horizontal overflow and no uncaught runtime errors. Video is muted and playable; pause and reduced-motion checks continue in the interaction stage.
 
 ## Latest checkpoint
-macOS shell restored and desktop/phone screenshots reviewed. Native dialog/search/contact changes and content changes remain local until their separate checkpoint commits. The reusable browser check is being updated for macOS controls (Control Center handles wallpaper motion).
+macOS shell restored and desktop/phone screenshots reviewed. Native dialog/search/contact changes are pushed. App interaction follow-up adds labelled, keyboard-operable gallery controls with focus restoration and isolated Escape, keyboard selection in Experience, clipboard failure feedback in Blog, and an accurate Spotify fallback. About and Projects remain separate content work.
 
 ### Interaction verification
 The macOS browser check passed: seven Finder folders; video pause/play and preference persistence; window minimize/restore; dialog focus containment and Escape isolation; keyboard search/empty state/contact routing; theme persistence; 390px/320px phones and short landscape; reduced-motion still wallpaper. No uncaught application errors. Small-screen scroll padding reserves space for the dock. Run `node scripts/check-portfolio.mjs` against a running local server to repeat. Voice connection is not exercised; mic/network failures have visible feedback.
+
+All seven folder apps opened without uncaught errors. Project images and the real live-project link loaded; Experience list selection worked with Enter; gallery arrow navigation and Escape left its parent window open. About scrolls through to its footer on desktop and phone. Production build passed after these app interaction changes.

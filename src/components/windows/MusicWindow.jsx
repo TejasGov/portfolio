@@ -24,6 +24,7 @@ export default function MusicWindow() {
             <button
               key={id}
               className={`music-nav-item ${active === id ? 'active' : ''}`}
+              aria-pressed={active === id}
               onClick={() => setActive(id)}
             >
               <Icon size={15} strokeWidth={2.2} />
@@ -59,7 +60,7 @@ export default function MusicWindow() {
             </div>
 
             <div className="music-spotify-footer">
-              <p className="music-spotify-note">Listen through Spotify's Web API.</p>
+              <p className="music-spotify-note">If the player is unavailable, open the playlist on Spotify.</p>
               <a
                 href="https://open.spotify.com/playlist/0TILaGSWrpojpLME9Z64Pv"
                 target="_blank"

@@ -376,6 +376,10 @@ export default function WorkExperience({ viewMode }) {
                     key={idx} 
                     className={`sb-row ${isSelected ? 'on' : ''}`} 
                     onClick={() => setStSel(idx)}
+                    role="button"
+                    tabIndex={0}
+                    aria-pressed={isSelected}
+                    onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); setStSel(idx); } }}
                   >
                     <div className="sb-ico" style={{ background: j.bg }}>
                       {j.logo ? (
@@ -406,6 +410,10 @@ export default function WorkExperience({ viewMode }) {
                     key={idx} 
                     className={`sb-row future-row ${isSelected ? 'on' : ''}`} 
                     onClick={() => setStSel(idx)}
+                    role="button"
+                    tabIndex={0}
+                    aria-pressed={isSelected}
+                    onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); setStSel(idx); } }}
                   >
                     <div className="sb-ico future-ico">
                       {j.logo ? (
