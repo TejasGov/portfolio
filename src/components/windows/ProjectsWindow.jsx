@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { ArrowRight, ArrowUpRight } from 'lucide-react';
 import { projectsData } from '../../data';
 import TechStack from './TechStack';
+import ProjectReviews from './ProjectReviews';
 import './ProjectsWindow.css';
 
 const hasPublicLink = (link) => /^https?:\/\//i.test(link || '');
@@ -122,7 +123,7 @@ export default function ProjectsWindow() {
           <TechStack stack={project.tech} />
         </section>
 
-        <section className="proj-section proj-section-last" aria-labelledby="project-details-title">
+        <section className="proj-section" aria-labelledby="project-details-title">
           <h3 className="proj-section-title" id="project-details-title">At a glance</h3>
           <dl className="proj-info-grid">
             {[...projectDetails, ['Platform', project.compatibility]].map(([label, value]) => (
@@ -134,6 +135,7 @@ export default function ProjectsWindow() {
           </dl>
           {!publicLink && <p className="proj-access-note">{publicSource ? 'Explore the implementation in the public repository.' : 'A public demo is not available.'}</p>}
         </section>
+        <ProjectReviews key={project.id} project={project} />
       </article> : <div className="proj-empty" role="status"><h2>No projects of this type yet</h2><p>Choose another type to explore the collection.</p><button className="proj-btn-source" onClick={() => chooseType('all')}>Show all projects</button></div>}
       </div>
     </div>

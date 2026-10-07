@@ -23,6 +23,6 @@ Existing Smash Cricket and Revere entries retain their authored descriptions and
 - `public/projects/commit-city.webp`: actual browser capture of the repository's unmodified local demo, using its built-in sample data and system fonts. This is not Tejas's live contribution history.
 - `public/projects/cosmos-source.svg`: portfolio-authored source-structure illustration based on the repository routes/content loader; labelled as an illustration, not an application screenshot or official logo.
 
-Assets were fetched from each repository's `main` branch, resized and compressed as local WebP files (about 133 KB total). The portfolio does not depend on remote GitHub image loading or runtime scraping.
+The four earlier visuals were fetched from each repository's `main` branch, resized and compressed as local WebP files (about 133 KB total). Commit City's local demo capture adds about 44 KB; the COSMOS source illustration is a small local SVG. The portfolio does not depend on remote GitHub image loading or runtime scraping.
 
 Excluded from this pass: CodeOpoly (README records an unresolved client-exposed API-key configuration issue), earlier Socra variants (pilot/MVP status and no verified public demo), Past-Sins (greybox prototype), GottaGetRich (less current visual/implementation evidence), and duplicate Revere/CogniFlow presentations. Repository research does not prove that external deployments or service integrations work; live demos are documented links, not newly validated deployments.
