@@ -59,3 +59,9 @@ My Tech now fits the entire diagram to its viewport, including phones, and recom
 
 ### Handoff / resume
 Use `ux/macos-apps` as the latest combined branch; it includes the macOS desktop correction, navigation and content checkpoints. Earlier branches are independent review points, not separate changes to merge together. `main` remains at `1458b92`. Screenshots: `/workspace/design-review/production-core` and `/workspace/design-review/production-windows`. Checkout is clean after the final commit. External service verification, existing large-chunk optimization and repository lint configuration remain future engineering work; the visual/usability pass is complete.
+
+## October 7 — macOS polish continuation
+User requested a further UI/smoothness pass while preserving macOS, with modern dither/pixel details. Based on `ux/macos-apps`.
+
+- `design/macos-pixel-polish`: coherent light/dark glass, clearer widget labels, distinct macOS dock app finishes, stronger folder depth, hover paper lift and a brief ordered-dither shimmer. Added a compact Spotlight shortcut in the welcome widget. Decorative effects use one tiny SVG tile and CSS; no animation loop or new dependency. Reduced motion disables the folder animation. Narrow-phone dock spacing now keeps all five icons within the screen.
+- Verification: production build and core browser check passed; desktop, light/dark and 390/320px phone screenshots inspected. Additional smoothness/state-preservation work follows on its own branch.

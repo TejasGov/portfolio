@@ -73,15 +73,15 @@ export default function App() {
     <a className="skip-link" href="#main-content">Skip to content</a>
     <Atmosphere paused={motionPaused || reduceMotion} />
     <TopNavbar activeWindowId={currentActiveWindow === 'desktop' ? null : currentActiveWindow} onHome={showHome} onOpenWindow={toggleWindow} onToggleSearch={() => setOverlay('search')} onContact={() => setOverlay('email')} onHelp={() => setOverlay('help')} isDarkMode={isDarkMode} onToggleTheme={() => setIsDarkMode(previous => !previous)} motionPaused={motionPaused} reducedMotion={reduceMotion} onToggleMotion={() => setMotionPaused(previous => !previous)} />
-    <Home onOpenWindow={toggleWindow} onContact={() => setOverlay('email')} activeWindows={activeWindows} minimizedWindows={minimizedWindows} />
+    <Home onOpenWindow={toggleWindow} onContact={() => setOverlay('email')} onSearch={() => setOverlay('search')} activeWindows={activeWindows} minimizedWindows={minimizedWindows} />
     <AnimatePresence>{activeWindows.map((id, index) => minimizedWindows.includes(id) ? null : <WindowModal key={id} id={id} onClose={() => closeWindow(id)} onMinimize={() => minimizeWindow(id)} zIndex={100 + index} isActive={currentActiveWindow === id} onFocus={() => toggleWindow(id)} constraintsRef={constraintsRef} onOpenWindow={toggleWindow} />)}</AnimatePresence>
     {activeWindows.length > 0 && <nav className="window-switcher" aria-label="Open windows">{activeWindows.map(id => <div className="window-task" key={id}><button className={currentActiveWindow === id ? 'is-active' : ''} onClick={() => toggleWindow(id)} aria-label={`${minimizedWindows.includes(id) ? 'Restore' : 'Show'} ${windowNames[id]}`}><span className="task-dot" />{windowNames[id]}{minimizedWindows.includes(id) && <span className="task-minimized">—</span>}</button><button className="task-close" aria-label={`Close ${windowNames[id]}`} onClick={() => closeWindow(id)}><X size={11} /></button></div>)}</nav>}
     <Dock>
       <DockIcon icon={<img src={memojiImg} alt="" />} label="About Me" onClick={() => toggleWindow('about')} isActive={activeWindows.includes('about')} />
-      <DockIcon icon={<FileText />} label="Experience" onClick={() => toggleWindow('work-ex')} isActive={activeWindows.includes('work-ex')} />
+      <DockIcon icon={<FileText />} variant="experience" label="Experience" onClick={() => toggleWindow('work-ex')} isActive={activeWindows.includes('work-ex')} />
       <span className="dock-divider" aria-hidden="true" />
-      <DockIcon icon={<Globe />} label="Socials" onClick={() => setOverlay('socials')} isActive={overlay === 'socials'} />
-      <DockIcon icon={<Mail />} label="Email" onClick={() => setOverlay('email')} isActive={overlay === 'email'} />
+      <DockIcon icon={<Globe />} variant="socials" label="Socials" onClick={() => setOverlay('socials')} isActive={overlay === 'socials'} />
+      <DockIcon icon={<Mail />} variant="mail" label="Email" onClick={() => setOverlay('email')} isActive={overlay === 'email'} />
       <span className="dock-divider" aria-hidden="true" />
       <DockIcon icon={<img src="/homepage/aiicon.svg" alt="" />} label="Orb" onClick={() => setOverlay('assistant')} isActive={overlay === 'assistant'} />
     </Dock>
