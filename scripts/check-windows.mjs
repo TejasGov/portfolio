@@ -65,6 +65,20 @@ try {
       await page.waitForFunction(() => !document.querySelector('[aria-label="Close photo preview"]'));
       assert.ok(await page.$('[data-window="photography"]'));
     }
+    if (title === 'My Tech') {
+      await page.focus('[aria-label="Explore AirPods Max"]');
+      await page.keyboard.press('Enter');
+      await page.waitForSelector('#tech-inspector');
+      assert.match(await page.$eval('#tech-inspector', e => e.textContent), /Spatial audio/);
+      await page.click('[aria-label="Email"]');
+      await page.waitForSelector('dialog[open]');
+      await page.keyboard.press('Escape');
+      await page.waitForFunction(() => !document.querySelector('dialog[open]'));
+      assert.ok(await page.$('#tech-inspector'));
+      await page.keyboard.press('Escape');
+      await page.waitForFunction(() => !document.querySelector('#tech-inspector'));
+      assert.ok(await page.$('[data-window="my-tech"]'));
+    }
     await page.screenshot({ path: `${output}/module-${title.replaceAll(' ', '-')}.png` });
     await closeWindow();
     console.log(`PASS ${title}`);
@@ -82,6 +96,23 @@ try {
   for (const title of titles) {
     await openFolder(title);
     assert.equal(await page.$eval('.window-content', e => e.scrollWidth <= e.clientWidth), true, `${title} phone overflow`);
+    if (title === 'My Tech') {
+      const initialScale = await page.$eval('.tech-canvas', e => Number(e.dataset.scale));
+      const fits = await page.$eval('.tech-canvas', e => {
+        const diagram = e.getBoundingClientRect();
+        const viewport = e.parentElement.getBoundingClientRect();
+        return diagram.left >= viewport.left && diagram.right <= viewport.right && diagram.top >= viewport.top && diagram.bottom <= viewport.bottom;
+      });
+      assert.equal(fits, true, 'Entire equipment diagram fits phone');
+      await page.click('[aria-label="Zoom in on setup"]');
+      assert.ok(await page.$eval('.tech-canvas', e => Number(e.dataset.scale)) > initialScale);
+      await page.click('[aria-label="Fit setup to window"]');
+      assert.equal(await page.$eval('.tech-canvas', e => Number(e.dataset.scale)), initialScale);
+      await page.select('[aria-label="Explore equipment"]', 'headphones');
+      await page.waitForSelector('#tech-inspector');
+      await page.screenshot({ path: `${output}/phone-equipment-details.png` });
+      await page.click('[aria-label="Close equipment details"]');
+    }
     await page.screenshot({ path: `${output}/phone-${title.replaceAll(' ', '-')}.png` });
     await closeWindow();
   }

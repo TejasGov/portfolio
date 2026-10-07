@@ -21,7 +21,7 @@ Audit and elevate the portfolio in verified, resumable parts. Keep existing cont
 1. **Audit and foundation — complete:** baseline screenshots/video inspected; asset optimization, typography, tokens and motion preferences.
 2. **Home and navigation — complete:** persistent identity, clear work/about/contact actions, responsive directory, command bar, window recovery.
 3. **Content and interactions — complete:** factual Projects, immediate About, accessible window frame/search/contact, route corrections.
-4. **Verification and handoff — in progress:** production build and core browser checks pass. Final screenshot review identified a cropped initial My Tech canvas on phones; fit and keyboard access need a final app checkpoint.
+4. **Verification and handoff — complete:** production build and both browser checks pass. Desktop, phone and short-screen screenshots reviewed; final My Tech phone fit and keyboard access corrected.
 
 ## Working rules / resume
 - Existing checkout: `/workspace/portfolio`; do not reinstall dependencies unnecessarily (this repo tracks macOS node_modules).
@@ -37,7 +37,8 @@ Audit and elevate the portfolio in verified, resumable parts. Keep existing cont
 - `design/portfolio-foundation` (`fd06d5e`): pushed earlier editorial alternative; **user rejected its visual direction — do not merge alone**.
 - `design/macos-desktop` (`b49c152`): pushed — corrected macOS shell, folders, widgets, dock and traffic lights.
 - `ux/macos-navigation` (`cf5d26e`): pushed — native dialogs, search/contact/assistant feedback, route cleanup and app interaction feedback; based on the corrected macOS branch.
-- `design/macos-content`: complete — truthful Projects and immediately readable About inside the preserved macOS windows; production verification passed.
+- `design/macos-content` (`7ecb7b1`): pushed — truthful Projects and immediately readable About inside the preserved macOS windows; production verification passed.
+- `ux/macos-apps`: final checkpoint — responsive equipment diagram, native keyboard selection, readable inspector, labelled 44px zoom controls, and Escape precedence for gallery/equipment when another overlay is open.
 Branches are stacked so later branches include earlier completed corrections. Push completed checkpoints. `main` has not been changed.
 
 ## Verification record
@@ -52,3 +53,9 @@ The macOS browser check passed: seven Finder folders; video pause/play and prefe
 All seven folder apps opened without uncaught errors. Project images and the real live-project link loaded; Experience list selection worked with Enter; gallery arrow navigation and Escape left its parent window open. About scrolls through to its footer on desktop and phone. Production build passed after these app interaction changes.
 
 Final content production build and both browser scripts passed against Vite preview on port 4173. All seven folder apps also pass phone overflow checks, with screenshots captured. Repeat with `node scripts/check-windows.mjs [preview-url]` and `node scripts/check-portfolio.mjs [preview-url]`. Outputs default to `/tmp/portfolio-review`; set `PORTFOLIO_CHECK_OUTPUT` to preserve elsewhere. External Spotify embeds and weather requests are blocked in this environment; fallback text and direct links remain visible. Live voice and remote media playback are untested. Existing large-chunk build warnings remain.
+
+### Final app verification
+My Tech now fits the entire diagram to its viewport, including phones, and recomputes fit after resize/maximize. Pan and zoom remain available. Equipment hotspots are native buttons, with a labelled native selection control as an alternative; details appear in a readable inspector outside the scaled canvas. Escape closes the inspector, restores focus and keeps the app open. A contact overlay above it receives Escape first. Production build and extended window checks passed after this change, including keyboard selection, inspector focus recovery, phone diagram bounds, zoom and fit reset. Gallery Escape also respects native overlays and active-window order.
+
+### Handoff / resume
+Use `ux/macos-apps` as the latest combined branch; it includes the macOS desktop correction, navigation and content checkpoints. Earlier branches are independent review points, not separate changes to merge together. `main` remains at `1458b92`. Screenshots: `/workspace/design-review/production-core` and `/workspace/design-review/production-windows`. Checkout is clean after the final commit. External service verification, existing large-chunk optimization and repository lint configuration remain future engineering work; the visual/usability pass is complete.

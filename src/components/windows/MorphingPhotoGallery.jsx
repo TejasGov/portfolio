@@ -135,6 +135,7 @@ export default function MorphingPhotoGallery({ photos, layout = 'grid', windowRe
   useEffect(() => {
     if (lightbox === null) return;
     const handler = (e) => {
+      if (document.querySelector('dialog[open]') || !lightboxRef.current?.closest('.window-modal')?.classList.contains('is-active')) return;
       if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); closeLightbox(); }
       if (e.key === 'ArrowLeft')   navigate(-1);
       if (e.key === 'ArrowRight')  navigate(1);
