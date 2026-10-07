@@ -1,8 +1,9 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { AnimatePresence, MotionConfig, useReducedMotion } from 'framer-motion';
-import { Mail, Globe, Terminal, Sparkles, Sun, Moon, Pause, Play, Grid2X2, X } from 'lucide-react';
+import { Mail, Globe, X, FileText } from 'lucide-react';
 import { useConversationClientTool } from '@elevenlabs/react';
 import Home from './components/desktop/Home';
+import { memojiImg } from './data';
 import Atmosphere from './components/desktop/Atmosphere';
 import Dock, { DockIcon } from './components/desktop/Dock';
 import TopNavbar from './components/desktop/TopNavbar';
@@ -20,7 +21,7 @@ export default function App() {
   const [activeWindows, setActiveWindows] = useState([]);
   const [minimizedWindows, setMinimizedWindows] = useState([]);
   const [overlay, setOverlay] = useState(null);
-  const [isDarkMode, setIsDarkMode] = useState(() => storedPreference('tg-theme', 'dark') !== 'light');
+  const [isDarkMode, setIsDarkMode] = useState(() => storedPreference('tg-theme', window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') !== 'light');
   const [motionPaused, setMotionPaused] = useState(() => storedPreference('tg-motion', 'play') === 'pause');
   const reduceMotion = useReducedMotion();
   const constraintsRef = useRef(null);
@@ -71,25 +72,23 @@ export default function App() {
   return <MotionConfig reducedMotion="user"><div ref={constraintsRef} className="desktop-root">
     <a className="skip-link" href="#main-content">Skip to content</a>
     <Atmosphere paused={motionPaused || reduceMotion} />
-    <TopNavbar onHome={showHome} onOpenWindow={toggleWindow} onToggleSearch={() => setOverlay('search')} onContact={() => setOverlay('email')} />
+    <TopNavbar activeWindowId={currentActiveWindow === 'desktop' ? null : currentActiveWindow} onHome={showHome} onOpenWindow={toggleWindow} onToggleSearch={() => setOverlay('search')} onContact={() => setOverlay('email')} onHelp={() => setOverlay('help')} isDarkMode={isDarkMode} onToggleTheme={() => setIsDarkMode(previous => !previous)} motionPaused={motionPaused} reducedMotion={reduceMotion} onToggleMotion={() => setMotionPaused(previous => !previous)} />
     <Home onOpenWindow={toggleWindow} onContact={() => setOverlay('email')} activeWindows={activeWindows} minimizedWindows={minimizedWindows} />
     <AnimatePresence>{activeWindows.map((id, index) => minimizedWindows.includes(id) ? null : <WindowModal key={id} id={id} onClose={() => closeWindow(id)} onMinimize={() => minimizeWindow(id)} zIndex={100 + index} isActive={currentActiveWindow === id} onFocus={() => toggleWindow(id)} constraintsRef={constraintsRef} onOpenWindow={toggleWindow} />)}</AnimatePresence>
     {activeWindows.length > 0 && <nav className="window-switcher" aria-label="Open windows">{activeWindows.map(id => <div className="window-task" key={id}><button className={currentActiveWindow === id ? 'is-active' : ''} onClick={() => toggleWindow(id)} aria-label={`${minimizedWindows.includes(id) ? 'Restore' : 'Show'} ${windowNames[id]}`}><span className="task-dot" />{windowNames[id]}{minimizedWindows.includes(id) && <span className="task-minimized">—</span>}</button><button className="task-close" aria-label={`Close ${windowNames[id]}`} onClick={() => closeWindow(id)}><X size={11} /></button></div>)}</nav>}
     <Dock>
-      <DockIcon icon={<Grid2X2 />} label="Home" onClick={showHome} isActive={!visibleWindows.length && !overlay} />
-      <DockIcon icon={<Terminal />} label="Terminal" onClick={() => toggleWindow('terminal')} isActive={currentActiveWindow === 'terminal'} />
-      <DockIcon icon={<Globe />} label="Elsewhere" onClick={() => setOverlay('socials')} isActive={overlay === 'socials'} />
-      <DockIcon icon={<Mail />} label="Contact" onClick={() => setOverlay('email')} isActive={overlay === 'email'} />
+      <DockIcon icon={<img src={memojiImg} alt="" />} label="About Me" onClick={() => toggleWindow('about')} isActive={activeWindows.includes('about')} />
+      <DockIcon icon={<FileText />} label="Experience" onClick={() => toggleWindow('work-ex')} isActive={activeWindows.includes('work-ex')} />
       <span className="dock-divider" aria-hidden="true" />
-      <DockIcon icon={<Sparkles />} label="Ask Orb" onClick={() => setOverlay('assistant')} isActive={overlay === 'assistant'} />
-      <DockIcon icon={isDarkMode ? <Sun /> : <Moon />} label={isDarkMode ? 'Light' : 'Dark'} ariaLabel={`Switch to ${isDarkMode ? 'light' : 'dark'} theme`} onClick={() => setIsDarkMode(previous => !previous)} />
-      <DockIcon icon={motionPaused || reduceMotion ? <Play /> : <Pause />} label={reduceMotion ? 'Still' : motionPaused ? 'Play' : 'Pause'} ariaLabel={reduceMotion ? 'Reduced motion enabled' : motionPaused ? 'Play background video' : 'Pause background video'} pressed={Boolean(motionPaused || reduceMotion)} onClick={() => { if (!reduceMotion) setMotionPaused(previous => !previous); }} />
+      <DockIcon icon={<Globe />} label="Socials" onClick={() => setOverlay('socials')} isActive={overlay === 'socials'} />
+      <DockIcon icon={<Mail />} label="Email" onClick={() => setOverlay('email')} isActive={overlay === 'email'} />
+      <span className="dock-divider" aria-hidden="true" />
+      <DockIcon icon={<img src="/homepage/aiicon.svg" alt="" />} label="Orb" onClick={() => setOverlay('assistant')} isActive={overlay === 'assistant'} />
     </Dock>
-    <button className="workspace-help" aria-label="How to explore this portfolio" onClick={() => setOverlay('help')}>?</button>
     <SpotlightSearch isOpen={overlay === 'search'} onClose={() => setOverlay(null)} onSelect={toggleWindow} />
     <SocialsDrawer isOpen={overlay === 'socials'} onClose={() => setOverlay(null)} />
     <EmailModal isOpen={overlay === 'email'} onClose={() => setOverlay(null)} />
-    {overlay === 'help' && <HelpModal activeWindowId={currentActiveWindow} onClose={() => setOverlay(null)} />}
+    {overlay === 'help' && <HelpModal activeWindowId={currentActiveWindow === 'desktop' ? null : currentActiveWindow} onClose={() => setOverlay(null)} />}
     <AIOrbOverlay isOpen={overlay === 'assistant'} onClose={() => setOverlay(null)} currentActiveWindow={currentActiveWindow} />
   </div></MotionConfig>;
 }

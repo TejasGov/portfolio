@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, lazy, Suspense } from 'react';
-import { motion, useDragControls, useAnimation } from 'framer-motion';
+import { motion, useDragControls, useAnimation, useReducedMotion } from 'framer-motion';
 import { photographyData } from '../../data';
 import useIsPhone from '../../hooks/useIsPhone';
 
@@ -16,36 +16,90 @@ const AboutWindow = lazy(() => import('./AboutWindow'));
 const TheLibrary = lazy(() => import('./TheLibrary'));
 import './WindowModal.css';
 
-const WINDOW_SR_DESCRIPTIONS = {
-  projects: "Projects Window: Documents key engineering projects built by Tejas Govind. Highlights include Smash Cricket (Computer Vision gesture game using OpenCV and MediaPipe), CogniFlow/CogniFight (Multimodal ML pipeline predicting ADHD task abandonment using LLaMA-3, YOLOv8, and XGBoost), and Revere (Wearable AI smart glasses for Alzheimer's care utilizing Raspberry Pi Zero 2 W and Gemini 2.0 Flash).",
-  'work-ex': "Work Experience Window: Interactive timeline detailing software engineering internships, research assistantships, and technical leadership roles. Demonstrates full-stack development, cloud architecture on GCP, performance optimization, and collaborative system design.",
-  photography: "Photography Gallery Window: Visual showcase of photography projects rendered in custom morphing glass grids, dynamic layout toggles (Stack, Grid, List), and responsive image pipelines.",
-  about: "About Me Window: Interactive profile detailing Tejas Govind's background as an undergraduate CS major at the University at Buffalo (Class of May 2027), core technical stack (React, Three.js, Python, OpenCV, XGBoost), personal philosophy, and creative pursuits.",
-  terminal: "Terminal Window: Interactive command line emulator supporting custom shell commands (help, projects, skills, contact, clear, bio). Demonstrates system design, keyboard shortcuts, and CLI parsing.",
-  'my-tech': "My Tech Window: Interactive hardware and desk setup diagram mapping hot-spotted components (MacBook Pro, Ultra-wide monitor, custom PC build with GPU/CPU specs) with technical descriptions.",
-  'my-niche': "My Niche Window: Multimodal media showcase spanning film reviews, sports analytics, and pop culture curation (Marvel MCU tier lists, football analytics, movie database).",
-  'my-sound': "My Sound Window: Music player interface showcasing curated soundtracks and sound design projects with audio visualizers.",
-  blog: "Blog Window: Technical writing and engineering articles covering AI pipelines, front-end architecture, user experience design, and software trade-offs.",
-  'my-library': "My Library Window: Comprehensive repository of books, technical literature, research papers, and software design guides."
-};
+// A modal overlay above the desktop owns Escape until it is dismissed.
+function visibleDialogLayer(element) {
+  if (!element.getClientRects().length || getComputedStyle(element).visibility === 'hidden') return -1;
+  const bounds = element.getBoundingClientRect();
+  let left = Math.max(0, bounds.left);
+  let right = Math.min(window.innerWidth, bounds.right);
+  let top = Math.max(0, bounds.top);
+  let bottom = Math.min(window.innerHeight, bounds.bottom);
+  let layer = 0;
+  for (let node = element; node && node !== document.body; node = node.parentElement) {
+    const style = getComputedStyle(node);
+    const value = Number.parseInt(style.zIndex, 10);
+    if (Number.isFinite(value)) layer = Math.max(layer, value);
+    if (node !== element) {
+      const clip = node.getBoundingClientRect();
+      if (/(hidden|clip|auto|scroll)/.test(style.overflowX)) {
+        left = Math.max(left, clip.left);
+        right = Math.min(right, clip.right);
+      }
+      if (/(hidden|clip|auto|scroll)/.test(style.overflowY)) {
+        top = Math.max(top, clip.top);
+        bottom = Math.min(bottom, clip.bottom);
+      }
+    }
+  }
+  return right > left && bottom > top ? layer : -1;
+}
 
-export default function WindowModal({ id, onClose, onMinimize, zIndex, onFocus, constraintsRef, onOpenWindow }) {
+export default function WindowModal({ id, onClose, onMinimize, zIndex, onFocus, constraintsRef, onOpenWindow, isActive = true }) {
   const isPhone = useIsPhone();
+  const reduceMotion = useReducedMotion();
   const [isMaximized, setIsMaximized] = useState(false);
   const [isFilled, setIsFilled] = useState(false);
   const [viewMode, setViewMode] = useState(id === 'blog' ? 'pages' : (id === 'photography' ? 'grid' : (id === 'my-niche' ? 'movies' : 'tl')));
   const controls = useDragControls();
   const animControls = useAnimation();
   const windowRef = useRef(null);
+  const previousFocusRef = useRef(null);
+  const isActiveRef = useRef(isActive);
+  isActiveRef.current = isActive;
+
+  useEffect(() => {
+    const frame = windowRef.current;
+    previousFocusRef.current = document.activeElement;
+    const request = requestAnimationFrame(() => {
+      if (isActiveRef.current) frame?.focus({ preventScroll: true });
+    });
+    return () => {
+      cancelAnimationFrame(request);
+      const previous = previousFocusRef.current;
+      // Closing a background window must not steal focus from the active one.
+      if (previous?.isConnected && (frame?.contains(document.activeElement) || document.activeElement === document.body)) {
+        previous.focus?.({ preventScroll: true });
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!isActive) return;
+    const handleEscape = (event) => {
+      if (event.key !== 'Escape' || event.defaultPrevented || event.isComposing) return;
+      if (document.querySelector('dialog[open]')) return;
+      const frame = windowRef.current;
+      if (!frame) return;
+      const layer = visibleDialogLayer(frame);
+      const higherDialog = Array.from(document.querySelectorAll('[role="dialog"], [aria-modal="true"], [data-overlay]'))
+        .some(dialog => dialog !== frame && visibleDialogLayer(dialog) >= layer);
+      if (higherDialog) return;
+      event.preventDefault();
+      event.stopPropagation();
+      onClose();
+    };
+    window.addEventListener('keydown', handleEscape);
+    return () => window.removeEventListener('keydown', handleEscape);
+  }, [isActive, onClose]);
 
   useEffect(() => {
     // Initial entrance animation
-    animControls.start({ opacity: 1, scale: 1, x: 0, y: 0, transition: { type: "spring", stiffness: 400, damping: 30 } });
-  }, [animControls]);
+    animControls.start({ opacity: 1, scale: 1, x: 0, y: 0, transition: reduceMotion ? { duration: 0 } : { duration: 0.24, ease: [0.22, 1, 0.36, 1] } });
+  }, [animControls, reduceMotion]);
 
   useEffect(() => {
     const handler = (e) => {
-      if (e.detail.id === id) {
+      if (e.detail?.id === id) {
         if (e.detail.cmd === 'minimize') {
           onMinimize();
         } else if (e.detail.cmd === 'close') {
@@ -57,13 +111,13 @@ export default function WindowModal({ id, onClose, onMinimize, zIndex, onFocus, 
           setIsFilled(prev => !prev);
           setIsMaximized(false);
         } else if (e.detail.cmd === 'center') {
-          animControls.start({ x: 0, y: 0, transition: { type: 'spring', stiffness: 300, damping: 30 } });
+          animControls.start({ x: 0, y: 0, transition: { duration: reduceMotion ? 0 : 0.2 } });
         }
       }
     };
     window.addEventListener('window-command', handler);
     return () => window.removeEventListener('window-command', handler);
-  }, [id, onMinimize, animControls]);
+  }, [id, onMinimize, onClose, animControls, reduceMotion]);
 
   let title = "";
   let content = null;
@@ -111,54 +165,57 @@ export default function WindowModal({ id, onClose, onMinimize, zIndex, onFocus, 
 
   return (
     <motion.div
-      initial={{ opacity: 0, scale: 0.85, y: 30 }}
+      initial={{ opacity: 0, scale: reduceMotion ? 1 : 0.985, y: reduceMotion ? 0 : 14 }}
       animate={animControls}
-      exit={{ opacity: 0, scale: 0.85, y: 30 }}
+      exit={{ opacity: 0, scale: reduceMotion ? 1 : 0.985, y: reduceMotion ? 0 : 10, transition: { duration: reduceMotion ? 0 : 0.15 } }}
       drag={!isPhone && !isMaximized && !isFilled}
       dragListener={false}
       dragControls={controls}
       dragConstraints={constraintsRef}
       dragMomentum={false}
-      onPointerDown={onFocus}
-      className={`glass-panel window-modal ${isMaximized ? 'maximized' : ''} ${isFilled ? 'filled' : ''}`}
-      style={{ zIndex, position: 'absolute' }}
+      onPointerDown={() => { if (!isActive) onFocus?.(); }}
+      onFocus={() => { if (!isActive) onFocus?.(); }}
+      role="dialog"
+      aria-labelledby={`window-title-${id}`}
+      tabIndex={-1}
+      data-window={id}
+      className={`glass-panel window-modal ${isActive ? 'is-active' : ''} ${isMaximized ? 'maximized' : ''} ${isFilled ? 'filled' : ''}`}
+      style={{ zIndex }}
       ref={windowRef}
     >
       <div 
         className="window-header" 
-        style={{ position: 'relative' }}
         onPointerDown={(e) => {
+          if (e.target.closest('button')) return;
           if (!isPhone && !isMaximized && !isFilled) {
             controls.start(e);
           }
-          onFocus();
+          if (!isActive) onFocus?.();
         }}
-        onDoubleClick={() => setIsMaximized(!isMaximized)}
+        onDoubleClick={(e) => { if (!isPhone && !e.target.closest('button')) { setIsMaximized(prev => !prev); setIsFilled(false); } }}
       >
-        <div className="traffic-lights">
-          <div className="traffic-light close" onClick={(e) => { e.stopPropagation(); onClose(); }}>
-            <svg viewBox="0 0 10 10"><path d="M1 1l8 8M9 1L1 9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" /></svg>
-          </div>
-          <div className="traffic-light minimize" onClick={(e) => { e.stopPropagation(); onMinimize(); }}>
-            <svg viewBox="0 0 10 10"><path d="M1 5h8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" /></svg>
-          </div>
-          <div className="traffic-light maximize" onClick={(e) => { e.stopPropagation(); setIsMaximized(!isMaximized); }}>
-            <svg viewBox="0 0 10 10"><path d="M1.5 8.5L8.5 1.5M1.5 1.5h7v7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none"/></svg>
-          </div>
+        <div className="traffic-lights" onPointerDown={e => e.stopPropagation()}>
+          <button type="button" className="traffic-light close" aria-label={`Close ${title}`} title="Close (Esc)" onClick={onClose}>
+            <svg aria-hidden="true" viewBox="0 0 16 16"><path d="m4 4 8 8M12 4l-8 8" /></svg>
+          </button>
+          <button type="button" className="traffic-light minimize" aria-label={`Minimize ${title}`} title="Minimize" onClick={onMinimize}>
+            <svg aria-hidden="true" viewBox="0 0 16 16"><path d="M4 8h8" /></svg>
+          </button>
+          <button type="button" className="traffic-light maximize" aria-label={`${isMaximized || isFilled ? 'Restore' : 'Expand'} ${title}`} aria-pressed={isMaximized || isFilled} title={isMaximized || isFilled ? 'Restore size' : 'Expand'} onClick={() => { setIsMaximized(prev => isFilled ? false : !prev); setIsFilled(false); }}>
+            <svg aria-hidden="true" viewBox="0 0 16 16"><path d={isMaximized || isFilled ? 'M6 3v3H3m10 4h-3v3M6 6 3 3m7 7 3 3' : 'M9 3h4v4M7 13H3V9m10-6L9 7m-6 6 4-4'} /></svg>
+          </button>
         </div>
-        <div className="window-title" style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)', fontSize: '13px', fontWeight: '600', color: 'var(--text-main)', opacity: 0.85, letterSpacing: '0.3px', cursor: 'default' }}>
-          {title}
-        </div>
+        <h2 id={`window-title-${id}`} className="window-title">{title}</h2>
         {(id === 'work-ex' || id === 'blog' || id === 'photography' || id === 'my-niche') ? (
-          <div className="switcher" onPointerDown={e => e.stopPropagation()} style={{ marginLeft: 'auto', zIndex: 10 }}>
+          <div className="switcher" role="group" aria-label={`${title} view`} onPointerDown={e => e.stopPropagation()}>
             {id === 'work-ex' ? (
               <>
-                <button className={`sw ${viewMode === 'tl' ? 'on' : ''}`} onClick={() => setViewMode('tl')}>
+                <button type="button" aria-label="Timeline view" aria-pressed={viewMode === 'tl'} className={`sw ${viewMode === 'tl' ? 'on' : ''}`} onClick={() => setViewMode('tl')}>
                   <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" strokeWidth="2.5" fill="none" style={{ marginRight: '4px', verticalAlign: '-1.5px', display: 'inline-block' }}>
                     <path d="M12 5v14M5 12h14" />
                   </svg> <span className="sw-text">Timeline</span>
                 </button>
-                <button className={`sw ${viewMode === 'st' ? 'on' : ''}`} onClick={() => setViewMode('st')}>
+                <button type="button" aria-label="List view" aria-pressed={viewMode === 'st'} className={`sw ${viewMode === 'st' ? 'on' : ''}`} onClick={() => setViewMode('st')}>
                   <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" strokeWidth="2.5" fill="none" style={{ marginRight: '4px', verticalAlign: '-1.5px', display: 'inline-block' }}>
                     <path d="M4 6h16M4 12h16M4 18h16" />
                   </svg> <span className="sw-text">List</span>
@@ -166,7 +223,7 @@ export default function WindowModal({ id, onClose, onMinimize, zIndex, onFocus, 
               </>
             ) : id === 'my-niche' ? (
               <>
-                <button className={`sw ${viewMode === 'movies' ? 'on' : ''}`} onClick={() => setViewMode('movies')}>
+                <button type="button" aria-label="Movies view" aria-pressed={viewMode === 'movies'} className={`sw ${viewMode === 'movies' ? 'on' : ''}`} onClick={() => setViewMode('movies')}>
                   <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" strokeWidth="2.5" fill="none" style={{ marginRight: '4px', verticalAlign: '-1.5px', display: 'inline-block' }}>
                     <rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"></rect>
                     <line x1="7" y1="2" x2="7" y2="22"></line>
@@ -178,14 +235,14 @@ export default function WindowModal({ id, onClose, onMinimize, zIndex, onFocus, 
                     <line x1="17" y1="7" x2="22" y2="7"></line>
                   </svg> <span className="sw-text">Movies</span>
                 </button>
-                <button className={`sw ${viewMode === 'football' ? 'on' : ''}`} onClick={() => setViewMode('football')}>
+                <button type="button" aria-label="Football view" aria-pressed={viewMode === 'football'} className={`sw ${viewMode === 'football' ? 'on' : ''}`} onClick={() => setViewMode('football')}>
                   <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" strokeWidth="2.5" fill="none" style={{ marginRight: '4px', verticalAlign: '-1.5px', display: 'inline-block' }}>
                     <circle cx="12" cy="12" r="10"></circle>
                     <path d="M12 8l3.5 2.5-1.3 4.1H9.8L8.5 10.5 12 8z"></path>
                     <path d="M12 8V4.5M15.5 10.5l3.3-1M14.2 14.6l2 3.4M9.8 14.6l-2 3.4M8.5 10.5l-3.3-1"></path>
                   </svg> <span className="sw-text">Football</span>
                 </button>
-                <button className={`sw ${viewMode === 'marvel' ? 'on' : ''}`} onClick={() => setViewMode('marvel')}>
+                <button type="button" aria-label="Marvel view" aria-pressed={viewMode === 'marvel'} className={`sw ${viewMode === 'marvel' ? 'on' : ''}`} onClick={() => setViewMode('marvel')}>
                   <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" strokeWidth="2.5" fill="none" style={{ marginRight: '4px', verticalAlign: '-1.5px', display: 'inline-block' }}>
                     <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"></path>
                   </svg> <span className="sw-text">Marvel</span>
@@ -193,12 +250,12 @@ export default function WindowModal({ id, onClose, onMinimize, zIndex, onFocus, 
               </>
             ) : id === 'blog' ? (
               <>
-                <button className={`sw ${viewMode === 'pages' ? 'on' : ''}`} onClick={() => setViewMode('pages')}>
+                <button type="button" aria-label="Pages view" aria-pressed={viewMode === 'pages'} className={`sw ${viewMode === 'pages' ? 'on' : ''}`} onClick={() => setViewMode('pages')}>
                   <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" strokeWidth="2.5" fill="none" style={{ marginRight: '4px', verticalAlign: '-1.5px', display: 'inline-block' }}>
                     <path d="M12 20h9M3 20h4M3 12h18M3 4h18" />
                   </svg> <span className="sw-text">Pages</span>
                 </button>
-                <button className={`sw ${viewMode === 'articles' ? 'on' : ''}`} onClick={() => setViewMode('articles')}>
+                <button type="button" aria-label="Articles view" aria-pressed={viewMode === 'articles'} className={`sw ${viewMode === 'articles' ? 'on' : ''}`} onClick={() => setViewMode('articles')}>
                   <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" strokeWidth="2.5" fill="none" style={{ marginRight: '4px', verticalAlign: '-1.5px', display: 'inline-block' }}>
                     <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20M4 19.5A2.5 2.5 0 0 0 6.5 22H20M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5z" />
                   </svg> <span className="sw-text">Articles</span>
@@ -206,14 +263,14 @@ export default function WindowModal({ id, onClose, onMinimize, zIndex, onFocus, 
               </>
             ) : (
               <>
-                <button className={`sw ${viewMode === 'stack' ? 'on' : ''}`} onClick={() => setViewMode('stack')}>
+                <button type="button" aria-label="Stack view" aria-pressed={viewMode === 'stack'} className={`sw ${viewMode === 'stack' ? 'on' : ''}`} onClick={() => setViewMode('stack')}>
                   <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" strokeWidth="2.5" fill="none" style={{ marginRight: '4px', verticalAlign: '-1.5px', display: 'inline-block' }}>
                     <polygon points="12 2 2 7 12 12 22 7 12 2" />
                     <polygon points="2 17 12 22 22 17" />
                     <polygon points="2 12 12 17 22 12" />
                   </svg> <span className="sw-text">Stack</span>
                 </button>
-                <button className={`sw ${viewMode === 'grid' ? 'on' : ''}`} onClick={() => setViewMode('grid')}>
+                <button type="button" aria-label="Grid view" aria-pressed={viewMode === 'grid'} className={`sw ${viewMode === 'grid' ? 'on' : ''}`} onClick={() => setViewMode('grid')}>
                   <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" strokeWidth="2.5" fill="none" style={{ marginRight: '4px', verticalAlign: '-1.5px', display: 'inline-block' }}>
                     <rect x="3" y="3" width="7" height="7" />
                     <rect x="14" y="3" width="7" height="7" />
@@ -221,7 +278,7 @@ export default function WindowModal({ id, onClose, onMinimize, zIndex, onFocus, 
                     <rect x="3" y="14" width="7" height="7" />
                   </svg> <span className="sw-text">Grid</span>
                 </button>
-                <button className={`sw ${viewMode === 'list' ? 'on' : ''}`} onClick={() => setViewMode('list')}>
+                <button type="button" aria-label="List view" aria-pressed={viewMode === 'list'} className={`sw ${viewMode === 'list' ? 'on' : ''}`} onClick={() => setViewMode('list')}>
                   <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" strokeWidth="2.5" fill="none" style={{ marginRight: '4px', verticalAlign: '-1.5px', display: 'inline-block' }}>
                     <line x1="8" y1="6" x2="21" y2="6" />
                     <line x1="8" y1="12" x2="21" y2="12" />
@@ -234,9 +291,7 @@ export default function WindowModal({ id, onClose, onMinimize, zIndex, onFocus, 
               </>
             )}
           </div>
-        ) : (
-          <div style={{ width: '52px', flexShrink: 0, marginLeft: 'auto' }} />
-        )}
+        ) : null}
       </div>
       
       <div 
@@ -246,18 +301,15 @@ export default function WindowModal({ id, onClose, onMinimize, zIndex, onFocus, 
           flexDirection: 'column', 
           gap: (id === 'terminal' || id === 'work-ex' || id === 'projects' || id === 'my-sound' || id === 'blog' || id === 'my-niche' || id === 'about' || id === 'my-library') ? '0' : '24px',
           padding: (id === 'terminal' || id === 'work-ex' || id === 'projects' || id === 'my-sound' || id === 'blog' || id === 'my-niche' || id === 'about' || id === 'my-library') ? '0' : undefined,
-          overflow: (id === 'terminal' || id === 'work-ex' || id === 'projects' || id === 'my-sound' || id === 'blog' || id === 'my-niche' || id === 'about' || id === 'my-library') ? 'hidden' : undefined,
+          overflow: id === 'about' ? 'auto' : (id === 'terminal' || id === 'work-ex' || id === 'projects' || id === 'my-sound' || id === 'blog' || id === 'my-niche' || id === 'about' || id === 'my-library') ? 'hidden' : undefined,
           cursor: 'auto',
           touchAction: 'auto'
         }} 
       >
-        <p className="sr-only">
-          {WINDOW_SR_DESCRIPTIONS[id] || `${title} application window - Tejas Govind Portfolio OS.`}
-        </p>
         <Suspense fallback={
-          <div className="window-loading">
-            <div className="spinner" />
-            <span>Loading...</span>
+          <div className="window-loading" role="status">
+            <div className="spinner" aria-hidden="true" />
+            <span>Opening {title.toLowerCase()}…</span>
           </div>
         }>
           {content}

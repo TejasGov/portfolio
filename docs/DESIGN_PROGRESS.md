@@ -14,8 +14,8 @@ Audit and elevate the portfolio in verified, resumable parts. Keep existing cont
 - Search has no suggestions or empty state. Minimized windows have no clear recovery mechanism.
 - Motion preferences, background-video pause/fallback, clipboard errors and external-service failure feedback need explicit handling.
 
-## Visual direction
-An editorial personal workspace: charcoal and warm ivory, one chartreuse accent, expressive serif paired with a clean sans, fine rules, clear hierarchy, atmospheric monochrome clouds and restrained halftone/dither texture. Content remains the focus. Desktop keeps floating windows; mobile becomes readable, scrollable sheets.
+## Visual direction — corrected after user feedback
+**Preserve the macOS identity.** The user rejected the editorial homepage replacement. Keep the native-feeling menu bar, Finder-style colored folders, desktop widgets, traffic lights, frosted surfaces and magnifying dock. Use the uploaded monochrome cloud video and restrained dither details within that language. Improve accessibility, content clarity, mobile fit and actual actions without replacing the desktop metaphor.
 
 ## Stages
 1. **Audit and foundation — complete:** baseline screenshots/video inspected; asset optimization, typography, tokens and motion preferences.
@@ -34,10 +34,14 @@ An editorial personal workspace: charcoal and warm ivory, one chartreuse accent,
 - Save a verified checkpoint in this document after each part. Do not leave half-connected controls or claim unrun checks passed.
 
 ## Branch checkpoints
-- `design/portfolio-foundation`: new home/shell, local fonts (OFL licenses included), optimized cloud video/poster, theme/motion controls and resumable plan.
-- `ux/portfolio-navigation`: next — windows, native dialogs, search/contact/assistant feedback and route cleanup.
-- `design/portfolio-content`: next — truthful Projects and immediately readable About; further module polish.
-Branches are stacked so later branches include earlier completed updates. Push each completed checkpoint; leave `main` unchanged until review/merge.
+- `design/portfolio-foundation` (`fd06d5e`): pushed earlier editorial alternative; **user rejected its visual direction — do not merge alone**.
+- `design/macos-desktop`: corrected macOS shell, folders, widgets, dock and traffic lights; current design checkpoint.
+- `ux/portfolio-navigation`: next — native dialogs, search/contact/assistant feedback and route cleanup; will be based on the corrected macOS branch.
+- `design/portfolio-content`: next — truthful Projects and immediately readable About inside the preserved macOS windows.
+Branches are stacked so later branches include earlier completed corrections. Push completed checkpoints. `main` has not been changed.
 
 ## Verification record
-Before screenshots captured at 1440×1000 and 390×844. Baseline production build and basic Projects search passed during onboarding. Foundation production build passed; desktop 1440×1000 and phone 390×844 screenshots reviewed. Home has no horizontal overflow and no uncaught runtime errors. Video is muted and playable; pause and reduced-motion checks continue in the interaction stage.
+Before screenshots captured at 1440×1000 and 390×844. Baseline production build and basic Projects search passed during onboarding. The earlier foundation production build passed; desktop 1440×1000 and phone 390×844 screenshots reviewed. Home has no horizontal overflow and no uncaught runtime errors. Video is muted and playable; pause and reduced-motion checks continue in the interaction stage.
+
+## Latest checkpoint
+macOS shell restored and desktop/phone screenshots reviewed. Native dialog/search/contact changes and content changes remain local until their separate checkpoint commits. The reusable browser check is being updated for macOS controls (Control Center handles wallpaper motion).

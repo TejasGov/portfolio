@@ -1,7 +1,11 @@
-.workspace-dock { position: absolute; z-index: 1200; bottom: max(17px, env(safe-area-inset-bottom)); left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 3px; padding: 7px; border: 1px solid var(--shell-line); border-radius: 12px; background: var(--dock-surface); backdrop-filter: blur(22px); box-shadow: 0 8px 40px #0003; max-width: calc(100vw - 24px); }
-.dock-item { min-width: 60px; height: 47px; padding: 0 11px; border-radius: 6px; display: flex; align-items: center; justify-content: center; gap: 8px; color: var(--text-muted); transition: background .15s, color .15s; }
-.dock-item > svg { width: 16px; height: 16px; stroke-width: 1.6; }
-.dock-item > span { font-size: 11px; }
-.dock-item:hover, .dock-item.is-active { color: var(--text-main); background: var(--badge-bg); }
-.dock-divider { width: 1px; height: 23px; background: var(--shell-line); margin: 0 5px; }
-@media(max-width: 600px) { .workspace-dock { bottom: max(12px, env(safe-area-inset-bottom)); gap: 1px; padding: 5px; } .dock-item { padding: 0; min-width: 43px; height: 44px; } .dock-item > span { display: none; } .dock-item > svg { width: 18px; height: 18px; } .dock-divider { margin: 0 3px; } }
+.workspace-dock { position: absolute; left: 50%; bottom: max(20px, env(safe-area-inset-bottom)); transform: translateX(-50%); z-index: 1200; max-width: calc(100vw - 20px); }
+.dock { display: flex; align-items: flex-end; gap: 12px; padding: 11px 14px; height: 74px; border-radius: 22px; background: var(--dock-surface, var(--glass-bg)); backdrop-filter: blur(30px) saturate(1.5); -webkit-backdrop-filter: blur(30px) saturate(1.5); border: 1px solid var(--glass-border); box-shadow: 0 12px 30px #0002, inset 0 1px 1px #ffffff44; }
+.dock-item { position: relative; display: flex; align-items: center; justify-content: center; padding: 0; border: 0; border-radius: 13px; flex-shrink: 0; color: var(--dock-icon-color); }
+.dock-icon-face { display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; border-radius: 25%; overflow: hidden; background: linear-gradient(150deg,#fff5,#fff1); box-shadow: inset 0 1px 1px #fff6, inset 0 -1px 1px #0001, 0 5px 8px #0002; border: 1px solid #ffffff30; }
+.dock-item:hover .dock-icon-face { background: linear-gradient(150deg,#fff7,#fff2); }
+.dock-icon-face > svg { width: 46%; height: 46%; stroke-width: 1.7; }
+.dock-icon-face > img { width: 100%; height: 100%; object-fit: cover; }
+.dock-active-dot { position: absolute; bottom: -8px; width: 4px; height: 4px; border-radius: 50%; background: var(--dock-icon-color); opacity: .85; }
+.dock-tooltip { position: absolute; bottom: calc(100% + 13px); left: 50%; transform: translateX(-50%); padding: 6px 11px; border: 1px solid var(--glass-border); border-radius: 7px; white-space: nowrap; font-size: 11px; background: var(--glass-bg); color: var(--text-main); box-shadow: 0 4px 12px #0002; pointer-events: none; backdrop-filter: blur(18px); }
+.dock-divider { width: 1px; height: 40px; background: var(--timeline-line); margin: 0 3px; align-self: center; }
+@media(max-width: 600px) { .workspace-dock { bottom: max(16px, env(safe-area-inset-bottom)); } .dock { height: 70px; gap: 10px; padding: 10px 12px; border-radius: 21px; } .dock-item { width: 46px !important; height: 46px !important; } .dock-tooltip { display: none; } }

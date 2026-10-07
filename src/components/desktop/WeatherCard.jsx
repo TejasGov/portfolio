@@ -42,6 +42,7 @@ const CONDITIONS = {
 
 export default function WeatherCard() {
   const [weather, setWeather] = useState(null);
+  const [unavailable, setUnavailable] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -55,12 +56,13 @@ export default function WeatherCard() {
         if (!res.ok) throw new Error('weather request failed');
         const data = await res.json();
         if (cancelled) return;
+        setUnavailable(false);
         setWeather({
           temp: Math.round(data.current.temperature_2m),
           code: data.current.weather_code,
         });
       } catch {
-        if (!cancelled) setWeather(null);
+        if (!cancelled) { setWeather(null); setUnavailable(true); }
       }
     };
 
@@ -69,7 +71,7 @@ export default function WeatherCard() {
     return () => { cancelled = true; clearInterval(timer); };
   }, []);
 
-  const [condition, Icon] = (weather && CONDITIONS[weather.code]) || ['- - -', Cloud];
+  const [condition, Icon] = (weather && CONDITIONS[weather.code]) || [unavailable ? 'OFFLINE' : 'LOADING', Cloud];
 
   // Split the temperature into dot-matrix glyphs, keeping a leading minus for sub-zero days.
   const tempChars = weather

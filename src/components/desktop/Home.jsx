@@ -1,29 +1,21 @@
-import { ArrowUpRight, ArrowDown, Braces, BriefcaseBusiness, Camera, Monitor, Film, AudioLines, BookOpen } from 'lucide-react';
-const sections = [
-  { id: 'projects', title: 'Selected work', caption: 'Ideas, made real', icon: Braces },
-  { id: 'work-ex', title: 'Experience', caption: 'The journey so far', icon: BriefcaseBusiness },
-  { id: 'photography', title: 'Photography', caption: 'Through my lens', icon: Camera },
-  { id: 'my-tech', title: 'My setup', caption: 'Tools of the trade', icon: Monitor },
-  { id: 'my-niche', title: 'Off the clock', caption: 'A few obsessions', icon: Film },
-  { id: 'my-sound', title: 'On repeat', caption: 'The soundtrack', icon: AudioLines },
-  { id: 'my-library', title: 'The bookshelf', caption: 'Between the lines', icon: BookOpen },
-];
+import { ArrowUpRight, BriefcaseBusiness, Camera, Film, Headphones, Monitor, BookOpen, Code2 } from 'lucide-react';
+import { desktopItems, memojiImg } from '../../data';
+import DesktopWidgets from './DesktopWidgets';
+const icons = { projects: Code2, 'work-ex': BriefcaseBusiness, photography: Camera, 'my-tech': Monitor, 'my-niche': Film, 'my-sound': Headphones, 'my-library': BookOpen };
+const colors = ['#f48eb3', '#75d9bd', '#82c5ef', '#8d8cdb', '#eec36e', '#b2a0e3', '#86b6f2'];
 export default function Home({ onOpenWindow, onContact, activeWindows, minimizedWindows }) {
-  return <main id="main-content" className="home-scroll" tabIndex={-1}>
-    <section className="hero" aria-labelledby="hero-title">
-      <div className="hero-intro">
-        <p className="eyebrow hero-eyebrow"><span className="status-dot" /> ENGINEER, BUILDER & CURIOUS HUMAN</p>
-        <h1 id="hero-title">A little logic.<br />A lot of <em>curiosity.</em><span className="pixel-spark" aria-hidden="true">✳</span></h1>
-        <p className="hero-description">I’m Tejas, a computer science student at the University at Buffalo. I build thoughtful digital experiences — and follow the things that make me curious.</p>
-        <div className="hero-actions"><button className="primary-button" onClick={() => onOpenWindow('projects')}>Explore my work <ArrowUpRight size={18} /></button><button className="text-button" onClick={() => onOpenWindow('about')}>The person behind it <ArrowUpRight size={16} /></button></div>
-      </div>
-      <aside className="hero-note" aria-label="Current chapter"><div className="note-mark" aria-hidden="true">[ TG — 01 ]</div><p className="eyebrow">CURRENT CHAPTER</p><p>Computer science.<br /><em>Human possibilities.</em></p><span>University at Buffalo · Class of 2027</span><button onClick={onContact}>Let’s make something good <ArrowUpRight size={14} /></button></aside>
-      <a className="hero-scroll-hint" href="#directory"><ArrowDown size={13} /> A LITTLE MORE OF MY WORLD</a>
+  return <main id="main-content" className="mac-desktop" tabIndex={-1} aria-label="Tejas OS desktop">
+    <div className="widget-stage"><DesktopWidgets /></div>
+    <section className="desktop-welcome glass-panel" aria-labelledby="desktop-greeting">
+      <div className="welcome-identity"><img src={memojiImg} alt="" /><div><p className="welcome-eyebrow">WELCOME TO MY DESKTOP</p><h1 id="desktop-greeting">Hi, I’m Tejas.</h1><p>Computer science at the University at Buffalo.<br />Building things. Following curiosity.</p></div></div>
+      <div className="welcome-actions"><button onClick={() => onOpenWindow('about')}>A little about me <ArrowUpRight size={13} /></button><button onClick={onContact}>Say hello <ArrowUpRight size={13} /></button></div>
     </section>
-    <section id="directory" className="directory" aria-labelledby="directory-title">
-      <div className="directory-heading"><div><p className="eyebrow">THE DIRECTORY</p><h2 id="directory-title">Many interests. One very curious mind.</h2></div><span className="directory-hint">Pick a folder. Stay a while. <ArrowUpRight size={14} /></span></div>
-      <div className="directory-grid">{sections.map(({ id, title, caption, icon: Icon }, i) => <button key={id} className={`directory-item ${activeWindows.includes(id) ? 'is-open' : ''}`} onClick={() => onOpenWindow(id)} aria-label={`Open ${title}`}><span className="directory-item-top"><span className="directory-number">0{i + 1}</span><ArrowUpRight className="directory-arrow" size={15} /></span><span className="directory-symbol" aria-hidden="true"><Icon size={28} strokeWidth={1.2} /></span><span className="desktop-icon-label">{title}</span><span className="directory-caption">{caption}</span>{activeWindows.includes(id) && <span className="directory-open-label">{minimizedWindows.includes(id) ? 'Minimized' : 'Open'}</span>}</button>)}</div>
-    </section>
-    <footer className="home-footer"><span>BUILT WITH INTENTION. A LITTLE PLAY, TOO.</span><button onClick={onContact}>Have something in mind? <ArrowUpRight size={13} /></button></footer>
+    <ul className="desktop-icons-grid" aria-label="Portfolio folders">{desktopItems.map((item, index) => {
+      const Icon = icons[item.id];
+      return <li key={item.id}><button className={`desktop-icon ${activeWindows.includes(item.id) && !minimizedWindows.includes(item.id) ? 'is-open' : ''}`} onClick={() => onOpenWindow(item.id)} aria-label={`Open ${item.title}`}>
+        <span className="finder-folder" style={{ '--folder-color': colors[index], '--folder-gradient': item.color }} aria-hidden="true"><span className="folder-tab" /><span className="folder-paper" /><span className="folder-face"><Icon size={25} strokeWidth={1.2} /></span><span className="folder-dither" /></span>
+        <span className="desktop-icon-label">{item.title}</span>
+      </button></li>;
+    })}</ul>
   </main>;
 }
