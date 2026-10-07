@@ -1,19 +1,29 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { ArrowRight, ArrowUpRight } from 'lucide-react';
 import { projectsData } from '../../data';
+import TechStack from './TechStack';
 import './ProjectsWindow.css';
 
 const hasPublicLink = (link) => /^https?:\/\//i.test(link || '');
 const projectNumber = (index) => String(index + 1).padStart(2, '0');
+const TYPES = [{ id: 'all', label: 'All' }, { id: 'games', label: 'Games' }, { id: 'ai', label: 'AI & ML' }, { id: 'web', label: 'Web apps' }];
 
 export default function ProjectsWindow() {
-  const [selected, setSelected] = useState(0);
+  const [selected, setSelected] = useState(projectsData[0].id);
+  const [type, setType] = useState('all');
+  const filteredProjects = projectsData.filter(item => type === 'all' || item.type === type);
+  const chooseType = next => {
+    setType(next);
+    const matches = projectsData.filter(item => next === 'all' || item.type === next);
+    setSelected(previous => matches.some(item => item.id === previous) ? previous : matches[0]?.id || null);
+  };
   const detailRef = useRef(null);
-  const project = projectsData[selected];
-  const publicLink = hasPublicLink(project.link);
-  const publicSource = hasPublicLink(project.github);
-  const liveLabel = project.linkLabel || 'Visit live project';
-  const projectDetails = Object.entries(project.info).filter(([label]) =>
+  const project = filteredProjects.find(item => item.id === selected) || filteredProjects[0];
+  const selectedNumber = projectsData.findIndex(item => item.id === project?.id);
+  const publicLink = hasPublicLink(project?.link);
+  const publicSource = hasPublicLink(project?.github);
+  const liveLabel = project?.linkLabel || 'Visit live project';
+  const projectDetails = Object.entries(project?.info || {}).filter(([label]) =>
     ['Type', 'Domain', 'Backend', 'Frontend', 'Hardware', 'Physics'].includes(label)
   );
 
@@ -23,25 +33,28 @@ export default function ProjectsWindow() {
 
   return (
     <div className="proj-root">
+      <div className="proj-toolbar"><div className="proj-type-control" role="group" aria-label="Filter projects by type">{TYPES.map(filter => <button key={filter.id} type="button" aria-pressed={type === filter.id} onClick={() => chooseType(filter.id)}>{filter.label}</button>)}</div><span className="proj-filter-count" role="status">{filteredProjects.length} {filteredProjects.length === 1 ? 'project' : 'projects'}</span></div>
+      <div className="proj-browser">
       <aside className="proj-sidebar" aria-label="Project collection">
         <div className="proj-index-heading">
           <span>Projects</span>
-          <span className="proj-count">{String(projectsData.length).padStart(2, '0')}</span>
+          <span className="proj-count">{String(filteredProjects.length).padStart(2, '0')}</span>
         </div>
         <nav className="proj-sb-list" aria-label="Select a project">
-          {projectsData.map((item, index) => (
+          {filteredProjects.map((item, index) => (
             <button
               type="button"
-              key={item.title}
-              className={`proj-sb-row ${selected === index ? 'on' : ''}`}
-              aria-pressed={selected === index}
+              key={item.id}
+              className={`proj-sb-row ${project?.id === item.id ? 'on' : ''}`}
+              aria-pressed={project?.id === item.id}
               aria-controls="project-case-study"
-              onClick={() => setSelected(index)}
+              data-project-id={item.id}
+              onClick={() => setSelected(item.id)}
               onKeyDown={event => {
                 if (!['ArrowDown', 'ArrowUp', 'ArrowRight', 'ArrowLeft', 'Home', 'End'].includes(event.key)) return;
                 event.preventDefault();
-                const next = event.key === 'Home' ? 0 : event.key === 'End' ? projectsData.length - 1 : Math.max(0, Math.min(projectsData.length - 1, index + (['ArrowDown', 'ArrowRight'].includes(event.key) ? 1 : -1)));
-                setSelected(next);
+                const next = event.key === 'Home' ? 0 : event.key === 'End' ? filteredProjects.length - 1 : Math.max(0, Math.min(filteredProjects.length - 1, index + (['ArrowDown', 'ArrowRight'].includes(event.key) ? 1 : -1)));
+                setSelected(filteredProjects[next].id);
                 const row = event.currentTarget.closest('nav').querySelectorAll('button')[next];
                 row.focus({ preventScroll: true });
                 row.scrollIntoView({ block: 'nearest', inline: 'nearest' });
@@ -58,11 +71,11 @@ export default function ProjectsWindow() {
         </nav>
         <div className="proj-index-footer" aria-hidden="true">
           <span className="proj-dither-mark" />
-          <span>{projectsData.length} projects · Tejas Govind</span>
+          <span>{filteredProjects.length} projects · Tejas Govind</span>
         </div>
       </aside>
 
-      <article
+      {project ? <article
         className="proj-detail"
         id="project-case-study"
         aria-labelledby="project-case-title"
@@ -71,7 +84,7 @@ export default function ProjectsWindow() {
       >
         <header className="proj-hero">
           <div className="proj-eyebrow">
-            <span>Project {projectNumber(selected)}</span>
+            <span>Project {projectNumber(selectedNumber)}</span>
             <span className="proj-badge-status">{project.status}</span>
           </div>
           <h2 className="proj-app-name" id="project-case-title">{project.title}</h2>
@@ -95,7 +108,7 @@ export default function ProjectsWindow() {
           </div>
           <figcaption>
             <span>{project.imageCaption || `${project.shortTitle} / Project visual`}</span>
-            <span aria-hidden="true">{projectNumber(selected)} — {String(projectsData.length).padStart(2, '0')}</span>
+            <span aria-hidden="true">{projectNumber(selectedNumber)} — {String(projectsData.length).padStart(2, '0')}</span>
           </figcaption>
         </figure>
 
@@ -106,11 +119,7 @@ export default function ProjectsWindow() {
 
         <section className="proj-section" aria-labelledby="project-stack-title">
           <h3 className="proj-section-title" id="project-stack-title">Built with</h3>
-          <ul className="proj-tech-wrap" aria-label="Technology stack">
-            {project.tech.split(', ').map((technology) => (
-              <li key={technology} className="proj-tech-tag">{technology}</li>
-            ))}
-          </ul>
+          <TechStack stack={project.tech} />
         </section>
 
         <section className="proj-section proj-section-last" aria-labelledby="project-details-title">
@@ -125,7 +134,8 @@ export default function ProjectsWindow() {
           </dl>
           {!publicLink && <p className="proj-access-note">{publicSource ? 'Explore the implementation in the public repository.' : 'A public demo is not available.'}</p>}
         </section>
-      </article>
+      </article> : <div className="proj-empty" role="status"><h2>No projects of this type yet</h2><p>Choose another type to explore the collection.</p><button className="proj-btn-source" onClick={() => chooseType('all')}>Show all projects</button></div>}
+      </div>
     </div>
   );
 }
