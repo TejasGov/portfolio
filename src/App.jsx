@@ -1,240 +1,95 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Mail, FileText, Globe, Mic } from 'lucide-react';
-
-import { desktopItems, memojiImg } from './data';
-
-import BootScreen from './components/overlays/BootScreen';
-import DesktopWidgets from './components/desktop/DesktopWidgets';
+import { useState, useRef, useEffect, useCallback } from 'react';
+import { AnimatePresence, MotionConfig, useReducedMotion } from 'framer-motion';
+import { Mail, Globe, Terminal, Sparkles, Sun, Moon, Pause, Play, Grid2X2, X } from 'lucide-react';
+import { useConversationClientTool } from '@elevenlabs/react';
+import Home from './components/desktop/Home';
+import Atmosphere from './components/desktop/Atmosphere';
 import Dock, { DockIcon } from './components/desktop/Dock';
+import TopNavbar from './components/desktop/TopNavbar';
 import SocialsDrawer from './components/overlays/SocialsDrawer';
 import HelpModal from './components/overlays/HelpModal';
 import SpotlightSearch from './components/overlays/SpotlightSearch';
 import EmailModal from './components/overlays/EmailModal';
-import WindowModal from './components/windows/WindowModal';
-import TopNavbar from './components/desktop/TopNavbar';
 import AIOrbOverlay from './components/overlays/AIOrbOverlay';
-import { useConversationClientTool } from '@elevenlabs/react';
+import WindowModal from './components/windows/WindowModal';
+
+const windowNames = { projects: 'Projects', 'work-ex': 'Experience', photography: 'Photography', 'my-tech': 'My setup', 'my-niche': 'Off the clock', 'my-sound': 'On repeat', 'my-library': 'Bookshelf', about: 'About', terminal: 'Terminal', blog: 'Journal' };
+function storedPreference(key, fallback) { try { return localStorage.getItem(key) ?? fallback; } catch { return fallback; } }
 
 export default function App() {
   const [activeWindows, setActiveWindows] = useState([]);
   const [minimizedWindows, setMinimizedWindows] = useState([]);
-  const [isDarkMode, setIsDarkMode] = useState(false);
-  const [isSocialsOpen, setIsSocialsOpen] = useState(false);
-  const [isEmailOpen, setIsEmailOpen] = useState(false);
-  const [isHelpOpen, setIsHelpOpen] = useState(false);
-  const [isSearchOpen, setIsSearchOpen] = useState(false);
-  const [showBoot, setShowBoot] = useState(true);
-  const [isOrbActive, setIsOrbActive] = useState(false);
+  const [overlay, setOverlay] = useState(null);
+  const [isDarkMode, setIsDarkMode] = useState(() => storedPreference('tg-theme', 'dark') !== 'light');
+  const [motionPaused, setMotionPaused] = useState(() => storedPreference('tg-motion', 'play') === 'pause');
+  const reduceMotion = useReducedMotion();
   const constraintsRef = useRef(null);
+  const visibleWindows = activeWindows.filter(id => !minimizedWindows.includes(id));
+  const currentActiveWindow = visibleWindows.at(-1) || 'desktop';
 
   useEffect(() => {
-    const handleKeyDown = (e) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
-        e.preventDefault();
-        setIsSearchOpen(prev => !prev);
+    document.body.classList.toggle('dark-mode', isDarkMode);
+    document.documentElement.style.colorScheme = isDarkMode ? 'dark' : 'light';
+    try { localStorage.setItem('tg-theme', isDarkMode ? 'dark' : 'light'); } catch {}
+  }, [isDarkMode]);
+  useEffect(() => { try { localStorage.setItem('tg-motion', motionPaused ? 'pause' : 'play'); } catch {} }, [motionPaused]);
+  useEffect(() => {
+    const handleKeyDown = event => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
+        event.preventDefault();
+        setOverlay(current => current === 'search' ? null : 'search');
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  useEffect(() => {
-    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    setIsDarkMode(prefersDark);
+  const toggleWindow = useCallback(id => {
+    if (id === 'contact') { setOverlay('email'); return; }
+    if (id === 'talk-to-me') { setOverlay('assistant'); return; }
+    if (!windowNames[id]) return;
+    setOverlay(null);
+    setMinimizedWindows(previous => previous.filter(item => item !== id));
+    setActiveWindows(previous => [...previous.filter(item => item !== id), id]);
   }, []);
-
-  useEffect(() => {
-    if (isDarkMode) {
-      document.body.classList.add('dark-mode');
-    } else {
-      document.body.classList.remove('dark-mode');
-    }
-  }, [isDarkMode]);
-
-  const toggleTheme = () => setIsDarkMode(!isDarkMode);
-
-  const toggleWindow = (id) => {
-    if (minimizedWindows.includes(id)) {
-      // Restore from minimized
-      setMinimizedWindows(prev => prev.filter(wId => wId !== id));
-      setActiveWindows(prev => [...prev.filter(wId => wId !== id), id]); // bring to front
-    } else if (activeWindows.includes(id)) {
-      // Bring to front
-      setActiveWindows(prev => [...prev.filter(wId => wId !== id), id]);
-    } else {
-      // Open new
-      setActiveWindows(prev => [...prev, id]);
-    }
+  const closeWindow = id => {
+    setActiveWindows(previous => previous.filter(item => item !== id));
+    setMinimizedWindows(previous => previous.filter(item => item !== id));
   };
-
-  const currentActiveWindow = activeWindows.length > 0 ? activeWindows[activeWindows.length - 1] : "desktop";
-
-  useConversationClientTool("open_window", (params) => {
-    const { window_name } = params || {};
-    if (!window_name) return;
-
-    const windowMap = {
-      "projects": "projects",
-      "work ex": "work-ex",
-      "work experience": "work-ex",
-      "workex": "work-ex",
-      "photography": "photography",
-      "my tech": "my-tech",
-      "tech": "my-tech",
-      "my niche": "my-niche",
-      "niche": "my-niche",
-      "my sound": "my-sound",
-      "sound": "my-sound",
-      "my library": "my-library",
-      "library": "my-library",
-      "about": "about",
-      "about me": "about",
-      "terminal": "terminal",
-      "blog": "blog"
-    };
-
-    const normalized = window_name.toLowerCase().trim();
-    const matchedId = windowMap[normalized];
-    if (matchedId) {
-      toggleWindow(matchedId);
-    }
+  const minimizeWindow = id => setMinimizedWindows(previous => previous.includes(id) ? previous : [...previous, id]);
+  const showHome = () => {
+    setOverlay(null);
+    setMinimizedWindows([...activeWindows]);
+    requestAnimationFrame(() => document.getElementById('main-content')?.focus());
+  };
+  useConversationClientTool('open_window', params => {
+    const names = { 'work ex': 'work-ex', 'work experience': 'work-ex', workex: 'work-ex', 'my tech': 'my-tech', tech: 'my-tech', 'my niche': 'my-niche', niche: 'my-niche', 'my sound': 'my-sound', sound: 'my-sound', 'my library': 'my-library', library: 'my-library', 'about me': 'about' };
+    const name = params?.window_name?.toLowerCase().trim();
+    if (name) toggleWindow(names[name] || name);
   });
 
-  const closeWindow = (id) => {
-    setActiveWindows(prev => prev.filter(wId => wId !== id));
-    setMinimizedWindows(prev => prev.filter(wId => wId !== id));
-  };
-
-  const minimizeWindow = (id) => {
-    setMinimizedWindows(prev => [...prev, id]);
-  };
-
-  const handleSearchSelect = (id) => {
-    setIsSearchOpen(false);
-    toggleWindow(id);
-  };
-
-  return (
-    <>
-      <AnimatePresence>
-        {showBoot && <BootScreen onComplete={() => setShowBoot(false)} />}
-      </AnimatePresence>
-
-      <div ref={constraintsRef} className="desktop-root">
-        <div className="desktop-bg" />
-
-        {/* Top Navbar */}
-        <TopNavbar
-          activeWindowId={activeWindows.length > 0 && !minimizedWindows.includes(activeWindows[activeWindows.length - 1]) ? activeWindows[activeWindows.length - 1] : null}
-          onToggleHelp={() => setIsHelpOpen(true)}
-          toggleTheme={toggleTheme}
-          isDarkMode={isDarkMode}
-          onToggleSearch={() => setIsSearchOpen(true)}
-          onOpenTerminal={() => toggleWindow('terminal')}
-          onOpenBlog={() => toggleWindow('blog')}
-        />
-
-        {/* Spotlight Search */}
-        <AnimatePresence>
-          {isSearchOpen && <SpotlightSearch isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} onSelect={handleSearchSelect} />}
-        </AnimatePresence>
-
-        {/* Help Modal */}
-        <AnimatePresence>
-          {isHelpOpen && <HelpModal activeWindowId={activeWindows.length > 0 && !minimizedWindows.includes(activeWindows[activeWindows.length - 1]) ? activeWindows[activeWindows.length - 1] : null} onClose={() => setIsHelpOpen(false)} />}
-        </AnimatePresence>
-
-        {/* Desktop Widgets */}
-        <DesktopWidgets />
-
-        {/* Desktop Folders */}
-        <ul className="desktop-icons-grid" role="list">
-          {desktopItems.map((item) => (
-            <motion.li
-              key={item.id}
-              className="desktop-icon"
-              role="listitem"
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={() => toggleWindow(item.id)}
-            >
-              {/* Simple MacOS-like Folder Icon shape using CSS */}
-              <div style={{ width: '80px', height: '65px', borderRadius: '8px', background: item.color, boxShadow: '0 4px 12px rgba(0,0,0,0.2)', position: 'relative' }}>
-                <div style={{ position: 'absolute', top: '-8px', left: '0', width: '35px', height: '15px', background: item.color, borderTopLeftRadius: '8px', borderTopRightRadius: '8px' }} />
-              </div>
-              <span className="desktop-icon-label">
-                {item.title}
-              </span>
-            </motion.li>
-          ))}
-        </ul>
-
-        {/* Window Modals */}
-        <AnimatePresence>
-          {activeWindows.map((windowId, index) => {
-            if (minimizedWindows.includes(windowId)) return null; // Hide if minimized
-            return (
-              <WindowModal
-                key={windowId}
-                id={windowId}
-                onClose={() => closeWindow(windowId)}
-                onMinimize={() => minimizeWindow(windowId)}
-                zIndex={100 + index}
-                onFocus={() => toggleWindow(windowId)}
-                constraintsRef={constraintsRef}
-                onOpenWindow={toggleWindow}
-              />
-            );
-          })}
-        </AnimatePresence>
-
-        {/* Socials Drawer */}
-        <SocialsDrawer isOpen={isSocialsOpen} onClose={() => setIsSocialsOpen(false)} />
-
-        {/* Email Modal */}
-        <EmailModal isOpen={isEmailOpen} onClose={() => setIsEmailOpen(false)} />
-
-        <Dock>
-          <DockIcon
-            icon={<img src={memojiImg} alt="Memoji Avatar - About Tejas Govind" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />}
-            label="About Me"
-            ariaLabel="Memoji Avatar - Interactive About Me Window"
-            isActive={activeWindows.includes('about')}
-            onClick={() => toggleWindow('about')}
-            hoverColor="rgba(255, 255, 255, 0.3)"
-          />
-          <div style={{ width: '1px', background: 'var(--timeline-line)', margin: '0 4px' }} />
-          <DockIcon icon={<FileText color="var(--dock-icon-color)" />} label="Resume" ariaLabel="Resume Document Download and View" hoverColor="var(--dock-item-hover)" />
-          <DockIcon
-            icon={<Globe color="var(--dock-icon-color)" />}
-            label="Socials"
-            ariaLabel="Social Media Links Drawer"
-            hoverColor="var(--dock-item-hover)"
-            onClick={() => setIsSocialsOpen(!isSocialsOpen)}
-            isActive={isSocialsOpen}
-          />
-          <DockIcon 
-            icon={<Mail color="var(--dock-icon-color)" />} 
-            label="Email" 
-            ariaLabel="Email Contact Modal"
-            hoverColor="var(--dock-item-hover)" 
-            onClick={() => setIsEmailOpen(!isEmailOpen)}
-            isActive={isEmailOpen}
-          />
-          <div style={{ width: '1px', background: 'var(--timeline-line)', margin: '0 4px' }} />
-          <DockIcon
-            icon={<img src="/homepage/aiicon.svg" alt="Orb - AI Voice Assistant" style={{ width: '100%', height: '100%', objectFit: 'contain', transform: 'scale(1.3)' }} />}
-            label="Orb"
-            ariaLabel="Orb - Interactive AI Voice & Multimodal Assistant"
-            onClick={() => setIsOrbActive(true)}
-            hoverColor="var(--dock-item-hover)"
-          />
-        </Dock>
-
-        {/* AI Orb Full Screen Viewport Glow & Overlay */}
-        <AIOrbOverlay isOpen={isOrbActive} onClose={() => setIsOrbActive(false)} currentActiveWindow={currentActiveWindow} />
-      </div>
-    </>
-  );
+  return <MotionConfig reducedMotion="user"><div ref={constraintsRef} className="desktop-root">
+    <a className="skip-link" href="#main-content">Skip to content</a>
+    <Atmosphere paused={motionPaused || reduceMotion} />
+    <TopNavbar onHome={showHome} onOpenWindow={toggleWindow} onToggleSearch={() => setOverlay('search')} onContact={() => setOverlay('email')} />
+    <Home onOpenWindow={toggleWindow} onContact={() => setOverlay('email')} activeWindows={activeWindows} minimizedWindows={minimizedWindows} />
+    <AnimatePresence>{activeWindows.map((id, index) => minimizedWindows.includes(id) ? null : <WindowModal key={id} id={id} onClose={() => closeWindow(id)} onMinimize={() => minimizeWindow(id)} zIndex={100 + index} isActive={currentActiveWindow === id} onFocus={() => toggleWindow(id)} constraintsRef={constraintsRef} onOpenWindow={toggleWindow} />)}</AnimatePresence>
+    {activeWindows.length > 0 && <nav className="window-switcher" aria-label="Open windows">{activeWindows.map(id => <div className="window-task" key={id}><button className={currentActiveWindow === id ? 'is-active' : ''} onClick={() => toggleWindow(id)} aria-label={`${minimizedWindows.includes(id) ? 'Restore' : 'Show'} ${windowNames[id]}`}><span className="task-dot" />{windowNames[id]}{minimizedWindows.includes(id) && <span className="task-minimized">—</span>}</button><button className="task-close" aria-label={`Close ${windowNames[id]}`} onClick={() => closeWindow(id)}><X size={11} /></button></div>)}</nav>}
+    <Dock>
+      <DockIcon icon={<Grid2X2 />} label="Home" onClick={showHome} isActive={!visibleWindows.length && !overlay} />
+      <DockIcon icon={<Terminal />} label="Terminal" onClick={() => toggleWindow('terminal')} isActive={currentActiveWindow === 'terminal'} />
+      <DockIcon icon={<Globe />} label="Elsewhere" onClick={() => setOverlay('socials')} isActive={overlay === 'socials'} />
+      <DockIcon icon={<Mail />} label="Contact" onClick={() => setOverlay('email')} isActive={overlay === 'email'} />
+      <span className="dock-divider" aria-hidden="true" />
+      <DockIcon icon={<Sparkles />} label="Ask Orb" onClick={() => setOverlay('assistant')} isActive={overlay === 'assistant'} />
+      <DockIcon icon={isDarkMode ? <Sun /> : <Moon />} label={isDarkMode ? 'Light' : 'Dark'} ariaLabel={`Switch to ${isDarkMode ? 'light' : 'dark'} theme`} onClick={() => setIsDarkMode(previous => !previous)} />
+      <DockIcon icon={motionPaused || reduceMotion ? <Play /> : <Pause />} label={reduceMotion ? 'Still' : motionPaused ? 'Play' : 'Pause'} ariaLabel={reduceMotion ? 'Reduced motion enabled' : motionPaused ? 'Play background video' : 'Pause background video'} pressed={Boolean(motionPaused || reduceMotion)} onClick={() => { if (!reduceMotion) setMotionPaused(previous => !previous); }} />
+    </Dock>
+    <button className="workspace-help" aria-label="How to explore this portfolio" onClick={() => setOverlay('help')}>?</button>
+    <SpotlightSearch isOpen={overlay === 'search'} onClose={() => setOverlay(null)} onSelect={toggleWindow} />
+    <SocialsDrawer isOpen={overlay === 'socials'} onClose={() => setOverlay(null)} />
+    <EmailModal isOpen={overlay === 'email'} onClose={() => setOverlay(null)} />
+    {overlay === 'help' && <HelpModal activeWindowId={currentActiveWindow} onClose={() => setOverlay(null)} />}
+    <AIOrbOverlay isOpen={overlay === 'assistant'} onClose={() => setOverlay(null)} currentActiveWindow={currentActiveWindow} />
+  </div></MotionConfig>;
 }

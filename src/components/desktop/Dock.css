@@ -1,26 +1,7 @@
-/* ==========================================
-   DOCK
-   ========================================== */
-
-.dock {
-  display: flex;
-  gap: 12px;
-  padding: 12px 16px;
-  border-radius: 24px;
-}
-
-.dock-item {
-  width: 48px;
-  height: 48px;
-  border-radius: 12px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  background: rgba(255, 255, 255, 0.1);
-  transition: background 0.2s;
-}
-
-.dock-item:hover {
-  background: rgba(255, 255, 255, 0.2);
-}
+.workspace-dock { position: absolute; z-index: 1200; bottom: max(17px, env(safe-area-inset-bottom)); left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 3px; padding: 7px; border: 1px solid var(--shell-line); border-radius: 12px; background: var(--dock-surface); backdrop-filter: blur(22px); box-shadow: 0 8px 40px #0003; max-width: calc(100vw - 24px); }
+.dock-item { min-width: 60px; height: 47px; padding: 0 11px; border-radius: 6px; display: flex; align-items: center; justify-content: center; gap: 8px; color: var(--text-muted); transition: background .15s, color .15s; }
+.dock-item > svg { width: 16px; height: 16px; stroke-width: 1.6; }
+.dock-item > span { font-size: 11px; }
+.dock-item:hover, .dock-item.is-active { color: var(--text-main); background: var(--badge-bg); }
+.dock-divider { width: 1px; height: 23px; background: var(--shell-line); margin: 0 5px; }
+@media(max-width: 600px) { .workspace-dock { bottom: max(12px, env(safe-area-inset-bottom)); gap: 1px; padding: 5px; } .dock-item { padding: 0; min-width: 43px; height: 44px; } .dock-item > span { display: none; } .dock-item > svg { width: 18px; height: 18px; } .dock-divider { margin: 0 3px; } }

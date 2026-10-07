@@ -1,9 +1,17 @@
-/* ==========================================
-   TOP NAVBAR
-   ========================================== */
-
-/* Nav item hover state — used on nav text links */
-.nav-item-hover:hover {
-  opacity: 0.6;
-  transition: opacity 0.15s ease;
-}
+.site-header { height: 88px; padding: 0 4.4%; display: flex; align-items: center; gap: 30px; position: relative; z-index: 1200; border-bottom: 1px solid var(--shell-line); background: var(--header-surface); backdrop-filter: blur(18px); }
+.brand { display: flex; gap: 16px; align-items: center; text-align: left; flex-shrink: 0; }
+.brand-mark { font-size: 38px; line-height: 1; letter-spacing: -4px; font-weight: 700; width: 48px; }
+.brand-mark span { color: var(--accent); }
+.brand-copy { font-size: 14px; font-weight: 500; }
+.brand-copy > span { display: block; font: 8px/1.5 var(--mono-font); letter-spacing: 1.5px; margin-top: 6px; color: var(--text-muted); }
+.header-nav { display: flex; gap: 32px; margin-left: auto; }
+.header-nav button { font-size: 13px; min-height: 44px; color: var(--text-muted); }
+.header-nav button:hover { color: var(--text-main); }
+.header-actions { display: flex; align-items: center; gap: 26px; margin-left: 25px; }
+.header-search { display: flex; align-items: center; gap: 11px; min-height: 44px; color: var(--text-muted); }
+.header-search kbd { font-size: 10px; opacity: .75; }
+.header-contact { display: flex; align-items: center; gap: 12px; border: 1px solid var(--shell-line); padding: 11px 16px; border-radius: 5px; font-size: 12px; min-height: 44px; }
+.header-contact:hover { background: var(--card-bg); border-color: var(--text-muted); }
+@media(max-width: 900px) { .brand-copy > span { display: none; } .header-nav { gap: 20px; } .header-actions { margin-left: 4px; gap: 18px; } }
+@media(max-width: 600px) { .site-header { height: 72px; padding: 0 22px; gap: 12px; } .brand { gap: 12px; } .brand-mark { font-size: 34px; width: 40px; } .brand-copy { font-size: 12px; } .header-nav { display: none; } .header-actions { margin-left: auto; gap: 12px; } .header-search { width: 36px; justify-content: center; } .header-search kbd { display: none; } .header-contact { border: 0; padding: 0; } }
+@media(max-width: 360px) { .brand-copy { display: none; } }
