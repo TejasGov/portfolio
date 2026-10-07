@@ -6,11 +6,17 @@ import FlowArt, { FlowSection } from '../ui/story-scroll';
 
 function CodeBlock({ code, lang }) {
   const [copied, setCopied] = useState(false);
-  const handleCopy = () => {
-    navigator.clipboard.writeText(code).then(() => {
+  const [copyError, setCopyError] = useState(false);
+  const timer = useRef(null);
+  useEffect(() => () => clearTimeout(timer.current), []);
+  const handleCopy = async () => {
+    setCopyError(false);
+    try {
+      await navigator.clipboard.writeText(code);
       setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    });
+      clearTimeout(timer.current);
+      timer.current = setTimeout(() => setCopied(false), 2000);
+    } catch { setCopyError(true); }
   };
   return (
     <div className="blog-code-container">
@@ -18,7 +24,7 @@ function CodeBlock({ code, lang }) {
         <span>{lang}</span>
         <button className="blog-copy-btn" onClick={handleCopy}>
           {copied ? <Check size={11} /> : <Copy size={11} />}
-          <span>{copied ? 'Copied!' : 'Copy Code'}</span>
+          <span>{copyError ? 'Copy unavailable' : copied ? 'Copied!' : 'Copy Code'}</span>
         </button>
       </div>
       <pre className="blog-code-content">

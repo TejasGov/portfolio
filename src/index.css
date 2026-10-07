@@ -1,5 +1,9 @@
-@import url('https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&display=swap');
-@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,400;0,500;0,600;1,400&display=swap');
+@font-face { font-family: 'DM Sans'; font-style: normal; font-weight: 400; font-display: swap; src: url('/fonts/dm-sans-latin-400-normal.woff2') format('woff2'); }
+@font-face { font-family: 'DM Sans'; font-style: normal; font-weight: 500; font-display: swap; src: url('/fonts/dm-sans-latin-500-normal.woff2') format('woff2'); }
+@font-face { font-family: 'DM Sans'; font-style: normal; font-weight: 600; font-display: swap; src: url('/fonts/dm-sans-latin-600-normal.woff2') format('woff2'); }
+@font-face { font-family: 'DM Sans'; font-style: normal; font-weight: 700; font-display: swap; src: url('/fonts/dm-sans-latin-700-normal.woff2') format('woff2'); }
+@font-face { font-family: 'Instrument Serif'; font-style: normal; font-weight: 400; font-display: swap; src: url('/fonts/instrument-serif-latin-400-normal.woff2') format('woff2'); }
+@font-face { font-family: 'Instrument Serif'; font-style: italic; font-weight: 400; font-display: swap; src: url('/fonts/instrument-serif-latin-400-italic.woff2') format('woff2'); }
 
 /* ==========================================
    DESIGN TOKENS
@@ -374,3 +378,61 @@ body.dark-mode .desktop-bg {
     border-color: transparent var(--card-border) transparent transparent;
   }
 }
+
+/* Tejas OS refinement: preserve the original macOS desktop language. */
+:root { --accent: #007aff; --accent-ink: #fff; --mono-font: ui-monospace, SFMono-Regular, Menlo, monospace; --font-mono: var(--mono-font); --shell-line: var(--timeline-line); --window-bg: #f5f5f7; --window-header-bg: #ededef; --window-active-border: #b8b8be; --dock-surface: #f7f7ff6e; }
+body.dark-mode { --accent: #0a84ff; --window-bg: #252527; --window-header-bg: #303033; --window-active-border: #66666b; --dock-surface: #24242b88; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'DM Sans', sans-serif; user-select: text; }
+button, input, textarea, select { font: inherit; }
+button { appearance: none; border: 0; background: none; padding: 0; color: inherit; cursor: pointer; }
+button:disabled { cursor: default; opacity: .5; }
+a { color: inherit; }
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+::-webkit-scrollbar { width: 6px; height: 5px; }
+::-webkit-scrollbar-thumb { border-radius: 6px; background: #8885; }
+.desktop-root { isolation: isolate; }
+.glass-panel { backdrop-filter: blur(25px) saturate(1.55); -webkit-backdrop-filter: blur(25px) saturate(1.55); }
+.skip-link { position: fixed; z-index: 4000; top: -70px; left: 12px; padding: 12px 18px; background: var(--accent); color: white; border-radius: 8px; }
+.skip-link:focus { top: 12px; }
+.atmosphere { position: absolute; inset: 0; z-index: -1; pointer-events: none; background: #151515; }
+.atmosphere-film, .atmosphere-film video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.dither-screen { position: absolute; inset: 0; background: radial-gradient(#111 1px, transparent 1.2px); background-size: 3px 3px; opacity: .22; mix-blend-mode: multiply; }
+.atmosphere-shade { position: absolute; inset: 0; background: linear-gradient(0deg,#0003,transparent 50%); }
+.mac-desktop { position: absolute; top: 32px; bottom: 0; left: 0; right: 0; overflow: auto; outline: 0; }
+.widget-stage { display: contents; }
+.mac-desktop .desktop-widgets { top: 18px; }
+.desktop-icons-grid { top: 21px; padding-left: 22px; grid-template-rows: repeat(auto-fill,minmax(103px,1fr)); }
+.desktop-icons-grid > li { list-style: none; }
+.desktop-icon { padding: 7px 4px; border-radius: 7px; gap: 7px; background: transparent; border: 1px solid transparent; width: 100px; height: 97px; transition: background .15s; user-select: none; }
+.desktop-icon:hover { background: #ffffff1a; border-color: #ffffff20; }
+.desktop-icon.is-open .desktop-icon-label { background: #007affcc; border-radius: 4px; padding-inline: 6px; }
+.desktop-icon-label { color: white; font-size: 12px; text-shadow: 0 1px 3px #000b, 0 0 7px #0005; font-weight: 500; line-height: 20px; padding-inline: 2px; }
+.finder-folder { display: block; width: 75px; height: 59px; position: relative; filter: drop-shadow(0 5px 4px #0004); }
+.folder-tab { position: absolute; width: 34px; height: 14px; top: 0; left: 0; border-radius: 5px 7px 0 0; background: var(--folder-color); }
+.folder-paper { position: absolute; inset: 8px 4px 2px; background: #fffffff0; border-radius: 3px; box-shadow: 0 -2px 0 #ffffff55; }
+.folder-face { position: absolute; inset: 11px 0 0; background: var(--folder-gradient); border-radius: 3px 5px 6px 6px; box-shadow: inset 0 1px 1px #ffffffc0, inset 0 -1px 1px #0002; display: grid; place-items: center; color: #2631495e; border-bottom: 1px solid #0002; }
+.folder-dither { position: absolute; inset: 12px 0 0; border-radius: 5px; pointer-events: none; background: radial-gradient(#fff .6px,transparent .7px); background-size: 3px 3px; mask-image: linear-gradient(150deg,transparent 50%,#000); opacity: .35; }
+.desktop-welcome { position: absolute; bottom: 135px; left: 165px; width: 370px; padding: 23px; border-radius: 21px; background: var(--glass-bg); box-shadow: 0 12px 40px #0002, inset 0 1px #ffffff30; }
+.welcome-identity { display: flex; align-items: center; gap: 16px; }
+.welcome-identity > img { width: 65px; height: 65px; border-radius: 17px; object-fit: cover; background: var(--badge-bg); }
+.welcome-eyebrow { color: var(--text-muted); font: 8px var(--mono-font); letter-spacing: 1.1px; margin-bottom: 7px; }
+.welcome-identity h1 { font-size: 24px; font-weight: 600; letter-spacing: -.8px; line-height: 1.3; margin: 0 0 5px; }
+.welcome-identity p:last-child { font-size: 11px; line-height: 1.6; color: var(--text-muted); }
+.welcome-actions { margin: 18px 0 0 81px; display: flex; align-items: center; gap: 22px; }
+.welcome-actions button { display: inline-flex; align-items: center; gap: 6px; color: var(--accent); font-size: 11px; min-height: 26px; }
+.window-switcher { display: flex; gap: 3px; position: absolute; bottom: 110px; left: 50%; transform: translateX(-50%); z-index: 1190; padding: 4px; max-width: calc(100vw - 24px); overflow-x: auto; background: var(--glass-bg); border: 1px solid var(--glass-border); border-radius: 8px; backdrop-filter: blur(20px); box-shadow: 0 4px 14px #0002; }
+.window-task { display: flex; align-items: center; flex-shrink: 0; }
+.window-task > button:first-child { min-height: 28px; padding: 5px 10px; font-size: 10px; display: flex; align-items: center; gap: 6px; border-radius: 4px; color: var(--text-muted); }
+.window-task > button.is-active { background: var(--accent); color: white; }
+.task-dot { width: 4px; height: 4px; background: currentColor; border-radius: 50%; }
+.task-minimized { opacity: .6; }
+.task-close { display: grid; place-items: center; width: 25px; height: 28px; color: var(--text-muted); }
+.primary-button { display: inline-flex; align-items: center; justify-content: center; gap: 12px; min-height: 42px; padding: 10px 16px; background: var(--accent); color: #fff; border-radius: 8px; font-size: 12px; font-weight: 500; text-decoration: none; }
+.text-button { display: inline-flex; align-items: center; gap: 8px; min-height: 40px; color: var(--accent); font-size: 12px; text-decoration: none; }
+.eyebrow { font: 9px/1.5 var(--mono-font); letter-spacing: 1px; color: var(--text-muted); margin: 0; }
+@media (max-width: 1024px) and (min-width: 601px) { .desktop-welcome { left: auto; right: 30px; bottom: 145px; width: 335px; } .desktop-icons-grid { top: 185px; grid-template-columns: repeat(4,100px); left: 18px; right: auto; padding: 0; gap: 18px; } }
+@media(max-width: 600px) { .mac-desktop { top: 40px; padding-bottom: 120px; } .widget-stage { display: block; height: 296px; position: relative; } .mac-desktop .desktop-widgets { top: 18px; } .desktop-welcome { position: relative; left: auto; bottom: auto; width: calc(100% - 36px); margin: 0 18px 24px; padding: 20px; border-radius: 19px; } .welcome-identity { gap: 13px; } .welcome-identity > img { width: 50px; height: 50px; border-radius: 12px; } .welcome-identity h1 { font-size: 21px; } .welcome-identity p:last-child { font-size: 10px; } .welcome-eyebrow { font-size: 7px; } .welcome-actions { margin: 15px 0 0 63px; gap: 18px; } .welcome-actions button { min-height: 34px; font-size: 10px; } .desktop-icons-grid { position: static; padding: 0 14px; grid-auto-flow: row; grid-template-rows: none; grid-auto-rows: auto; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 19px 3px; align-content: start; } .desktop-icon { width: 100%; height: 88px; padding: 5px 1px; gap: 6px; } .finder-folder { width: 61px; height: 51px; } .desktop-icon-label { font-size: 10px !important; padding-inline: 1px; white-space: nowrap; } .window-switcher { bottom: 98px; } }
+@media(max-height: 560px) and (min-width: 601px) { .mac-desktop { padding: 24px 25px 130px; } .widget-stage { display: none; } .desktop-welcome { position: relative; bottom: auto; left: auto; width: 355px; margin: 0 0 24px; } .desktop-icons-grid { position: static; display: grid; grid-auto-flow: row; grid-template-rows: none; grid-template-columns: repeat(7,100px); padding: 0; column-gap: 6px; } }
+@media(prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; } }
+.mac-desktop { scroll-padding-top: 20px; scroll-padding-bottom: 120px; }
+.desktop-icon { scroll-margin-top: 20px; scroll-margin-bottom: 120px; }

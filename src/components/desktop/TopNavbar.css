@@ -1,9 +1,24 @@
-/* ==========================================
-   TOP NAVBAR
-   ========================================== */
-
-/* Nav item hover state — used on nav text links */
-.nav-item-hover:hover {
-  opacity: 0.6;
-  transition: opacity 0.15s ease;
-}
+.mac-menubar { height: 32px; position: absolute; inset: 0 0 auto; display: flex; align-items: center; justify-content: space-between; padding: 0 15px; background: var(--navbar-bg); backdrop-filter: blur(24px) saturate(1.7); -webkit-backdrop-filter: blur(24px) saturate(1.7); border-bottom: 1px solid var(--navbar-border); color: var(--navbar-text); font-size: 12px; z-index: 2000; user-select: none; }
+.menubar-left, .menubar-right { display: flex; align-items: center; gap: 4px; }
+.mac-menubar button { display: inline-flex; align-items: center; justify-content: center; min-height: 28px; padding: 0 9px; border-radius: 5px; }
+.mac-menubar button:hover, .mac-menubar button[aria-expanded=true] { background: var(--badge-bg); }
+.mac-menubar .os-monogram { font: italic 700 20px Georgia, serif; padding: 0 7px 0 0; }
+.os-app-name { font-weight: 650; }
+.menubar-right { gap: 3px; }
+.menubar-right > button, .menubar-right .menu-anchor > button { padding-inline: 7px; }
+.menu-clock { font-size: 11px; margin-left: 8px; white-space: nowrap; }
+.menu-anchor { position: relative; }
+.mac-menu { position: absolute; top: 30px; left: 0; padding: 5px; min-width: 195px; background: var(--glass-bg); backdrop-filter: blur(35px) saturate(1.7); -webkit-backdrop-filter: blur(35px) saturate(1.7); border: 1px solid var(--glass-border); border-radius: 9px; box-shadow: 0 12px 35px #0003; color: var(--text-main); }
+.mac-menu > button { display: flex; gap: 10px; width: 100%; justify-content: flex-start; min-height: 34px; padding: 8px 12px; font-size: 12px; border-radius: 5px; }
+.mac-menu > button:hover { background: #007aff; color: #fff; }
+.mac-menu kbd { margin-left: auto; font-size: 10px; opacity: .6; }
+.mac-menu hr { border: 0; border-top: 1px solid var(--timeline-line); margin: 5px; }
+.portfolio-menu { left: 42px; }
+.control-center { left: auto; right: -6px; width: 265px; padding: 14px; border-radius: 15px; }
+.control-center > p { margin: 0 0 12px; font-size: 12px; font-weight: 600; }
+.control-center > button { min-height: 45px; padding: 10px; background: var(--badge-bg); margin: 6px 0; }
+.control-center > button > span { margin-left: auto; font-size: 10px; opacity: .7; }
+.volume-control { display: flex; align-items: center; gap: 12px; padding: 10px; }
+.volume-control input { width: 100%; accent-color: #007aff; }
+@media(max-width: 600px) { .mac-menubar { height: 40px; padding: 0 10px; } .mac-menubar button { min-height: 36px; padding-inline: 6px; } .desktop-menu-item { display: none !important; } .menu-clock { font-size: 9px; margin-left: 3px; } .menubar-right { gap: 0; } .mac-menu { top: 39px; } .control-center { right: -94px; } }
+@media(max-width: 365px) { .menu-clock { display: none; } }

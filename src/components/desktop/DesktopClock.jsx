@@ -10,9 +10,10 @@ export default function DesktopClock() {
     return () => clearInterval(timer);
   }, []);
 
-  const seconds = time.getSeconds();
-  const minutes = time.getMinutes();
-  const hours = time.getHours();
+  const localTime = new Date(time.toLocaleString('en-US', { timeZone: 'America/New_York' }));
+  const seconds = localTime.getSeconds();
+  const minutes = localTime.getMinutes();
+  const hours = localTime.getHours();
 
   const secRotation = seconds * 6;
   const minRotation = minutes * 6 + seconds * 0.1;
@@ -20,8 +21,8 @@ export default function DesktopClock() {
 
   const hoursStr = hours.toString().padStart(2, '0');
   const minutesStr = minutes.toString().padStart(2, '0');
-  const dateStr = time.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).toUpperCase();
-  const dayStr = time.toLocaleDateString('en-GB', { weekday: 'short' }).toUpperCase();
+  const dateStr = time.toLocaleDateString('en-GB', { timeZone: 'America/New_York', day: '2-digit', month: 'short', year: 'numeric' }).toUpperCase();
+  const dayStr = time.toLocaleDateString('en-GB', { timeZone: 'America/New_York', weekday: 'short' }).toUpperCase();
 
   return (
     <>

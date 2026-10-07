@@ -1,204 +1,64 @@
-import React, { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Sun, Moon, Search, SlidersHorizontal, Volume2 } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { Search, SlidersHorizontal, Sun, Moon, Pause, Play, Volume2 } from 'lucide-react';
 import './TopNavbar.css';
-
-function MenuItem({ label, shortcut, onClick }) {
-  const [hovered, setHovered] = useState(false);
-  return (
-    <div 
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      onClick={onClick}
-      style={{
-        padding: '6px 12px',
-        borderRadius: '6px',
-        background: hovered ? 'var(--badge-bg)' : 'transparent',
-        cursor: 'pointer',
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center'
-      }}
-    >
-      <span>{label}</span>
-      {shortcut && <span style={{ opacity: 0.5, fontSize: '12px' }}>{shortcut}</span>}
-    </div>
-  );
-}
-
-export default function TopNavbar({ activeWindowId, onToggleHelp, toggleTheme, isDarkMode, onToggleSearch, onOpenTerminal, onOpenBlog }) {
-  const [isWindowMenuOpen, setIsWindowMenuOpen] = useState(false);
-  const [isControlPanelOpen, setIsControlPanelOpen] = useState(false);
+const titles = { projects: 'Projects', about: 'About Me', 'work-ex': 'Work Experience', photography: 'Photography', 'my-tech': 'My Tech', 'my-niche': 'My Niche', 'my-sound': 'My Sound', 'my-library': 'My Library', blog: 'Blog', terminal: 'Terminal' };
+export default function TopNavbar({ activeWindowId, onHome, onOpenWindow, onToggleSearch, onContact, onHelp, isDarkMode, onToggleTheme, motionPaused, reducedMotion, onToggleMotion }) {
+  const [menu, setMenu] = useState(null);
   const [volume, setVolume] = useState(50);
-
-  // Sync volume to all existing and future audio/video elements
-  React.useEffect(() => {
-    const applyVolume = (node) => {
-      if (node.tagName === 'AUDIO' || node.tagName === 'VIDEO') {
-        node.volume = volume / 100;
-      }
-      if (node.querySelectorAll) {
-        node.querySelectorAll('audio, video').forEach(el => {
-          el.volume = volume / 100;
-        });
-      }
-    };
-
-    // Apply to existing elements
-    applyVolume(document.body);
-
-    // Observer to catch dynamically added audio/video elements
-    const observer = new MutationObserver((mutations) => {
-      mutations.forEach(mutation => {
-        mutation.addedNodes.forEach(node => {
-          if (node.nodeType === 1) applyVolume(node);
-        });
-      });
-    });
-
-    observer.observe(document.body, { childList: true, subtree: true });
-    
-    // Make volume available globally if any custom component needs to read it
+  const barRef = useRef(null);
+  const returnFocusRef = useRef(null);
+  const [time, setTime] = useState(new Date());
+  useEffect(() => { const timer = setInterval(() => setTime(new Date()), 30000); return () => clearInterval(timer); }, []);
+  useEffect(() => {
+    const applyVolume = media => { media.volume = volume / 100; };
+    document.querySelectorAll('audio, video').forEach(applyVolume);
     window.portfolioGlobalVolume = volume / 100;
-
+    const observer = new MutationObserver(records => {
+      records.forEach(record => record.addedNodes.forEach(node => {
+        if (node.nodeType !== Node.ELEMENT_NODE) return;
+        if (node.matches('audio, video')) applyVolume(node);
+        node.querySelectorAll('audio, video').forEach(applyVolume);
+      }));
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
     return () => observer.disconnect();
   }, [volume]);
-
-  let windowTitle = "Tejas OS";
-  if (activeWindowId === 'projects') windowTitle = "Projects";
-  else if (activeWindowId === 'work-ex') windowTitle = "Work Experience";
-  else if (activeWindowId === 'photography') windowTitle = "Photography";
-  else if (activeWindowId === 'about') windowTitle = "About Me";
-  else if (activeWindowId === 'my-tech') windowTitle = "My Tech";
-  else if (activeWindowId === 'my-niche') windowTitle = "My Niche";
-  else if (activeWindowId === 'my-sound') windowTitle = "My Sound";
-  else if (activeWindowId === 'blog') windowTitle = "Blog";
-  else if (activeWindowId === 'my-library') windowTitle = "My Library";
-
-  const dispatchCommand = (cmd) => {
-    window.dispatchEvent(new CustomEvent('window-command', { detail: { id: activeWindowId, cmd } }));
-    setIsWindowMenuOpen(false);
+  useEffect(() => {
+    if (!menu) return;
+    const dismiss = event => { if (!barRef.current?.contains(event.target)) setMenu(null); };
+    const escape = event => {
+      if (((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') || (event.metaKey && event.code === 'Space')) { setMenu(null); return; }
+      if (event.key === 'Escape' && !document.querySelector('dialog[open]')) { event.preventDefault(); event.stopPropagation(); setMenu(null); returnFocusRef.current?.focus(); }
+    };
+    document.addEventListener('pointerdown', dismiss);
+    document.addEventListener('keydown', escape, true);
+    return () => { document.removeEventListener('pointerdown', dismiss); document.removeEventListener('keydown', escape, true); };
+  }, [menu]);
+  const toggleMenu = (name, event) => { returnFocusRef.current = event.currentTarget; setMenu(current => current === name ? null : name); };
+  const navigateMenu = event => {
+    if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return;
+    const popup = barRef.current?.querySelector('.mac-menu');
+    const trigger = event.target.closest('button[aria-expanded]');
+    if (trigger && ['ArrowDown', 'ArrowUp'].includes(event.key)) {
+      event.preventDefault();
+      if (trigger.getAttribute('aria-expanded') !== 'true') trigger.click();
+      requestAnimationFrame(() => {
+        const buttons = barRef.current?.querySelectorAll('.mac-menu button:not(:disabled)');
+        (event.key === 'ArrowUp' ? buttons?.[buttons.length - 1] : buttons?.[0])?.focus();
+      });
+      return;
+    }
+    if (!popup?.contains(event.target) || !event.target.matches('button')) return;
+    const buttons = [...popup.querySelectorAll('button:not(:disabled)')];
+    const index = buttons.indexOf(event.target);
+    const next = event.key === 'Home' ? 0 : event.key === 'End' ? buttons.length - 1 : (index + (event.key === 'ArrowDown' ? 1 : -1) + buttons.length) % buttons.length;
+    event.preventDefault();
+    buttons[next]?.focus();
   };
-
-  return (
-    <div style={{
-      position: 'absolute',
-      top: 0, left: 0, right: 0,
-      height: '28px',
-      background: 'var(--navbar-bg)',
-      backdropFilter: 'blur(20px)',
-      borderBottom: '1px solid var(--navbar-border)',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      padding: '0 16px',
-      color: 'var(--navbar-text)',
-      fontSize: '13px',
-      fontWeight: '500',
-      zIndex: 2000,
-      userSelect: 'none'
-    }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-        <span style={{ fontFamily: "'Dancing Script', cursive", fontSize: '20px', fontWeight: '700', marginRight: '4px', cursor: 'default' }}>TG</span>
-        <span style={{ fontWeight: '700', cursor: 'default' }}>{windowTitle}</span>
-        <div style={{ display: 'flex', gap: '16px', opacity: 0.8 }}>
-          <span style={{ cursor: 'pointer' }} className="nav-item-hover" onClick={onOpenTerminal}>Terminal</span>
-          <div style={{ position: 'relative' }}>
-            <span 
-              style={{ cursor: activeWindowId ? 'pointer' : 'default', opacity: activeWindowId ? 1 : 0.5 }} 
-              className={activeWindowId ? "nav-item-hover" : ""}
-              onClick={() => activeWindowId && setIsWindowMenuOpen(!isWindowMenuOpen)}
-            >
-              Window
-            </span>
-            <AnimatePresence>
-              {isWindowMenuOpen && activeWindowId && (
-                <motion.div
-                  initial={{ opacity: 0, y: -10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  style={{
-                    position: 'absolute',
-                    top: '24px',
-                    left: '-10px',
-                    background: 'var(--glass-bg)',
-                    backdropFilter: 'blur(10px)',
-                    border: '1px solid var(--glass-border)',
-                    boxShadow: '0 8px 24px rgba(0,0,0,0.2)',
-                    borderRadius: '8px',
-                    padding: '8px',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '4px',
-                    minWidth: '150px'
-                  }}
-                >
-                  <MenuItem label="Close" onClick={() => dispatchCommand('close')} />
-                  <MenuItem label="Minimize" onClick={() => dispatchCommand('minimize')} />
-                  <MenuItem label="Fill" onClick={() => dispatchCommand('fill')} />
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-          <span
-            style={{ cursor: 'pointer' }}
-            className="nav-item-hover"
-            onClick={onOpenBlog}
-          >Blog</span>
-          <span style={{ cursor: 'pointer' }} className="nav-item-hover" onClick={onToggleHelp}>Help</span>
-        </div>
-      </div>
-
-      <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', opacity: 0.8, position: 'relative' }}>
-          <div onClick={toggleTheme} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
-            {isDarkMode ? <Sun size={16} /> : <Moon size={16} />}
-          </div>
-          <Search size={16} style={{ cursor: 'pointer' }} onClick={onToggleSearch} />
-          <div style={{ position: 'relative' }}>
-            <SlidersHorizontal 
-              size={14} 
-              style={{ cursor: 'pointer' }} 
-              onClick={() => setIsControlPanelOpen(!isControlPanelOpen)} 
-            />
-            <AnimatePresence>
-              {isControlPanelOpen && (
-                <motion.div
-                  initial={{ opacity: 0, y: -10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  style={{
-                    position: 'absolute',
-                    top: '24px',
-                    right: '-10px',
-                    background: 'var(--glass-bg)',
-                    backdropFilter: 'blur(10px)',
-                    border: '1px solid var(--glass-border)',
-                    boxShadow: '0 8px 24px rgba(0,0,0,0.2)',
-                    borderRadius: '12px',
-                    padding: '16px',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '16px',
-                    minWidth: '200px'
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', color: 'var(--text-main)' }}>
-                    <Volume2 size={16} />
-                    <input 
-                      type="range" 
-                      min="0" max="100" 
-                      value={volume} 
-                      onChange={(e) => setVolume(e.target.value)} 
-                      style={{ flex: 1, cursor: 'pointer' }} 
-                    />
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
+  const command = name => { window.dispatchEvent(new CustomEvent('window-command', { detail: { id: activeWindowId, cmd: name } })); setMenu(null); };
+  return <header className="mac-menubar" ref={barRef} onKeyDown={navigateMenu}>
+    <nav className="menubar-left" aria-label="Desktop menu"><button className="os-monogram" onClick={onHome} aria-label="Show desktop">TG</button><button className="os-app-name" onClick={event => toggleMenu('portfolio', event)} aria-expanded={menu === 'portfolio'}>{titles[activeWindowId] || 'Tejas OS'}</button><button className="desktop-menu-item" onClick={() => onOpenWindow('terminal')}>Terminal</button><div className="menu-anchor desktop-menu-item"><button disabled={!activeWindowId} onClick={event => toggleMenu('window', event)} aria-expanded={menu === 'window'}>Window</button>{menu === 'window' && activeWindowId && <div className="mac-menu" aria-label="Window actions"><button onClick={() => command('close')}>Close Window <kbd>Esc</kbd></button><button onClick={() => command('minimize')}>Minimize</button><button onClick={() => command('zoom')}>Zoom</button><button onClick={() => command('center')}>Center</button></div>}</div><button className="desktop-menu-item" onClick={() => onOpenWindow('blog')}>Blog</button><button className="desktop-menu-item" onClick={onHelp}>Help</button></nav>
+    {menu === 'portfolio' && <div className="mac-menu portfolio-menu"><button onClick={() => { onOpenWindow('about'); setMenu(null); }}>About Tejas</button><button onClick={() => { onOpenWindow('projects'); setMenu(null); }}>Projects</button><button onClick={() => { onOpenWindow('work-ex'); setMenu(null); }}>Experience</button><button onClick={() => { onOpenWindow('blog'); setMenu(null); }}>Blog</button><hr /><button onClick={() => { onContact(); setMenu(null); }}>Contact</button><button onClick={() => { onHelp(); setMenu(null); }}>How to explore</button></div>}
+    <div className="menubar-right"><button onClick={onToggleTheme} aria-label={`Switch to ${isDarkMode ? 'light' : 'dark'} theme`}>{isDarkMode ? <Sun size={15} /> : <Moon size={15} />}</button><button onClick={onToggleSearch} aria-label="Search the portfolio"><Search size={15} /></button><div className="menu-anchor"><button onClick={event => toggleMenu('controls', event)} aria-label="Control Center" aria-expanded={menu === 'controls'}><SlidersHorizontal size={15} /></button>{menu === 'controls' && <div className="mac-menu control-center"><p>Control Center</p><button onClick={onToggleTheme}>{isDarkMode ? <Sun size={17} /> : <Moon size={17} />}Appearance<span>{isDarkMode ? 'Dark' : 'Light'}</span></button><button disabled={reducedMotion} onClick={onToggleMotion} aria-label={reducedMotion ? 'Reduced motion enabled' : motionPaused ? 'Play background video' : 'Pause background video'}>{motionPaused || reducedMotion ? <Play size={17} /> : <Pause size={17} />}Wallpaper<span>{reducedMotion ? 'Still' : motionPaused ? 'Paused' : 'Playing'}</span></button><label className="volume-control"><Volume2 size={16} /><span className="sr-only">Media volume</span><input type="range" min="0" max="100" value={volume} onChange={event => setVolume(Number(event.target.value))} /></label></div>}</div><time className="menu-clock" dateTime={time.toISOString()}>{time.toLocaleString('en-US', { timeZone: 'America/New_York', weekday: 'short', hour: 'numeric', minute: '2-digit' })}</time></div>
+  </header>;
 }

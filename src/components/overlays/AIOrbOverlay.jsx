@@ -1,205 +1,135 @@
-import React, { useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { useConversationControls, useConversationStatus } from '@elevenlabs/react';
+import { useEffect, useRef, useState } from 'react';
+import { Mic, Square } from 'lucide-react';
+import { useConversation } from '@elevenlabs/react';
+import { useReducedMotion } from 'framer-motion';
+import OverlayDialog from './OverlayDialog';
+import SiriOrb from '../ui/SiriOrb';
+import StreamedText from '../ui/StreamedText';
 import './AIOrbOverlay.css';
 
-export default function AIOrbOverlay({ isOpen, onClose, currentActiveWindow }) {
-  const { startSession, endSession } = useConversationControls();
-  const { status } = useConversationStatus();
-
-  // Reset/disconnect session when overlay closes
+function VoiceMeter({ connected, speaking, getInputVolume, getOutputVolume }) {
+  const meter = useRef(null);
+  const reducedMotion = useReducedMotion();
   useEffect(() => {
-    if (!isOpen) {
-      if (status === "connected" || status === "connecting") {
-        endSession();
+    if (!connected || reducedMotion) return;
+    let frame;
+    let last = 0;
+    const update = time => {
+      if (time - last > 33) {
+        const level = Math.min(1, Math.max(0, speaking ? getOutputVolume() : getInputVolume()));
+        meter.current?.style.setProperty('--voice-level', level);
+        last = time;
       }
-    }
-  }, [isOpen, status, endSession]);
+      frame = requestAnimationFrame(update);
+    };
+    frame = requestAnimationFrame(update);
+    return () => cancelAnimationFrame(frame);
+  }, [connected, speaking, reducedMotion, getInputVolume, getOutputVolume]);
+  return <div className="siri-meter" ref={meter} aria-hidden="true">{[.4, .7, 1, .7, .4].map((height, index) => <span key={index} style={{ height: `${height * 28}px` }} />)}</div>;
+}
 
-  // Listen for Escape key to close the overlay
+export default function AIOrbOverlay({ isOpen, onClose, currentActiveWindow }) {
+  const [error, setError] = useState('');
+  const [starting, setStarting] = useState(false);
+  const [holding, setHolding] = useState(false);
+  const [messages, setMessages] = useState([]);
+  const [ended, setEnded] = useState(false);
+  const openRef = useRef(isOpen);
+  const requested = useRef(false);
+  const controlsRef = useRef(null);
+  const logRef = useRef(null);
+  const followTranscript = useRef(true);
+  const sequence = useRef(0);
+  openRef.current = isOpen;
+  const fail = (message, context) => {
+    requested.current = false;
+    controlsRef.current?.endSession();
+    setStarting(false);
+    setHolding(false);
+    if (!openRef.current) return;
+    const denied = context?.name === 'NotAllowedError' || /permission|notallowed|denied/i.test(message || '');
+    setError(denied ? 'Microphone access was denied. Allow access in your browser, then try again.' : 'Orb couldn’t connect. Check your connection and microphone access, then try again.');
+  };
+  const conversation = useConversation({
+    micMuted: !holding,
+    onConnect: () => {
+      if (!openRef.current || !requested.current) { controlsRef.current?.endSession(); return; }
+      setStarting(false);
+    },
+    onError: fail,
+    onDisconnect: details => {
+      requested.current = false;
+      setStarting(false);
+      setHolding(false);
+      if (openRef.current) {
+        setEnded(true);
+        if (details?.reason === 'error') fail(details.message);
+      }
+    },
+    onMessage: event => {
+      if (!openRef.current || !requested.current || !event.message) return;
+      const role = event.role || (event.source === 'user' ? 'user' : 'agent');
+      const id = event.event_id == null ? `message-${++sequence.current}` : `${role}-${event.event_id}`;
+      setMessages(previous => {
+        const existing = previous.find(item => item.id === id);
+        return existing ? previous.map(item => item.id === id ? { ...item, text: event.message } : item) : [...previous, { id, role, text: event.message }].slice(-50);
+      });
+    },
+  });
+  controlsRef.current = conversation;
+  const { status, isSpeaking, startSession, endSession, getInputVolume, getOutputVolume } = conversation;
+  const connected = status === 'connected';
+  const connecting = starting || status === 'connecting';
+
+  useEffect(() => {
+    setHolding(false);
+    if (isOpen) { setError(''); setMessages([]); setEnded(false); followTranscript.current = true; }
+    else { requested.current = false; setStarting(false); endSession(); }
+  }, [isOpen, endSession]);
+  useEffect(() => {
+    if (!starting) return;
+    const timer = setTimeout(() => {
+      requested.current = false;
+      endSession();
+      fail('Connection timed out');
+    }, 25000);
+    return () => clearTimeout(timer);
+  }, [starting, endSession]);
   useEffect(() => {
     if (!isOpen) return;
-    const handleKeyDown = (e) => {
-      if (e.key === 'Escape') {
-        onClose();
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, onClose]);
-
-  // Prevent background scrolling/interactions while open
-  useEffect(() => {
-    if (isOpen) {
-      document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = '';
-    }
-    return () => {
-      document.body.style.overflow = '';
-    };
+    const release = () => setHolding(false);
+    const hide = () => { if (document.hidden) release(); };
+    window.addEventListener('blur', release);
+    document.addEventListener('visibilitychange', hide);
+    return () => { window.removeEventListener('blur', release); document.removeEventListener('visibilitychange', hide); };
   }, [isOpen]);
+  useEffect(() => {
+    const log = logRef.current;
+    if (!log) return;
+    const observer = new ResizeObserver(() => { if (followTranscript.current) log.scrollTop = log.scrollHeight; });
+    if (log.firstElementChild) observer.observe(log.firstElementChild);
+    if (followTranscript.current) log.scrollTop = log.scrollHeight;
+    return () => observer.disconnect();
+  }, [messages]);
 
-  // Helper to determine status text copy
-  const getStatusText = () => {
-    if (status === "connected") return "Orb (Connected)";
-    if (status === "connecting") return "Orb (Connecting...)";
-    return "Orb";
+  const begin = () => {
+    if (requested.current || connecting || connected) return;
+    setError(''); setEnded(false); setStarting(true); requested.current = true;
+    try { startSession({ agentId: 'agent_5301m0tx6pz3evjveb5s4e9e33g5', dynamicVariables: { current_active_window: currentActiveWindow } }); }
+    catch (failure) { fail(failure?.message, failure); }
   };
+  const stop = () => { requested.current = false; setHolding(false); setStarting(false); setEnded(true); endSession(); };
+  const statusText = error ? 'Unable to connect' : connecting ? 'Connecting…' : connected ? holding ? 'Listening…' : isSpeaking ? 'Orb is speaking…' : 'Hold to talk' : ended ? 'Conversation ended' : 'What would you like to know?';
 
-  return (
-    <AnimatePresence>
-      {isOpen && (
-        <>
-          {/* Subtle Dimmed Backdrop - clicking anywhere closes */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.4 }}
-            className="orb-overlay-backdrop"
-            onClick={onClose}
-          >
-            {/* Centered Orb and Assistive Text */}
-            <motion.div
-              initial={{ scale: 0.8, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.85, opacity: 0 }}
-              transition={{ type: 'spring', stiffness: 260, damping: 25 }}
-              className="orb-center-wrapper"
-            >
-              {/* Centered Orb Avatar wrapper with absolutely positioned centered glows & rings */}
-              <div 
-                className="orb-avatar-wrapper"
-                onClick={(e) => {
-                  e.stopPropagation(); // prevent backdrop click closing
-                  if (status === "connected") {
-                    endSession();
-                  } else {
-                    try {
-                      startSession({
-                        agentId: "agent_5301m0tx6pz3evjveb5s4e9e33g5",
-                        dynamicVariables: { current_active_window: currentActiveWindow },
-                        onError: (error) => console.error("ElevenLabs Conversation Error:", error),
-                        onConnect: () => console.log("ElevenLabs Agent Connected!"),
-                        onDisconnect: () => console.log("ElevenLabs Agent Disconnected.")
-                      });
-                    } catch (err) {
-                      console.error("Failed to start ElevenLabs session:", err);
-                    }
-                  }
-                }}
-              >
-                {/* Layered glows and rings simulating Siri focus centered exactly behind the orb */}
-                <div className={`orb-glow-layer ${status}`} />
-                <div className={`orb-pulse-ring ${status}`} />
-                <div className={`orb-pulse-ring ${status}`} />
-
-                {/* Glowing Interactive Circle (without border/container styling) */}
-                <div className={`orb-avatar-container ${status}`}>
-                  <img
-                    src="/homepage/aiicon.svg"
-                    alt="Orb Avatar"
-                    className="orb-avatar-img"
-                  />
-                </div>
-              </div>
-
-              {/* Status and instruction copy */}
-              <h2 className="orb-status-text">{getStatusText()}</h2>
-              <p className="orb-subtitle-text">Click the Orb to speak, click anywhere else to exit</p>
-
-              {/* Voice visualizer graph */}
-              <div style={{ height: '32px', marginTop: '30px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <AnimatePresence mode="wait">
-                  {status === "connected" ? (
-                    <motion.div 
-                      key="active-voice"
-                      initial={{ opacity: 0, scale: 0.8 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      exit={{ opacity: 0, scale: 0.8 }}
-                      style={{ display: 'flex', gap: '5px', height: '24px', alignItems: 'center' }}
-                    >
-                      {[0.4, 0.9, 0.6, 0.8, 0.5, 0.7, 0.3].map((val, i) => (
-                        <motion.div
-                          key={i}
-                          animate={{
-                            height: ['8px', `${val * 32}px`, '8px'],
-                          }}
-                          transition={{
-                            duration: 1.0 + i * 0.08,
-                            repeat: Infinity,
-                            ease: 'easeInOut',
-                          }}
-                          style={{
-                            width: '3px',
-                            backgroundColor: 'rgba(255, 255, 255, 0.75)',
-                            borderRadius: '2px',
-                          }}
-                        />
-                      ))}
-                    </motion.div>
-                  ) : (
-                    <motion.div
-                      key="inactive-voice"
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 0.4 }}
-                      exit={{ opacity: 0 }}
-                      style={{ display: 'flex', gap: '5px', alignItems: 'center' }}
-                    >
-                      {/* Quiet voice wave (breathing gently) */}
-                      {[0, 0, 0, 0, 0].map((_, i) => (
-                        <motion.div
-                          key={i}
-                          animate={{
-                            height: ['4px', '6px', '4px'],
-                          }}
-                          transition={{
-                            duration: 2.0,
-                            repeat: Infinity,
-                            delay: i * 0.15,
-                            ease: 'easeInOut',
-                          }}
-                          style={{
-                            width: '4px',
-                            height: '4px',
-                            backgroundColor: 'rgba(255, 255, 255, 0.6)',
-                            borderRadius: '50%',
-                          }}
-                        />
-                      ))}
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-            </motion.div>
-          </motion.div>
-
-          {/* Apple Intelligence Full Viewport Edge Bloom Glow */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.5 }}
-            className="apple-intelligence-glow"
-          />
-
-          {/* Floating Close Button */}
-          <motion.button
-            initial={{ opacity: 0, scale: 0.8 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.8 }}
-            transition={{ delay: 0.1 }}
-            className="orb-close-btn"
-            onClick={onClose}
-            aria-label="Close Assistant"
-          >
-            <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" strokeWidth="2.5" fill="none" strokeLinecap="round">
-              <path d="M18 6L6 18M6 6l12 12" />
-            </svg>
-          </motion.button>
-        </>
-      )}
-    </AnimatePresence>
-  );
+  return <OverlayDialog isOpen={isOpen} onClose={onClose} title="Orb voice assistant" className="siri-dialog" hideHeading>
+    <div className="siri-intelligence-border" aria-hidden="true" />
+    <div className="siri-display"><SiriOrb size={96} active={connecting || connected && (holding || isSpeaking)} /><h2 className="siri-status" role="status">{statusText}</h2><p className="siri-subtitle">Ask about Tejas, his work, or a project.</p><VoiceMeter connected={connected} speaking={isSpeaking} getInputVolume={getInputVolume} getOutputVolume={getOutputVolume} /></div>
+    {messages.length > 0 && <div className="siri-transcript" ref={logRef} role="log" aria-label="Voice conversation transcript" onScroll={event => { const log = event.currentTarget; followTranscript.current = log.scrollHeight - log.scrollTop - log.clientHeight < 40; }}><div>{messages.map(message => <p key={message.id} className={`siri-message ${message.role}`}><span className="sr-only">{message.role === 'user' ? 'You: ' : 'Orb: '}</span>{message.role === 'agent' ? <StreamedText text={message.text} /> : message.text}</p>)}</div></div>}
+    {error && <p className="siri-error" role="alert">{error}</p>}
+    <div className="siri-actions">{connected ? <>
+      <button className={`siri-talk ${holding ? 'is-held' : ''}`} aria-label="Hold to talk" aria-pressed={holding} onPointerDown={event => { if (event.button !== 0) return; event.currentTarget.setPointerCapture(event.pointerId); setHolding(true); }} onPointerUp={() => setHolding(false)} onPointerCancel={() => setHolding(false)} onLostPointerCapture={() => setHolding(false)} onKeyDown={event => { if ([' ', 'Enter'].includes(event.key)) { event.preventDefault(); if (!event.repeat) setHolding(true); } }} onKeyUp={event => { if ([' ', 'Enter'].includes(event.key)) { event.preventDefault(); setHolding(false); } }} onBlur={() => setHolding(false)}><Mic size={16} aria-hidden="true" />{holding ? 'Listening…' : 'Hold to talk'}</button>
+      <button className="siri-end" onClick={stop} aria-label="End conversation"><Square size={13} aria-hidden="true" /></button>
+    </> : <button className="siri-talk" onClick={begin} disabled={connecting}><Mic size={16} aria-hidden="true" />{connecting ? 'Connecting…' : error ? 'Try again' : 'Start voice conversation'}</button>}</div>
+    <p className="siri-permission">{connected ? 'Hold the button to speak. Release to listen.' : 'Microphone access starts when you begin.'}<br />Voice powered by ElevenLabs.</p>
+  </OverlayDialog>;
 }

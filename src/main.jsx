@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client'
 import { ConversationProvider } from '@elevenlabs/react'
 import App from './App.jsx'
 import './index.css'
+import './components/desktop/DesktopPolish.css'
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>

@@ -38,13 +38,14 @@ function NavButton({ side, onClick }) {
   return (
     <motion.button
       onClick={onClick}
+      aria-label={isLeft ? 'Previous photo' : 'Next photo'}
       whileHover={{ background: 'rgba(255,255,255,0.16)' }}
       whileTap={{ scale: 0.93 }}
       style={{
         position: 'absolute',
         [isLeft ? 'left' : 'right']: '14px',
         top: '50%', transform: 'translateY(-50%)',
-        width: '38px', height: '38px', borderRadius: '50%',
+        width: '44px', height: '44px', borderRadius: '50%',
         border: '1px solid rgba(255,255,255,0.14)',
         background: 'rgba(255,255,255,0.07)',
         backdropFilter: 'blur(8px)',
@@ -81,14 +82,16 @@ function ThumbnailStrip({ photos, current, onSelect }) {
       onClick={e => e.stopPropagation()}
     >
       {photos.map((src, i) => (
-        <motion.div
+        <motion.button
           key={i}
           ref={i === current ? activeRef : null}
           onClick={() => onSelect(i)}
+          aria-label={`View photo ${i + 1}`}
+          aria-pressed={current === i}
           whileHover={{ opacity: 0.85 }}
           whileTap={{ scale: 0.94 }}
           style={{
-            width: '36px', height: '36px', borderRadius: '6px',
+            width: '44px', height: '44px', borderRadius: '6px',
             overflow: 'hidden', flexShrink: 0, cursor: 'pointer',
             border: `1.5px solid ${i === current ? 'rgba(255,255,255,0.75)' : 'rgba(255,255,255,0.12)'}`,
             opacity: i === current ? 1 : 0.4,
@@ -96,7 +99,7 @@ function ThumbnailStrip({ photos, current, onSelect }) {
           }}
         >
           <img src={src} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-        </motion.div>
+        </motion.button>
       ))}
     </div>
   );
@@ -109,6 +112,15 @@ export default function MorphingPhotoGallery({ photos, layout = 'grid', windowRe
   const [lightbox, setLightbox] = useState(null);
   const [direction, setDirection] = useState(0);
   const [isNavigating, setIsNavigating] = useState(false);
+
+  const lightboxRef = useRef(null);
+  const isLightboxOpen = lightbox !== null;
+  useEffect(() => {
+    if (!isLightboxOpen) return;
+    const previous = document.activeElement;
+    const frame = requestAnimationFrame(() => lightboxRef.current?.querySelector("button")?.focus());
+    return () => { cancelAnimationFrame(frame); if (previous?.isConnected) previous.focus({ preventScroll: true }); };
+  }, [isLightboxOpen]);
 
   const openLightbox = (i) => { setIsNavigating(false); setDirection(0); setLightbox(i); };
   const closeLightbox = () => setLightbox(null);
@@ -123,12 +135,13 @@ export default function MorphingPhotoGallery({ photos, layout = 'grid', windowRe
   useEffect(() => {
     if (lightbox === null) return;
     const handler = (e) => {
-      if (e.key === 'Escape')      closeLightbox();
+      if (document.querySelector('dialog[open]') || !lightboxRef.current?.closest('.window-modal')?.classList.contains('is-active')) return;
+      if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); closeLightbox(); }
       if (e.key === 'ArrowLeft')   navigate(-1);
       if (e.key === 'ArrowRight')  navigate(1);
     };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
+    window.addEventListener('keydown', handler, true);
+    return () => window.removeEventListener('keydown', handler, true);
   }, [lightbox]); // eslint-disable-line
 
   /* stack swipe */
@@ -156,6 +169,16 @@ export default function MorphingPhotoGallery({ photos, layout = 'grid', windowRe
     <AnimatePresence>
       <motion.div
         key="lb-overlay"
+        ref={lightboxRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label={`Photo ${lightbox + 1} of ${photos.length}`}
+        onKeyDown={event => {
+          if (event.key !== 'Tab') return;
+          const buttons = [...event.currentTarget.querySelectorAll('button')].filter(button => button.getClientRects().length);
+          if (event.shiftKey && document.activeElement === buttons[0]) { event.preventDefault(); buttons.at(-1)?.focus(); }
+          else if (!event.shiftKey && document.activeElement === buttons.at(-1)) { event.preventDefault(); buttons[0]?.focus(); }
+        }}
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
@@ -176,11 +199,12 @@ export default function MorphingPhotoGallery({ photos, layout = 'grid', windowRe
         {/* Close button */}
         <motion.button
           onClick={closeLightbox}
+          aria-label="Close photo preview"
           whileHover={{ background: 'rgba(255,255,255,0.14)' }}
           whileTap={{ scale: 0.92 }}
           style={{
             position: 'absolute', top: '14px', right: '14px',
-            width: '30px', height: '30px', borderRadius: '50%',
+            width: '44px', height: '44px', borderRadius: '50%',
             border: '1px solid rgba(255,255,255,0.14)',
             background: 'rgba(255,255,255,0.06)',
             color: 'rgba(255,255,255,0.75)', cursor: 'pointer',
@@ -250,13 +274,14 @@ export default function MorphingPhotoGallery({ photos, layout = 'grid', windowRe
             gap: '8px',
           }}>
             {photos.map((src, i) => (
-              <motion.div
+              <motion.button
                 key={i}
                 layoutId={`photo-${i}`}
                 initial={{ opacity: 0, scale: 0.88 }}
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ type: 'spring', stiffness: 320, damping: 26, delay: i * 0.02 }}
                 onClick={() => openLightbox(i)}
+                aria-label={`Open photo ${i + 1}`}
                 style={{
                   aspectRatio: '1',
                   borderRadius: '11px',
@@ -271,7 +296,7 @@ export default function MorphingPhotoGallery({ photos, layout = 'grid', windowRe
                 <img src={src} alt={`Photo ${i + 1}`}
                   style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
                   loading="lazy" />
-              </motion.div>
+              </motion.button>
             ))}
           </div>
         )}
@@ -280,12 +305,13 @@ export default function MorphingPhotoGallery({ photos, layout = 'grid', windowRe
         {layout === 'list' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
             {photos.map((src, i) => (
-              <motion.div
+              <motion.button
                 key={i}
                 initial={{ opacity: 0, x: -20 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ type: 'spring', stiffness: 300, damping: 25, delay: i * 0.025 }}
                 onClick={() => openLightbox(i)}
+                aria-label={`Open photo ${i + 1}`}
                 style={{
                   display: 'flex', gap: '16px', alignItems: 'center',
                   padding: '10px', borderRadius: '14px',
@@ -301,7 +327,7 @@ export default function MorphingPhotoGallery({ photos, layout = 'grid', windowRe
                   <div style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-main)' }}>Photo {i + 1}</div>
                   <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px' }}>Photography Collection</div>
                 </div>
-              </motion.div>
+              </motion.button>
             ))}
           </div>
         )}
@@ -333,6 +359,10 @@ export default function MorphingPhotoGallery({ photos, layout = 'grid', windowRe
                       onDragEnd={handleDragEnd}
                       whileDrag={{ scale: 1.03, cursor: 'grabbing' }}
                       onClick={() => { if (!isDragging) openLightbox(origIdx); }}
+                      role={isTop ? 'button' : undefined}
+                      tabIndex={isTop ? 0 : -1}
+                      aria-label={`Open photo ${origIdx + 1}`}
+                      onKeyDown={event => { if (isTop && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); openLightbox(origIdx); } }}
                       style={{
                         position: 'absolute', top: 0, left: 0,
                         width: '100%', height: '100%',

@@ -1,133 +1,142 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
+import { ArrowRight, ArrowUpRight } from 'lucide-react';
 import { projectsData } from '../../data';
+import TechStack from './TechStack';
+import ProjectReviews from './ProjectReviews';
 import './ProjectsWindow.css';
 
-function Stars({ rating, className }) {
-  return (
-    <span className={className}>
-      {[1, 2, 3, 4, 5].map(i => (
-        <span key={i} style={{ opacity: i <= Math.round(rating) ? 1 : 0.2 }}>★</span>
-      ))}
-    </span>
-  );
-}
+const hasPublicLink = (link) => /^https?:\/\//i.test(link || '');
+const projectNumber = (index) => String(index + 1).padStart(2, '0');
+const TYPES = [{ id: 'all', label: 'All' }, { id: 'games', label: 'Games' }, { id: 'ai', label: 'AI & ML' }, { id: 'web', label: 'Web apps' }];
 
 export default function ProjectsWindow() {
-  const [sel, setSel] = useState(0);
-  const [isDark, setIsDark] = useState(() => document.body.classList.contains('dark-mode'));
+  const [selected, setSelected] = useState(projectsData[0].id);
+  const [type, setType] = useState('all');
+  const filteredProjects = projectsData.filter(item => type === 'all' || item.type === type);
+  const chooseType = next => {
+    setType(next);
+    const matches = projectsData.filter(item => next === 'all' || item.type === next);
+    setSelected(previous => matches.some(item => item.id === previous) ? previous : matches[0]?.id || null);
+  };
+  const detailRef = useRef(null);
+  const project = filteredProjects.find(item => item.id === selected) || filteredProjects[0];
+  const selectedNumber = projectsData.findIndex(item => item.id === project?.id);
+  const publicLink = hasPublicLink(project?.link);
+  const publicSource = hasPublicLink(project?.github);
+  const liveLabel = project?.linkLabel || 'Visit live project';
+  const projectDetails = Object.entries(project?.info || {}).filter(([label]) =>
+    ['Type', 'Domain', 'Backend', 'Frontend', 'Hardware', 'Physics'].includes(label)
+  );
 
   useEffect(() => {
-    const observer = new MutationObserver(() => {
-      setIsDark(document.body.classList.contains('dark-mode'));
-    });
-    observer.observe(document.body, { attributes: true, attributeFilter: ['class'] });
-    return () => observer.disconnect();
-  }, []);
-
-  const p = projectsData[sel];
-  const infoEntries = [...Object.entries(p.info), ['Status', p.status], ['Compatibility', p.compatibility]];
+    if (detailRef.current) detailRef.current.scrollTop = 0;
+  }, [selected]);
 
   return (
     <div className="proj-root">
-      {/* Sidebar */}
-      <div className="proj-sidebar">
-        <div className="proj-sb-label">My Apps</div>
-        <div className="proj-sb-list">
-          {projectsData.map((proj, i) => (
-            <div
-              key={i}
-              className={`proj-sb-row ${sel === i ? 'on' : ''}`}
-              onClick={() => setSel(i)}
+      <div className="proj-toolbar"><div className="proj-type-control" role="group" aria-label="Filter projects by type">{TYPES.map(filter => <button key={filter.id} type="button" aria-pressed={type === filter.id} onClick={() => chooseType(filter.id)}>{filter.label}</button>)}</div><span className="proj-filter-count" role="status">{filteredProjects.length} {filteredProjects.length === 1 ? 'project' : 'projects'}</span></div>
+      <div className="proj-browser">
+      <aside className="proj-sidebar" aria-label="Project collection">
+        <div className="proj-index-heading">
+          <span>Projects</span>
+          <span className="proj-count">{String(filteredProjects.length).padStart(2, '0')}</span>
+        </div>
+        <nav className="proj-sb-list" aria-label="Select a project">
+          {filteredProjects.map((item, index) => (
+            <button
+              type="button"
+              key={item.id}
+              className={`proj-sb-row ${project?.id === item.id ? 'on' : ''}`}
+              aria-pressed={project?.id === item.id}
+              aria-controls="project-case-study"
+              data-project-id={item.id}
+              onClick={() => setSelected(item.id)}
+              onKeyDown={event => {
+                if (!['ArrowDown', 'ArrowUp', 'ArrowRight', 'ArrowLeft', 'Home', 'End'].includes(event.key)) return;
+                event.preventDefault();
+                const next = event.key === 'Home' ? 0 : event.key === 'End' ? filteredProjects.length - 1 : Math.max(0, Math.min(filteredProjects.length - 1, index + (['ArrowDown', 'ArrowRight'].includes(event.key) ? 1 : -1)));
+                setSelected(filteredProjects[next].id);
+                const row = event.currentTarget.closest('nav').querySelectorAll('button')[next];
+                row.focus({ preventScroll: true });
+                row.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+              }}
             >
-              <div className="proj-sb-icon" style={{ background: proj.bg }}>{proj.emoji}</div>
-              <div className="proj-sb-info">
-                <div className="proj-sb-name">{proj.shortTitle}</div>
-                <div className="proj-sb-cat">{proj.shortCategory}</div>
-                <Stars rating={proj.rating} className="proj-sb-stars" />
-              </div>
-            </div>
+              <span className="proj-sb-icon" style={{ background: item.bg }} aria-hidden="true">{item.emoji}</span>
+              <span className="proj-sb-info">
+                <span className="proj-sb-name">{item.shortTitle}</span>
+                <span className="proj-sb-cat">{item.shortCategory}</span>
+              </span>
+              <ArrowRight className="proj-sb-arrow" size={15} aria-hidden="true" />
+            </button>
           ))}
+        </nav>
+        <div className="proj-index-footer" aria-hidden="true">
+          <span className="proj-dither-mark" />
+          <span>{filteredProjects.length} projects · Tejas Govind</span>
         </div>
-      </div>
+      </aside>
 
-      {/* Detail pane */}
-      <div className="proj-detail">
-        {/* Hero */}
-        <div className="proj-hero">
-          <div className="proj-hero-icon" style={{ background: p.bg }}>{p.emoji}</div>
-          <div className="proj-hero-info">
-            <div className="proj-app-name">{p.title}</div>
-            <div className="proj-app-dev" style={{ color: p.color }}>Tejas Govind</div>
-            <div className="proj-app-cat">{p.category}</div>
-            <div className="proj-rating-row">
-              <span className="proj-rating-num">{p.rating}</span>
-              <div>
-                <Stars rating={p.rating} className="proj-stars-main" />
-                <div className="proj-rating-count">{p.ratingCount}</div>
-              </div>
-            </div>
-            <div className="proj-actions">
-              {p.link !== '#' ? (
-                <a href={p.link} target="_blank" rel="noreferrer" className="proj-btn-primary">↗ Open</a>
-              ) : (
-                <span className="proj-btn-primary proj-btn-disabled">Not Public</span>
-              )}
-              <span className="proj-badge-status">{p.status}</span>
-            </div>
+      {project ? <article
+        className="proj-detail"
+        id="project-case-study"
+        aria-labelledby="project-case-title"
+        ref={detailRef}
+        tabIndex={0}
+      >
+        <header className="proj-hero">
+          <div className="proj-eyebrow">
+            <span>Project {projectNumber(selectedNumber)}</span>
+            <span className="proj-badge-status">{project.status}</span>
           </div>
-        </div>
+          <h2 className="proj-app-name" id="project-case-title">{project.title}</h2>
+          <p className="proj-app-cat">{project.category}</p>
+          {(publicLink || publicSource) && <div className="proj-actions">{publicLink && (
+            <a
+              href={project.link}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="proj-btn-primary"
+              aria-label={`${liveLabel}: ${project.shortTitle} (opens in a new tab)`}
+            >
+              {liveLabel} <ArrowUpRight size={17} aria-hidden="true" />
+            </a>
+          )}{publicSource && <a className="proj-btn-source" href={project.github} target="_blank" rel="noopener noreferrer" aria-label={`View source for ${project.shortTitle} (opens in a new tab)`}>View source <ArrowUpRight size={15} aria-hidden="true" /></a>}</div>}
+        </header>
 
-        {/* Preview */}
-        <div className="proj-section">
-          <div className="proj-section-title">Preview</div>
-          <div className="proj-screenshots">
-            <div className="proj-screenshot">
-              <img src={p.image} alt={p.title} />
-            </div>
-            {p.screenshots.map((s, i) => (
-              <div key={i} className="proj-screenshot proj-screenshot-placeholder" style={{ background: s.bg }}>
-                <span className="proj-screenshot-emoji">{p.emoji}</span>
-                <div className="proj-screenshot-label">{s.label}</div>
-              </div>
-            ))}
+        <figure className="proj-visual">
+          <div className="proj-visual-frame" data-image-kind={project.imageKind} style={{ background: project.imageBackground }}>
+            <img src={project.image} alt={project.imageAlt || `${project.shortTitle} project visual`} width={project.imageWidth || 1024} height={project.imageHeight || 1024} />
           </div>
-        </div>
+          <figcaption>
+            <span>{project.imageCaption || `${project.shortTitle} / Project visual`}</span>
+            <span aria-hidden="true">{projectNumber(selectedNumber)} — {String(projectsData.length).padStart(2, '0')}</span>
+          </figcaption>
+        </figure>
 
-        {/* Description */}
-        <div className="proj-section">
-          <div className="proj-section-title">Description</div>
-          <p className="proj-desc">{p.description}</p>
-        </div>
+        <section className="proj-section" aria-labelledby="project-overview-title">
+          <h3 className="proj-section-title" id="project-overview-title">The project</h3>
+          <p className="proj-desc">{project.description}</p>
+        </section>
 
-        {/* What's New */}
-        <div className="proj-section">
-          <div className="proj-section-title">What's New</div>
-          <div className="proj-version">{p.version} · {p.updated}</div>
-          <p className="proj-whatsnew">{p.whatsnew}</p>
-        </div>
+        <section className="proj-section" aria-labelledby="project-stack-title">
+          <h3 className="proj-section-title" id="project-stack-title">Built with</h3>
+          <TechStack stack={project.tech} />
+        </section>
 
-        {/* Tech Stack */}
-        <div className="proj-section">
-          <div className="proj-section-title">Tech Stack</div>
-          <div className="proj-tech-wrap">
-            {p.tech.split(', ').map((t, i) => (
-              <span key={i} className="proj-tech-tag">{t}</span>
-            ))}
-          </div>
-        </div>
-
-        {/* Information */}
-        <div className="proj-section proj-section-last">
-          <div className="proj-section-title">Information</div>
-          <div className="proj-info-grid">
-            {infoEntries.map(([k, v]) => (
-              <div key={k} className="proj-info-cell">
-                <div className="proj-info-key">{k}</div>
-                <div className="proj-info-val">{v}</div>
+        <section className="proj-section" aria-labelledby="project-details-title">
+          <h3 className="proj-section-title" id="project-details-title">At a glance</h3>
+          <dl className="proj-info-grid">
+            {[...projectDetails, ['Platform', project.compatibility]].map(([label, value]) => (
+              <div key={label} className="proj-info-cell">
+                <dt className="proj-info-key">{label}</dt>
+                <dd className="proj-info-val">{value}</dd>
               </div>
             ))}
-          </div>
-        </div>
+          </dl>
+          {!publicLink && <p className="proj-access-note">{publicSource ? 'Explore the implementation in the public repository.' : 'A public demo is not available.'}</p>}
+        </section>
+        <ProjectReviews key={project.id} project={project} />
+      </article> : <div className="proj-empty" role="status"><h2>No projects of this type yet</h2><p>Choose another type to explore the collection.</p><button className="proj-btn-source" onClick={() => chooseType('all')}>Show all projects</button></div>}
       </div>
     </div>
   );
