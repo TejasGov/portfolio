@@ -85,9 +85,10 @@ try {
   }
   await page.click('[aria-label="About Me"]');
   await page.waitForSelector('.about-profile');
+  await page.click('.about-read-all');
   await loadedPortrait();
-  assert.equal(await page.$eval('.window-content', e => e.scrollHeight > e.clientHeight), true);
-  await page.$eval('.window-content', e => { e.scrollTop = e.scrollHeight; });
+  assert.equal(await page.$eval('.about-thread', e => e.scrollHeight > e.clientHeight), true);
+  await page.$eval('.about-thread', e => { e.scrollTop = e.scrollHeight; });
   await page.screenshot({ path: `${output}/about-footer.png` });
   await closeWindow();
 
@@ -118,8 +119,9 @@ try {
   }
   await page.click('[aria-label="About Me"]');
   await page.waitForSelector('.about-profile');
+  await page.click('.about-read-all');
   await loadedPortrait();
-  assert.equal(await page.$eval('.window-content', e => e.scrollHeight > e.clientHeight), true);
+  assert.equal(await page.$eval('.about-thread', e => e.scrollHeight > e.clientHeight), true);
   assert.equal(await page.$eval('.about-profile', e => e.scrollWidth <= e.clientWidth), true);
   await settle();
   await page.screenshot({ path: `${output}/about-mobile.png` });

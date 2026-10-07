@@ -1,127 +1,69 @@
-import React from 'react';
-import { ArrowUpRight, Coffee, Film, Goal } from 'lucide-react';
+import { useContext, useEffect, useRef, useState } from 'react';
+import { useReducedMotion } from 'framer-motion';
+import { RotateCcw, ArrowUpRight } from 'lucide-react';
+import { memojiImg } from '../../data';
+import { SUMMARY, SECTION_TEXT, SKILLS, MARVEL_TIERS, WISHES } from '../../data/aboutData';
+import { WindowActivityContext } from '../../contexts/WindowActivity';
+import SiriOrb from '../ui/SiriOrb';
+import StreamedText from '../ui/StreamedText';
 import './AboutWindow.css';
 
-const SKILLS = [
-  { category: 'Interfaces', items: ['React', 'TypeScript', 'JavaScript', 'Next.js', 'Tailwind CSS', 'Framer Motion'] },
-  { category: 'AI & machine learning', items: ['Python', 'PyTorch', 'LangChain', 'OpenAI API', 'Hugging Face'] },
-  { category: 'Behind the scenes', items: ['Node.js', 'FastAPI', 'PostgreSQL', 'REST APIs'] },
-  { category: 'Everyday tools', items: ['Figma', 'Git', 'Vite', 'Docker'] },
+const TOPICS = [
+  { id: 'intro', question: 'Who is Tejas?', text: SUMMARY },
+  { id: 'builder', question: 'What kind of builder is he?', text: SECTION_TEXT.builder },
+  { id: 'people', question: 'Is he a people person?', text: SECTION_TEXT.people },
+  { id: 'fuel', question: 'What keeps him going?', text: SECTION_TEXT.fuel },
+  { id: 'cinema', question: 'What does he watch?', text: SECTION_TEXT.cinema },
+  { id: 'football', question: 'Football guy?', text: SECTION_TEXT.football },
+  { id: 'skills', question: 'What can he build?', text: 'React is home base. Python for machine learning. Figma for design. Here are the tools he reaches for.' },
+  { id: 'wishes', question: 'If he had three wishes?', text: 'If I got three wishes, I would choose:' },
 ];
 
-const INTERESTS = [
-  { icon: Coffee, title: 'Always iced.', text: 'An iced vanilla latte, even in January. A daily ritual my girlfriend introduced me to.' },
-  { icon: Film, title: 'It started with Interstellar.', text: 'Now I notice the score before the dialogue, have thoughts on aspect ratios, and plenty of Marvel opinions.' },
-  { icon: Goal, title: 'Football is personal.', text: 'One club. One GOAT. And a dream of taking India to a World Cup victory.' },
-];
-
-const MARVEL_TIERS = [
-  { tier: 'S', movies: 'Avengers: Endgame · Iron Man · Infinity War · Civil War' },
-  { tier: 'A', movies: 'Winter Soldier · Thor: Ragnarok · No Way Home · Guardians Vol. 2' },
-  { tier: 'B', movies: 'Black Panther · Doctor Strange · Shang-Chi · Ant-Man' },
-  { tier: 'C', movies: 'Thor: The Dark World · The Marvels · Eternals' },
-];
+function AboutTurn({ topic, instant }) {
+  const active = useContext(WindowActivityContext);
+  const reducedMotion = useReducedMotion();
+  const [ready, setReady] = useState(false);
+  const [done, setDone] = useState(false);
+  const [skip, setSkip] = useState(false);
+  const reveal = instant || skip || reducedMotion;
+  useEffect(() => {
+    if (reveal) { setReady(true); return; }
+    if (!active || ready) return;
+    const timer = setTimeout(() => setReady(true), 450);
+    return () => clearTimeout(timer);
+  }, [active, ready, reveal]);
+  return <section className="about-turn" aria-label={topic.question}>
+    <div className="about-question">{topic.question}</div>
+    <div className="about-answer">
+      <div className="about-answer-label"><SiriOrb size={24} active={!done && !reveal} /><span>About Tejas</span>{!done && !reveal && <button onClick={() => setSkip(true)}>Show answer</button>}</div>
+      {!ready && !reveal ? <p className="about-thinking" role="status">Thinking<span aria-hidden="true">…</span></p> : <>
+        <p className="about-answer-text"><StreamedText text={topic.text} instant={reveal} onComplete={() => setDone(true)} /></p>
+        {(done || reveal) && <>
+          {topic.id === 'intro' && <figure className="about-portrait"><img src="/tejas_about.webp" alt="Tejas Govind" width="1368" height="1824" decoding="async" /><figcaption>Computer Science · University at Buffalo<br />Expected graduation · May 2027</figcaption></figure>}
+          {topic.id === 'skills' && <div className="about-skills">{SKILLS.map(group => <div key={group.category}><h3>{group.category}</h3><ul>{group.items.map(skill => <li key={skill}>{skill}</li>)}</ul></div>)}</div>}
+          {topic.id === 'cinema' && <details className="about-marvel"><summary>His Marvel rankings</summary><dl>{MARVEL_TIERS.map(group => <div key={group.tier}><dt>{group.tier}</dt><dd>{group.movies.join(' · ')}</dd></div>)}</dl></details>}
+          {topic.id === 'football' && <img className="about-football" src="/messi.webp" alt="Lionel Messi" loading="lazy" />}
+          {topic.id === 'wishes' && <ol className="about-wishes">{WISHES.map(wish => <li key={wish}>{wish}</li>)}</ol>}
+        </>}
+      </>}
+    </div>
+  </section>;
+}
 
 export default function AboutWindow() {
-  return (
-    <article className="about-profile" aria-label="About Tejas Govind">
-      <div className="about-profile-inner">
-        <header className="about-intro">
-          <div className="about-intro-copy">
-            <p className="about-eyebrow">The person behind the pixels</p>
-            <h2>Hi, I’m Tejas<span>.</span></h2>
-            <p className="about-lead">Curious about people.<br />Compelled to build.</p>
-            <p className="about-description">
-              I’m a computer science student at the University at Buffalo, building
-              thoughtful web experiences with React, machine learning, and a care
-              for the details.
-            </p>
-            <a className="about-contact-link" href="mailto:tejasgov2005@gmail.com">
-              Let’s talk <ArrowUpRight size={16} aria-hidden="true" />
-            </a>
-          </div>
-          <figure className="about-portrait">
-            <img src="/tejas_about.webp" alt="Tejas Govind" width="1368" height="1824" decoding="async" />
-            <figcaption>Tejas Govind · Buffalo, NY</figcaption>
-          </figure>
-        </header>
-
-        <dl className="about-facts">
-          <div><dt>Studying</dt><dd>B.S. Computer Science</dd></div>
-          <div><dt>At</dt><dd>University at Buffalo</dd></div>
-          <div><dt>Expected graduation</dt><dd>May 2027</dd></div>
-        </dl>
-
-        <section className="about-section about-approach" aria-labelledby="about-approach-title">
-          <div className="about-section-heading">
-            <span className="about-section-number" aria-hidden="true">01 /</span>
-            <h3 id="about-approach-title">It starts with a real person.</h3>
-          </div>
-          <div className="about-section-copy">
-            <p>
-              I tend to find a problem and have a hard time letting it go. Sometimes
-              that means a scrappy fix. Sometimes it means exploring how a product
-              could better support someone with ADHD or Alzheimer’s.
-            </p>
-            <p>
-              Real conversations shape how I build. I’d rather spend an hour
-              understanding someone than a week guessing what they need.
-            </p>
-          </div>
-        </section>
-
-        <section className="about-section" aria-labelledby="about-skills-title">
-          <div className="about-section-heading">
-            <span className="about-section-number" aria-hidden="true">02 /</span>
-            <h3 id="about-skills-title">Tools I reach for.</h3>
-          </div>
-          <div className="about-skills">
-            {SKILLS.map(group => (
-              <div className="about-skill-group" key={group.category}>
-                <h4>{group.category}</h4>
-                <ul aria-label={group.category}>
-                  {group.items.map(skill => <li key={skill}>{skill}</li>)}
-                </ul>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        <section className="about-section" aria-labelledby="about-interests-title">
-          <div className="about-section-heading">
-            <span className="about-section-number" aria-hidden="true">03 /</span>
-            <h3 id="about-interests-title">Away from the keyboard.</h3>
-          </div>
-          <div className="about-interests">
-            {INTERESTS.map(({ icon: Icon, title, text }) => (
-              <div className="about-interest" key={title}>
-                <Icon size={21} strokeWidth={1.5} aria-hidden="true" />
-                <h4>{title}</h4>
-                <p>{text}</p>
-              </div>
-            ))}
-          </div>
-          <details className="about-movie-details">
-            <summary>For the curious: my Marvel rankings <span aria-hidden="true">+</span></summary>
-            <dl>
-              {MARVEL_TIERS.map(({ tier, movies }) => (
-                <div key={tier}><dt>{tier}<span className="sr-only"> tier</span></dt><dd>{movies}</dd></div>
-              ))}
-            </dl>
-          </details>
-          <p className="about-small-wish">
-            If I had three wishes: food for everyone, cleaner air in India, and that World Cup.
-          </p>
-        </section>
-
-        <footer className="about-footer">
-          <p>Good things start with a conversation.</p>
-          <div>
-            <a href="https://github.com/TejasGov" target="_blank" rel="noopener noreferrer" aria-label="GitHub (opens in a new tab)">GitHub <ArrowUpRight size={14} aria-hidden="true" /></a>
-            <a href="https://www.linkedin.com/in/tejas-govind-29520a2b2/" target="_blank" rel="noopener noreferrer" aria-label="LinkedIn (opens in a new tab)">LinkedIn <ArrowUpRight size={14} aria-hidden="true" /></a>
-          </div>
-        </footer>
-      </div>
-    </article>
-  );
+  const [turns, setTurns] = useState([{ topic: TOPICS[0], instant: false, key: 0 }]);
+  const threadRef = useRef(null);
+  const sequence = useRef(0);
+  const ask = topic => {
+    const key = ++sequence.current;
+    setTurns(previous => [...previous.map(turn => ({ ...turn, instant: true })), { topic, instant: false, key }]);
+    requestAnimationFrame(() => threadRef.current?.lastElementChild?.scrollIntoView({ block: 'start', behavior: 'instant' }));
+  };
+  const readAll = () => { setTurns(TOPICS.map(topic => ({ topic, instant: true, key: ++sequence.current }))); requestAnimationFrame(() => { if (threadRef.current) threadRef.current.scrollTop = 0; }); };
+  const replay = () => { setTurns([{ topic: TOPICS[0], instant: false, key: ++sequence.current }]); requestAnimationFrame(() => { if (threadRef.current) threadRef.current.scrollTop = 0; }); };
+  return <article className="about-profile about-siri" aria-label="About Tejas Govind">
+    <header className="about-siri-header"><img src={memojiImg} alt="" /><div><h2>Tejas Govind</h2><p>A little about me.</p></div><button onClick={replay} aria-label="Replay About conversation" title="Replay"><RotateCcw size={16} /></button><button className="about-read-all" onClick={readAll}>Read all</button></header>
+    <div className="about-thread" ref={threadRef} tabIndex={0} aria-label="About conversation">{turns.map(turn => <AboutTurn key={turn.key} topic={turn.topic} instant={turn.instant} />)}</div>
+    <footer className="about-chat-footer"><p>Ask about Tejas</p><div className="about-prompts">{TOPICS.slice(1).map(topic => <button key={topic.id} onClick={() => ask(topic)}>{topic.question}</button>)}</div><div className="about-footer"><span>Written by Tejas, told a little differently.</span><a href="mailto:tejasgov2005@gmail.com">Get in touch <ArrowUpRight size={12} aria-hidden="true" /></a></div></footer>
+  </article>;
 }

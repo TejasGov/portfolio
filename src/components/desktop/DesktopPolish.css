@@ -26,6 +26,7 @@ body.dark-mode {
 .atmosphere-shade { background: linear-gradient(90deg, #0003, transparent 45%, #0001), linear-gradient(0deg, #0004, transparent 60%); }
 .dither-screen { background: var(--ordered-dither); background-size: 8px 8px; opacity: .12; mix-blend-mode: soft-light; }
 .glass-panel { box-shadow: var(--glass-shadow); }
+.desktop-root.has-minimized-windows { --minimized-window-gap: 56px; }
 .widget-card { position: relative; isolation: isolate; }
 .widget-card::after { content: ''; position: absolute; inset: 0; border-radius: inherit; background: var(--ordered-dither); opacity: .09; mask-image: linear-gradient(135deg, transparent 30%, #000); pointer-events: none; z-index: -1; }
 .widget-label { font-family: var(--mono-font) !important; }
@@ -102,9 +103,6 @@ body.dark-mode {
 .mac-menu > button:focus-visible { outline: none; background: var(--accent); color: white; }
 .overlay-dialog { animation: dialog-arrive 180ms var(--ease-out); background: var(--glass-bg); box-shadow: 0 30px 100px #0005, inset 0 1px 0 var(--surface-sheen); }
 .overlay-dialog::backdrop { background: #10131b66; backdrop-filter: blur(5px); animation: backdrop-arrive 160ms ease; }
-.search-field { background: var(--badge-bg); border: 1px solid var(--card-border); border-radius: 10px; padding: 8px 12px; }
-.search-results li[aria-selected=true] { background: var(--accent); color: white; }
-.search-results li[aria-selected=true] .search-result-icon, .search-results li[aria-selected=true] button > svg:last-child { color: white; }
 .window-switcher { border-radius: 11px; padding: 5px; box-shadow: 0 6px 22px #0003, inset 0 1px 0 var(--surface-sheen); }
 .window-task > button:first-child { min-height: 32px; border-radius: 6px; transition: background 150ms ease, color 150ms ease; }
 .task-close { min-height: 32px; border-radius: 5px; }

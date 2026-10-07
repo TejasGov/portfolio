@@ -10,5 +10,5 @@ const links = [
   { title: 'Kaggle', url: 'https://www.kaggle.com/tejasgovind', icon: Database },
 ];
 export default function SocialsDrawer({ isOpen, onClose }) {
-  return <OverlayDialog isOpen={isOpen} onClose={onClose} title="Elsewhere on the internet." eyebrow="SAME PERSON, OTHER PLACES" description="Things I’m building, thinking about, and occasionally photographing."><div className="social-links">{links.map(({ title, url, icon: Icon }) => <a className="overlay-row-link" key={title} href={url} target="_blank" rel="noopener noreferrer" aria-label={`${title} (opens in a new tab)`}><Icon size={17} aria-hidden="true" />{title}<ArrowUpRight size={14} aria-hidden="true" /></a>)}</div><p className="overlay-note">All links open in a new tab.</p></OverlayDialog>;
+  return <OverlayDialog isOpen={isOpen} onClose={onClose} title="Socials" description="Find my work and connect with me."><div className="social-links">{links.map(({ title, url, icon: Icon }) => <a className="overlay-row-link" key={title} href={url} target="_blank" rel="noopener noreferrer" aria-label={`${title} (opens in a new tab)`}><Icon size={17} aria-hidden="true" />{title}<ArrowUpRight size={14} aria-hidden="true" /></a>)}</div><p className="overlay-note">All links open in a new tab.</p></OverlayDialog>;
 }

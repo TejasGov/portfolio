@@ -5,7 +5,7 @@
   left: max(24px, calc((100vw - 1080px) / 2));
   width: min(1080px, calc(100vw - 48px));
   min-width: 320px;
-  height: calc(100dvh - 180px);
+  height: calc(100dvh - 180px - var(--minimized-window-gap, 0px));
   max-height: 840px;
   display: flex;
   flex-direction: column;
@@ -31,7 +31,7 @@
   top: 40px;
   left: 16px;
   width: calc(100vw - 32px);
-  height: calc(100dvh - 155px);
+  height: calc(100dvh - 155px - var(--minimized-window-gap, 0px));
   max-height: none;
   transform: none !important;
 }
@@ -194,7 +194,7 @@
     left: 8px;
     width: calc(100vw - 16px);
     min-width: 0;
-    height: calc(100dvh - 166px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+    height: calc(100dvh - 166px - var(--minimized-window-gap, 0px) - env(safe-area-inset-top) - env(safe-area-inset-bottom));
     max-height: none;
     border-radius: 12px;
     transform: none !important;
@@ -236,8 +236,8 @@
   .window-modal,
   .window-modal.maximized,
   .window-modal.filled {
-    top: 86px;
-    height: calc(100dvh - 170px);
+    top: 46px;
+    height: calc(100dvh - 164px - var(--minimized-window-gap, 0px));
     max-height: none;
   }
 }

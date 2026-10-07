@@ -319,7 +319,7 @@ export default function WindowModal({ id, onClose, onMinimize, zIndex, onFocus, 
           flexDirection: 'column', 
           gap: (id === 'terminal' || id === 'work-ex' || id === 'projects' || id === 'my-sound' || id === 'blog' || id === 'my-niche' || id === 'about' || id === 'my-library') ? '0' : '24px',
           padding: (id === 'terminal' || id === 'work-ex' || id === 'projects' || id === 'my-sound' || id === 'blog' || id === 'my-niche' || id === 'about' || id === 'my-library') ? '0' : undefined,
-          overflow: id === 'about' ? 'auto' : (id === 'terminal' || id === 'work-ex' || id === 'projects' || id === 'my-sound' || id === 'blog' || id === 'my-niche' || id === 'about' || id === 'my-library') ? 'hidden' : undefined,
+          overflow: (id === 'terminal' || id === 'work-ex' || id === 'projects' || id === 'my-sound' || id === 'blog' || id === 'my-niche' || id === 'about' || id === 'my-library') ? 'hidden' : undefined,
           cursor: 'auto',
           touchAction: 'auto'
         }} 

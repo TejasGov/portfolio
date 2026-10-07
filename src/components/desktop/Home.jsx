@@ -9,7 +9,7 @@ export default function Home({ onOpenWindow, onContact, onSearch, activeWindows,
     <section className="desktop-welcome glass-panel" aria-labelledby="desktop-greeting">
       <div className="welcome-identity"><img src={memojiImg} alt="" /><div><p className="welcome-eyebrow"><span className="pixel-mark" aria-hidden="true" /> WELCOME TO MY DESKTOP</p><h1 id="desktop-greeting">Hi, I’m Tejas.</h1><p>Computer science at the University at Buffalo.<br />Building things. Following curiosity.</p></div></div>
       <div className="welcome-actions"><button onClick={() => onOpenWindow('about')}>A little about me <ArrowUpRight size={13} /></button><button onClick={onContact}>Say hello <ArrowUpRight size={13} /></button></div>
-      <button className="welcome-search" onClick={onSearch} aria-label="Open Spotlight"><Search size={14} aria-hidden="true" /><span>Find something on my desktop</span><kbd>⌘ K</kbd></button>
+      <button className="welcome-search" onClick={onSearch} aria-label="Open Spotlight"><Search size={14} aria-hidden="true" /><span>Spotlight Search</span><kbd>⌘ Space</kbd></button>
     </section>
     <ul className="desktop-icons-grid" aria-label="Portfolio folders">{desktopItems.map((item, index) => {
       const Icon = icons[item.id];

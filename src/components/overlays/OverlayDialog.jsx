@@ -2,7 +2,7 @@ import { useEffect, useId, useRef } from 'react';
 import { X } from 'lucide-react';
 import './OverlayDialog.css';
 
-export default function OverlayDialog({ isOpen, onClose, title, eyebrow, description, className = '', initialFocusRef, children }) {
+export default function OverlayDialog({ isOpen, onClose, title, eyebrow, description, className = '', initialFocusRef, hideHeading = false, hideClose = false, children }) {
   const dialogRef = useRef(null);
   const titleId = useId();
   const descriptionId = useId();
@@ -38,8 +38,8 @@ export default function OverlayDialog({ isOpen, onClose, title, eyebrow, descrip
       const rect = event.currentTarget.getBoundingClientRect();
       if (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom) onCloseRef.current();
     }}>
-    <button className="overlay-close" onClick={onClose} aria-label={`Close ${title}`}><X size={18} /></button>
-    <header className="overlay-heading">
+    {!hideClose && <button className="overlay-close" onClick={onClose} aria-label={`Close ${title}`}><X size={18} /></button>}
+    <header className={hideHeading ? 'sr-only' : 'overlay-heading'}>
       {eyebrow && <p className="eyebrow">{eyebrow}</p>}
       <h2 id={titleId}>{title}</h2>
       {description && <p id={descriptionId}>{description}</p>}

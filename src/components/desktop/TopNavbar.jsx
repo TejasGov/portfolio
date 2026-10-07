@@ -27,7 +27,7 @@ export default function TopNavbar({ activeWindowId, onHome, onOpenWindow, onTogg
     if (!menu) return;
     const dismiss = event => { if (!barRef.current?.contains(event.target)) setMenu(null); };
     const escape = event => {
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') { setMenu(null); return; }
+      if (((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') || (event.metaKey && event.code === 'Space')) { setMenu(null); return; }
       if (event.key === 'Escape' && !document.querySelector('dialog[open]')) { event.preventDefault(); event.stopPropagation(); setMenu(null); returnFocusRef.current?.focus(); }
     };
     document.addEventListener('pointerdown', dismiss);

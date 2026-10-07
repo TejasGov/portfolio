@@ -36,7 +36,8 @@ export default function App() {
   useEffect(() => { try { localStorage.setItem('tg-motion', motionPaused ? 'pause' : 'play'); } catch {} }, [motionPaused]);
   useEffect(() => {
     const handleKeyDown = event => {
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
+      if (event.isComposing) return;
+      if (((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') || (event.metaKey && event.code === 'Space')) {
         event.preventDefault();
         setOverlay(current => current === 'search' ? null : 'search');
       }
@@ -74,13 +75,13 @@ export default function App() {
     if (name) toggleWindow(names[name] || name);
   });
 
-  return <MotionConfig reducedMotion="user"><div ref={constraintsRef} className="desktop-root">
+  return <MotionConfig reducedMotion="user"><div ref={constraintsRef} className={`desktop-root ${minimizedWindows.length ? 'has-minimized-windows' : ''}`}>
     <a className="skip-link" href="#main-content">Skip to content</a>
     <Atmosphere paused={motionPaused || reduceMotion} />
     <TopNavbar activeWindowId={currentActiveWindow === 'desktop' ? null : currentActiveWindow} onHome={showHome} onOpenWindow={toggleWindow} onToggleSearch={() => setOverlay('search')} onContact={() => setOverlay('email')} onHelp={() => setOverlay('help')} isDarkMode={isDarkMode} onToggleTheme={() => setIsDarkMode(previous => !previous)} motionPaused={motionPaused} reducedMotion={reduceMotion} onToggleMotion={() => setMotionPaused(previous => !previous)} />
     <Home onOpenWindow={toggleWindow} onContact={() => setOverlay('email')} onSearch={() => setOverlay('search')} activeWindows={activeWindows} minimizedWindows={minimizedWindows} />
     <AnimatePresence>{activeWindows.map((id, index) => <WindowModal key={id} id={id} isMinimized={minimizedWindows.includes(id)} onClose={() => closeWindow(id)} onMinimize={() => minimizeWindow(id)} zIndex={100 + index} isActive={currentActiveWindow === id} onFocus={() => toggleWindow(id)} constraintsRef={constraintsRef} onOpenWindow={toggleWindow} />)}</AnimatePresence>
-    {activeWindows.length > 0 && <nav className="window-switcher" aria-label="Open windows">{activeWindows.map(id => <div className="window-task" key={id}><button className={currentActiveWindow === id ? 'is-active' : ''} onClick={() => toggleWindow(id)} aria-label={`${minimizedWindows.includes(id) ? 'Restore' : 'Show'} ${windowNames[id]}`}><span className="task-dot" />{windowNames[id]}{minimizedWindows.includes(id) && <span className="task-minimized">—</span>}</button><button className="task-close" aria-label={`Close ${windowNames[id]}`} onClick={() => closeWindow(id)}><X size={11} /></button></div>)}</nav>}
+    {minimizedWindows.length > 0 && <nav className="window-switcher" aria-label="Minimized windows">{minimizedWindows.map(id => <div className="window-task" key={id}><button onClick={() => toggleWindow(id)} aria-label={`Restore ${windowNames[id]}`}><span className="task-dot" />{windowNames[id]}<span className="task-minimized">—</span></button><button className="task-close" aria-label={`Close ${windowNames[id]}`} onClick={() => closeWindow(id)}><X size={11} /></button></div>)}</nav>}
     <Dock>
       <DockIcon icon={<img src={memojiImg} alt="" />} label="About Me" onClick={() => toggleWindow('about')} isActive={activeWindows.includes('about')} />
       <DockIcon icon={<FileText />} variant="experience" label="Experience" onClick={() => toggleWindow('work-ex')} isActive={activeWindows.includes('work-ex')} />
