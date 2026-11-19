@@ -33,21 +33,23 @@ function TableauSketch({ note }) {
   )
 }
 
-export default function Chapter({ chapter }) {
+export default function Chapter({ chapter, shown }) {
   const { id, caption, title, line, tableau, accent, objects, height = '170svh' } = chapter
   const isInterval = id === 'interval'
+  // Boot carries the page's only h1 (the name); every other act is an h2.
+  const Heading = id === 'boot' ? 'h1' : 'h2'
 
   return (
     // Tall section + sticky stage gives each act dwell time; the 3D tableau scrubs against this runway.
     <section id={id} tabIndex={-1} aria-labelledby={`${id}-title`} className="chapter relative outline-none" style={{ minHeight: height, viewTimeline: `--ch-${id}` }}>
       <div className="sticky top-0 grid min-h-svh items-center gap-10 px-6 pt-24 pb-24 md:grid-cols-[1.2fr_1fr] md:px-12">
         {id === 'boot' && <PixelDisplaceField className="absolute inset-0 -z-10 opacity-50" />}
-        <div className={isInterval ? 'text-center md:col-span-2' : ''}>
-          <p className="caption mb-5 opacity-80">{caption}</p>
-          <h2 id={`${id}-title`} className={`act-title ${isInterval ? 'text-[clamp(4rem,16vw,14rem)]' : 'text-[clamp(3rem,9vw,8rem)]'}`}>
+        <div className={`t-stagger ${shown ? 'is-shown' : ''} ${isInterval ? 'text-center md:col-span-2' : ''}`}>
+          <p className="t-stagger-line caption mb-5 opacity-80">{caption}</p>
+          <Heading id={`${id}-title`} className={`t-stagger-line t-stagger-line--2 act-title ${isInterval ? 'text-[clamp(4rem,16vw,14rem)]' : 'text-[clamp(3rem,9vw,8rem)]'}`}>
             {title}
-          </h2>
-          <p className={`mt-6 max-w-2xl text-[clamp(1.5rem,3.2vw,2.5rem)] leading-tight font-light ${isInterval ? 'mx-auto' : ''}`}>
+          </Heading>
+          <p className={`t-stagger-line t-stagger-line--3 mt-6 max-w-2xl text-[clamp(1.5rem,3.2vw,2.5rem)] leading-tight font-light ${isInterval ? 'mx-auto' : ''}`}>
             {line[0]}{' '}
             <em className="font-serif" style={{ color: accent ?? 'var(--accent)' }}>
               {line[1]}.
@@ -55,7 +57,7 @@ export default function Chapter({ chapter }) {
           </p>
 
           {id === 'deploy' && (
-            <div className="mt-10 space-y-6">
+            <div className="t-stagger-line t-stagger-line--4 mt-10 space-y-6">
               <a href={`mailto:${contact.email}`} className="inline-block rounded-full bg-paper px-6 py-3 text-lg font-medium text-ink transition-transform hover:-translate-y-0.5">
                 {contact.email} →
               </a>
@@ -77,7 +79,7 @@ export default function Chapter({ chapter }) {
           )}
         </div>
 
-        {!isInterval && <Tableau id={id} note={tableau} objects={objects} />}
+        {tableau && <Tableau id={id} note={tableau} objects={objects} />}
       </div>
     </section>
   )

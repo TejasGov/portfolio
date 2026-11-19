@@ -9,7 +9,7 @@ export const chapters = [
     caption: 'sample 000 — the model, untrained',
     title: 'Tejas Govind',
     line: ['I find the problem first, then I can’t stop', 'building'],
-    tableau: 'pixel field resolves into the orb',
+    // No tableau: the name and the pixel field carry this screen; the orb arrives in act 1.
   },
   {
     id: 'hero',
@@ -55,7 +55,6 @@ export const chapters = [
     caption: 'interval — 00:05, grab a chai',
     title: 'Interval',
     line: ['Trained on chai. Fine-tuned on iced vanilla', 'lattes'],
-    tableau: 'steam curls off the orb',
   },
   {
     id: 'checkpoints',

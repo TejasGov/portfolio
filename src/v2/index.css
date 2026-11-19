@@ -135,7 +135,57 @@
   }
 }
 
+/* transitions.dev "texts reveal" (recipe 18), tuned slower and taller for act-sized type. */
+:root {
+  --stagger-dur: 750ms;
+  --stagger-distance: 22px;
+  --stagger-stagger: 90ms;
+  --stagger-blur: 5px;
+  --stagger-ease: cubic-bezier(0.22, 1, 0.36, 1);
+}
+.t-stagger-line {
+  opacity: 0;
+  transform: translateY(var(--stagger-distance));
+  filter: blur(var(--stagger-blur));
+  transition:
+    opacity var(--stagger-dur) var(--stagger-ease),
+    transform var(--stagger-dur) var(--stagger-ease),
+    filter var(--stagger-dur) var(--stagger-ease);
+}
+.t-stagger-line--2 { transition-delay: var(--stagger-stagger); }
+.t-stagger-line--3 { transition-delay: calc(var(--stagger-stagger) * 2); }
+.t-stagger-line--4 { transition-delay: calc(var(--stagger-stagger) * 3); }
+.t-stagger.is-shown .t-stagger-line {
+  opacity: 1;
+  transform: translateY(0);
+  filter: blur(0);
+}
+
+/* Boot gate: lifts away with a soft blur, then unmounts. */
+.gate {
+  transition: opacity 0.7s ease, filter 0.7s ease, transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.gate.is-leaving {
+  opacity: 0;
+  filter: blur(8px);
+  transform: scale(1.04);
+  pointer-events: none;
+}
+.blink {
+  animation: blink 1s steps(1) infinite;
+}
+@keyframes blink {
+  50% { opacity: 0; }
+}
+
 @media (prefers-reduced-motion: reduce) {
+  .t-stagger-line,
+  .gate {
+    transition: none !important;
+  }
+  .blink {
+    animation: none;
+  }
   .colour-field,
   html,
   body {

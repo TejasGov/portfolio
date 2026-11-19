@@ -21,6 +21,12 @@ export function startSmoothScroll() {
   }
 }
 
+/** Freeze or release page scrolling (used while the Boot gate is up). */
+export function setScrollLocked(locked) {
+  document.documentElement.style.overflow = locked ? 'hidden' : ''
+  if (lenis) locked ? lenis.stop() : lenis.start()
+}
+
 /** Scroll to a chapter and move focus there, so keyboard and screen-reader users land in it too. */
 export function goTo(id) {
   const el = document.getElementById(id)
