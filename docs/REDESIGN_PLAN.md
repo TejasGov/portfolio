@@ -43,6 +43,7 @@ The portfolio is **a night at the movies**. It runs in one 3D world, a cinema bu
 
 - **Copy:** `BEATS` in `chapters/Prologue.jsx` and `chapters/Epilogue.jsx`; `collage.js`; `content.js` for project one-liners.
 - **A project's model, size, turn, tint or screen footage (`still`):** `PROJECT_MODELS` in `cinema/world.js`.
+- **Share card:** `public/og.jpg` (1200×630) is a frame of the opening shot with the header and page counter hidden. Re-render it if the prologue's look changes.
 - **Relight the hall:** edit the lights in `scripts/cinema/bake.py`, then rebake:
 
   ```sh
@@ -56,6 +57,7 @@ The portfolio is **a night at the movies**. It runs in one 3D world, a cinema bu
 - **Performance:**
   - The page's own JS is about 60 KB. The 3D stage is lazy-loaded: 151 KB gzipped plus about 16 MB of models and textures, with projects loading after the first frame.
   - Phones get fewer ray-march steps, fewer dust motes and smaller shadow and film-frame maps.
+  - On a desktop RX 9060 XT a frame takes 6–10 ms at 2520×1575. Slower GPUs are handled by adaptive resolution: when frames run long for about a second, the stage drops the pixel ratio by 20%, down to 0.7 (`govern` in `stage/Stage.jsx`).
   - Rendering stops while paper covers the screen.
 - **Accessibility:** all text and links are real DOM. Hidden beats are `inert`. Reduced motion stacks the scrapbook. The 3D sits behind an error boundary with a WebGL2 check.
 - **Licensing:**
@@ -64,7 +66,7 @@ The portfolio is **a night at the movies**. It runs in one 3D world, a cinema bu
 
 ## 5. Open items
 
-1. **Real hardware:** check on a phone and a laptop GPU. The levers are `steps` in the volumetric pass, dust count, the recliner instance count and the shadow map size.
+1. **Real hardware:** check on a phone and a laptop GPU. Adaptive resolution covers the worst of it. The remaining levers are `steps` in the volumetric pass, dust count, the recliner instance count and the shadow map size.
 2. **Four portraits:** Salman Khan, Akshay Kumar, Priyanka Chopra and a new Deepika Padukone photo were picked (see `scripts/cinema/collage_jobs.json`). Wikimedia still answers 429 to scripted downloads from this machine (retried on 19 Nov). Run `python scripts/cinema/collage_photos.py scripts/cinema/collage_jobs.json salman akshay priyanka deepika2`, then add them to the cast lineups in `collage.js`.
 3. **Smash Cricket link:** `smash-cricket.vercel.app` returns 404 and there is no public repo, so the link is hidden (`link: "#"` in `src/data/projectsData.js`). Put the URL back when it is redeployed.
 4. **Copy pass by Tejas,** especially the prologue lines.

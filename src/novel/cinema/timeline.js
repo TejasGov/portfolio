@@ -74,9 +74,9 @@ export function stateAt(s, mouse, aspect) {
     st.sweep = ss(0.9, 0.995, p) * 1.3
     st.card = { key: 'prologue', kicker: 'Now showing', title: 'Tejas Govind' }
     // Clear the air while the camera faces the screen, so the name reads through the beam.
-    const facingScreen = ss(0.18, 0.28, p) * (1 - ss(0.4, 0.5, p))
-    st.density = 0.6 * (1 - 0.55 * facingScreen)
-    st.dust = 1 - 0.6 * facingScreen
+    const facingScreen = ss(0.16, 0.26, p) * (1 - ss(0.42, 0.52, p))
+    st.density = 0.6 * (1 - 0.8 * facingScreen)
+    st.dust = 1 - 0.7 * facingScreen
     // A booth this close to the lens: the projector's own glow is softer until you leave it.
     st.exposure = 3
   } else if (sec === 'work') {
@@ -118,6 +118,7 @@ export function stateAt(s, mouse, aspect) {
     st.lamp = 1 - 0.55 * ss(0.1, 0.4, e)
     st.exposure = THREE.MathUtils.lerp(3, 1.6, st.house)
     st.dust = 0.3
+    st.density = 0.2 // a thinner beam than the prologue's, so "The End" reads through it
     st.card = { key: 'end', kicker: 'Thank you for watching', title: 'The End' }
   }
 

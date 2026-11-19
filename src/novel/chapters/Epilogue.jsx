@@ -19,12 +19,13 @@ const ext = { target: '_blank', rel: 'noreferrer' }
 
 export default function Epilogue() {
   const ref = useRef(null)
+  const whole = useRef(null) // the section and the colophon: the running head holds to the last line
   useProgress(ref, 'epilogue')
-  useRunningHead(ref, 'Epilogue · House lights')
+  useRunningHead(whole, 'Epilogue · House lights')
   const bind = useBeats('epilogue', BEATS)
 
   return (
-    <>
+    <div ref={whole}>
       <section ref={ref} id="epilogue" aria-labelledby="epilogue-title" className="relative" style={{ height: '320svh' }}>
         <div className="sticky top-0 h-svh">
           <div className="absolute inset-0 grid px-6 md:px-[6vw]">
@@ -84,6 +85,6 @@ export default function Epilogue() {
           <p className="kicker mt-12 text-night-ink/40">© {new Date().getFullYear()} Tejas Govind · The end.</p>
         </div>
       </footer>
-    </>
+    </div>
   )
 }

@@ -26,9 +26,10 @@ export default function Stage() {
       if (!alive) return
       world = w
       if (import.meta.env.DEV) window.__world = w
+      since = performance.now()
       resize()
       canvas.current.style.opacity = '1'
-      loop()
+      raf = requestAnimationFrame(loop)
       // Projects arrive after the first frame, nearest-first.
       for (const id of PROJECT_IDS) {
         if (!alive) return
@@ -36,9 +37,26 @@ export default function Stage() {
       }
     })
 
-    const loop = () => {
+    // Adaptive resolution: if frames run long for about a second, render at 80% of the pixel ratio
+    // (never below 0.7). Long gaps (a tab switch, a paper chapter) don't count.
+    // shortcut: it only steps down, so a display capped at 30 fps (battery saver) also lands at 0.7; add a step back up if that matters.
+    let last = 0, ema = 16.7, slow = 0, since = performance.now()
+    const govern = now => {
+      const dt = now - last
+      last = now
+      if (dt > 100 || now - since < 2500) return
+      ema += (dt - ema) * 0.05
+      slow = ema > 24 ? slow + 1 : 0
+      if (slow < 45 || world.dpr <= 0.7) return
+      world.setDpr(Math.max(0.7, world.dpr * 0.8))
+      slow = 0
+      ema = 16.7
+    }
+
+    const loop = now => {
       raf = requestAnimationFrame(loop)
       if (!store.night) return
+      govern(now)
       const k = reduced() ? 0 : 0.06
       mouse.x += (store.mouse.x - mouse.x) * k
       mouse.y += (store.mouse.y - mouse.y) * k

@@ -131,7 +131,7 @@ export async function createCinema(canvas, { mobile = false, onProgress } = {}) 
   renderer.setPixelRatio(dpr)
   renderer.outputColorSpace = THREE.SRGBColorSpace
   renderer.shadowMap.enabled = true
-  renderer.shadowMap.type = THREE.PCFSoftShadowMap
+  renderer.shadowMap.type = THREE.PCFShadowMap
   RectAreaLightUniformsLib.init()
 
   const scene = new THREE.Scene()
@@ -281,7 +281,7 @@ export async function createCinema(canvas, { mobile = false, onProgress } = {}) 
     }
     return stills[url]
   }
-  function card(key, { kicker = '', title = '', field = ['#0a1220', '#3b5d8f'], ink = '#ffffff', image } = {}) {
+  function card(key, { kicker = '', title = '', field = ['#03060c', '#1a2a46'], ink = '#ffffff', image } = {}) {
     if (key === lastCard) return
     lastCard = key
     const g = frame.getContext('2d')
@@ -377,7 +377,7 @@ export async function createCinema(canvas, { mobile = false, onProgress } = {}) 
     geo.setAttribute('aTo', new THREE.BufferAttribute(to, 3))
     geo.setAttribute('aSeed', new THREE.BufferAttribute(seed, 3))
     const pmat = new THREE.ShaderMaterial({
-      uniforms: { uMorph: { value: 0 }, uTime: { value: 0 }, uFade: { value: 0 }, uDpr: { value: dpr }, uColor: { value: new THREE.Color(spec.tint).multiplyScalar(2.4) } },
+      uniforms: { uMorph: { value: 0 }, uTime: { value: 0 }, uFade: { value: 0 }, uDpr: { value: renderer.getPixelRatio() }, uColor: { value: new THREE.Color(spec.tint).multiplyScalar(2.4) } },
       vertexShader: /* glsl */ `
         attribute vec3 aTo; attribute vec3 aSeed;
         uniform float uMorph; uniform float uTime; uniform float uFade; uniform float uDpr;
@@ -412,13 +412,21 @@ export async function createCinema(canvas, { mobile = false, onProgress } = {}) 
 
   // ------------------------------------------------------------ per-frame state
   const look = new THREE.Vector3()
-  const clock = new THREE.Clock()
+  const timer = new THREE.Timer()
   let active = true
   function resize(w, h) {
     renderer.setSize(w, h, false)
     composer.setSize(w, h)
     camera.aspect = w / h
     camera.updateProjectionMatrix()
+  }
+  /** Render resolution, lowered by the stage when a GPU can't keep up. Point sprites scale with it. */
+  function setDpr(d) {
+    renderer.setPixelRatio(d)
+    dust.material.uniforms.uDpr.value = d
+    for (const p of Object.values(projects)) p.pmat.uniforms.uDpr.value = d
+    const s = renderer.getSize(new THREE.Vector2())
+    resize(s.x, s.y)
   }
 
   /**
@@ -427,7 +435,7 @@ export async function createCinema(canvas, { mobile = false, onProgress } = {}) 
    */
   function render(state) {
     if (!active) return
-    const t = clock.getElapsedTime()
+    const t = timer.update().getElapsed()
     camera.position.copy(state.pos)
     look.copy(state.target)
     camera.lookAt(look)
@@ -496,7 +504,7 @@ export async function createCinema(canvas, { mobile = false, onProgress } = {}) 
   card('prologue', { kicker: 'Now showing', title: 'Tejas Govind' })
   onProgress?.(1)
   return {
-    renderer, scene, camera, render, resize, loadProject,
+    renderer, scene, camera, render, resize, loadProject, setDpr, get dpr() { return renderer.getPixelRatio() },
     setActive: v => { active = v },
     debug: { vol, bloom, dust, lamp, hallMat, seats, projector, screenLight, hemi, bulb, flare, streak, projects },
   }
