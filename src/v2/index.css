@@ -1,0 +1,67 @@
+@import "tailwindcss" source("./");
+@import "@fontsource-variable/bricolage-grotesque";
+@import "@fontsource/instrument-serif/400-italic.css";
+@import "@fontsource-variable/geist-mono";
+
+/* Monolith × human-md: paper + ink, one saturated colour field per chapter. */
+:root {
+  --paper: #f4efe8;
+  --ink: #201e1f;
+  --accent: #f0531c; /* saffron-vermilion: punchline word + marker dot */
+
+  --field-boot: #cfcfcf;
+  --field-hero: #9fb5ae;
+  --field-training: #ffabc8;
+  --field-interval: #f2c230;
+  --field-inference: #2140c4;
+  --field-checkpoints: #e7bfff;
+  --field-still: #f5a08c;
+  --field-deploy: #0b1026;
+}
+
+@theme inline {
+  --color-paper: var(--paper);
+  --color-ink: var(--ink);
+  --color-accent: var(--accent);
+  --color-field-boot: var(--field-boot);
+  --color-field-hero: var(--field-hero);
+  --color-field-training: var(--field-training);
+  --color-field-interval: var(--field-interval);
+  --color-field-inference: var(--field-inference);
+  --color-field-checkpoints: var(--field-checkpoints);
+  --color-field-still: var(--field-still);
+  --color-field-deploy: var(--field-deploy);
+
+  --font-sans: "Bricolage Grotesque Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Instrument Serif", Georgia, serif;
+  --font-mono: "Geist Mono Variable", ui-monospace, monospace;
+}
+
+@layer base {
+  html,
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+}
+
+/* Museum-tag caption under objects, e.g. "sample 003 — cricket ball, 2009" */
+@utility caption {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+}
+
+/* Chunky act title with an inked outline (Monolith). */
+@utility act-title {
+  font-family: var(--font-sans);
+  font-weight: 800;
+  text-transform: uppercase;
+  line-height: 0.9;
+  letter-spacing: -0.02em;
+  color: var(--paper);
+  -webkit-text-stroke: 2px var(--ink);
+  paint-order: stroke fill;
+}
