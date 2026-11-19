@@ -38,12 +38,83 @@
 }
 
 @layer base {
+  html {
+    --fg: var(--ink);
+  }
+  /* Dark colour fields (cobalt, night) flip text to paper. */
+  html[data-tone="dark"] {
+    --fg: var(--paper);
+  }
+  /* Background on html only: a body background would paint over the fixed colour field. */
+  html {
+    background: var(--paper);
+  }
   html,
   body {
-    background: var(--paper);
-    color: var(--ink);
+    color: var(--fg);
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
+    transition: color 0.8s ease;
+  }
+}
+
+/* The saturated wall behind each act; Phase 2 moves this into the 3D stage. */
+.colour-field {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  transition: background-color 1s ease;
+}
+
+/* Monolith-style act bars: one per chapter, filling as you read it. */
+.act-bar-track {
+  display: block;
+  width: clamp(18px, 5vw, 44px);
+  height: 4px;
+  border-radius: 99px;
+  background: color-mix(in srgb, var(--fg) 25%, transparent);
+  overflow: hidden;
+}
+.act-bar-fill {
+  display: block;
+  height: 100%;
+  background: var(--fg);
+  transform-origin: 0 50%;
+  transform: scaleX(0);
+}
+.act-bar[aria-current] .act-bar-fill {
+  transform: scaleX(1);
+}
+.act-bar:hover .act-bar-track {
+  background: color-mix(in srgb, var(--fg) 45%, transparent);
+}
+.act-bar:focus-visible {
+  outline: 2px solid var(--fg);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Progressive enhancement: each bar tracks its section's own scroll. Decorative, so no JS fallback. */
+@media (prefers-reduced-motion: no-preference) {
+  @supports ((animation-timeline: scroll()) and (animation-range: 0% 100%)) {
+    @keyframes act-fill {
+      from { transform: scaleX(0); }
+      to { transform: scaleX(1); }
+    }
+    .act-bar .act-bar-fill,
+    .act-bar[aria-current] .act-bar-fill {
+      animation: act-fill linear both;
+      /* animation-timeline is set inline per bar, after this shorthand */
+      animation-range: contain 0% contain 100%;
+    }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .colour-field,
+  html,
+  body {
+    transition: none;
   }
 }
 

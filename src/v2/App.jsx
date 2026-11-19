@@ -1,36 +1,48 @@
-import PixelDisplaceField from '@/v2/components/pixel-perfect/pixel-displace-field'
+import { useEffect, useState } from 'react'
+import { chapters } from '@/v2/data/chapters'
+import { startSmoothScroll } from '@/v2/lib/scroll'
+import Chrome from '@/v2/components/Chrome'
+import Chapter from '@/v2/components/Chapter'
 
-// Phase 0 shell: proves tokens, fonts, Tailwind and the shadcn pipeline. Chapters arrive in Phase 1.
+/** The chapter crossing the middle of the viewport is "active": it sets the colour field, tone and nav state. */
+function useActiveChapter() {
+  const [active, setActive] = useState(chapters[0].id)
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      entries => entries.forEach(e => e.isIntersecting && setActive(e.target.id)),
+      { rootMargin: '-50% 0px -50% 0px' },
+    )
+    chapters.forEach(c => {
+      const el = document.getElementById(c.id)
+      if (el) observer.observe(el)
+    })
+    return () => observer.disconnect()
+  }, [])
+  return active
+}
+
 export default function App() {
+  const active = useActiveChapter()
+  const current = chapters.find(c => c.id === active)
+
+  useEffect(startSmoothScroll, [])
+  useEffect(() => {
+    document.documentElement.dataset.tone = current.tone ?? 'light'
+  }, [current])
+
   return (
-    <main className="relative min-h-dvh overflow-hidden bg-field-hero text-ink">
-      <PixelDisplaceField className="absolute inset-0 opacity-60" />
-
-      <div className="pointer-events-none relative z-10 flex min-h-dvh flex-col justify-between p-6 md:p-10">
-        <header className="caption flex items-center justify-between">
-          <span className="flex items-center gap-2">
-            <span className="size-2.5 rounded-full bg-accent" aria-hidden="true" />
-            Tejas Govind
-          </span>
-          <span>Act 0 · Boot</span>
-        </header>
-
-        <section className="max-w-4xl">
-          <p className="caption mb-4">sample 000 — the model, untrained</p>
-          <h1 className="act-title text-6xl md:text-9xl">Training data</h1>
-          <p className="mt-6 max-w-2xl text-2xl font-light md:text-4xl">
-            Every model is what it was trained on. Mine was cricket, chai and{' '}
-            <em className="font-serif text-accent">Bollywood.</em>
-          </p>
-        </section>
-
-        <footer className="caption flex justify-between">
-          <span>Scroll</span>
-          <a className="pointer-events-auto underline-offset-4 hover:underline" href="/os/">
-            The 2023 site →
-          </a>
-        </footer>
-      </div>
-    </main>
+    // timeline-scope lets the fixed act bars read each section's view-timeline.
+    <div style={{ timelineScope: chapters.map(c => `--ch-${c.id}`).join(', ') }}>
+      <a href="#hero" className="caption sr-only z-50 rounded-full bg-paper px-4 py-2 focus:not-sr-only focus:fixed focus:top-4 focus:left-4">
+        Skip intro
+      </a>
+      <div className="colour-field" style={{ background: current.field }} aria-hidden="true" />
+      <Chrome active={active} />
+      <main>
+        {chapters.map(c => (
+          <Chapter key={c.id} chapter={c} />
+        ))}
+      </main>
+    </div>
   )
 }
