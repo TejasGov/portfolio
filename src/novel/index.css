@@ -1,0 +1,195 @@
+@import "tailwindcss" source("./");
+@import "@fontsource/instrument-serif/400.css";
+@import "@fontsource/instrument-serif/400-italic.css";
+@import "@fontsource-variable/newsreader";
+@import "@fontsource-variable/newsreader/opsz-italic.css";
+@import "@fontsource-variable/geist-mono";
+@import "@fontsource/anton";
+@import "@fontsource-variable/caveat";
+
+/*
+ * Two worlds, one book: NIGHT (the WebGL chapters) and PAPER (the collage and the index).
+ * Type: Instrument Serif for display, Newsreader for reading, Geist Mono for instruments,
+ * Anton for collage labels, Caveat for margin notes.
+ */
+:root {
+  --night: #03050b;
+  --night-ink: #e6eefc;
+  --glow: #9cc7ff;
+  --dim: #6f7f9f;
+
+  --paper: #efe8da;
+  --paper-deep: #e4dac6;
+  --ink: #17140f;
+  --stamp: #c8361e;
+  --marker: #ffe14a;
+  --kraft: #c9a47a;
+  --tape: rgb(246 239 214 / 0.82);
+
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@theme inline {
+  --color-night: var(--night);
+  --color-night-ink: var(--night-ink);
+  --color-glow: var(--glow);
+  --color-dim: var(--dim);
+  --color-paper: var(--paper);
+  --color-paper-deep: var(--paper-deep);
+  --color-ink: var(--ink);
+  --color-stamp: var(--stamp);
+  --color-marker: var(--marker);
+  --color-kraft: var(--kraft);
+
+  --font-display: "Instrument Serif", "Times New Roman", serif;
+  --font-serif: "Newsreader Variable", Georgia, serif;
+  --font-mono: "Geist Mono Variable", ui-monospace, monospace;
+  --font-poster: "Anton", Impact, sans-serif;
+  --font-hand: "Caveat Variable", "Comic Sans MS", cursive;
+}
+
+@layer base {
+  html {
+    background: var(--night);
+    color: var(--night-ink);
+    font-family: var(--font-serif);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  ::selection {
+    background: var(--marker);
+    color: var(--ink);
+  }
+}
+
+/* Small caps instrument text: kickers, running heads, readouts. */
+@utility kicker {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+/* ------------------------------------------------------------------ HUD */
+/* Each marker: a dot on the tracked point, and a bracketed readout whose bottom-left corner sits on it. */
+.hud-mark {
+  position: absolute;
+  left: 0;
+  top: 0;
+  color: rgb(205 225 255);
+  opacity: 0;
+  will-change: transform, opacity;
+}
+.hud-dot {
+  position: absolute;
+  width: 4px;
+  height: 4px;
+  margin: -2px 0 0 -2px;
+  background: currentColor;
+  box-shadow: 0 0 8px 1px rgb(120 170 255 / 0.9);
+}
+.hud-box {
+  position: absolute;
+  left: -7px;
+  bottom: -7px;
+  padding: 7px 12px 8px 14px;
+  /* Corner brackets: eight 1px strokes, no extra elements. */
+  --c: rgb(200 222 255 / 0.85);
+  background:
+    linear-gradient(var(--c), var(--c)) top left / 9px 1px no-repeat,
+    linear-gradient(var(--c), var(--c)) top left / 1px 9px no-repeat,
+    linear-gradient(var(--c), var(--c)) top right / 9px 1px no-repeat,
+    linear-gradient(var(--c), var(--c)) top right / 1px 9px no-repeat,
+    linear-gradient(var(--c), var(--c)) bottom left / 9px 1px no-repeat,
+    linear-gradient(var(--c), var(--c)) bottom left / 1px 9px no-repeat,
+    linear-gradient(var(--c), var(--c)) bottom right / 9px 1px no-repeat,
+    linear-gradient(var(--c), var(--c)) bottom right / 1px 9px no-repeat;
+  transform: translateY(-14px);
+}
+.hud-label {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  white-space: pre;
+  color: rgb(226 236 255 / 0.92);
+  text-shadow: 0 0 10px rgb(80 140 255 / 0.7);
+}
+.hud-link {
+  stroke: rgb(214 230 255);
+  stroke-width: 0.7;
+  opacity: 0;
+}
+.hud-home {
+  color: #fff;
+}
+.hud-home .hud-label {
+  font-size: 12.5px;
+  color: #fff;
+}
+.hud-home .hud-dot {
+  width: 7px;
+  height: 7px;
+  margin: -3.5px 0 0 -3.5px;
+  background: #fff;
+  box-shadow: 0 0 0 5px rgb(255 255 255 / 0.12), 0 0 18px 3px rgb(150 190 255 / 0.9);
+}
+.hud-note .hud-box {
+  background-color: rgb(4 8 20 / 0.5);
+}
+
+/* --------------------------------------------------------------- paper */
+.paper {
+  background-color: var(--paper);
+  color: var(--ink);
+  /* Paper fibre: two static noise layers, multiplied in. Rasterised once by the browser. */
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='320' height='320'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .36 0 0 0 0 .3 0 0 0 0 .22 0 0 0 .32 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='600' height='600'%3E%3Cfilter id='f'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.012 .09' numOctaves='2' seed='4'/%3E%3CfeColorMatrix values='0 0 0 0 .5 0 0 0 0 .42 0 0 0 0 .3 0 0 0 .12 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23f)'/%3E%3C/svg%3E");
+}
+
+/* Grain over the whole book; strongest on paper, a whisper at night. */
+.grain {
+  position: fixed;
+  inset: -50%;
+  pointer-events: none;
+  z-index: 60;
+  opacity: 0.055;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)'/%3E%3C/svg%3E");
+  animation: grain 0.5s steps(4) infinite;
+}
+@keyframes grain {
+  0% { transform: translate(0, 0); }
+  25% { transform: translate(-3%, 2%); }
+  50% { transform: translate(2%, -3%); }
+  75% { transform: translate(-1%, 3%); }
+}
+
+/* Stop-motion "boil": collage pieces breathe at ~12fps, like animated cut paper. */
+@keyframes boil {
+  0% { transform: rotate(var(--r, 0deg)) translate(0, 0); }
+  33% { transform: rotate(calc(var(--r, 0deg) + 0.45deg)) translate(0.6px, -0.6px); }
+  66% { transform: rotate(calc(var(--r, 0deg) - 0.35deg)) translate(-0.6px, 0.5px); }
+}
+.boil {
+  animation: boil 0.25s steps(1) infinite;
+}
+
+/* Sticker cut: a white paper rim and a soft lift shadow round a transparent PNG. */
+.sticker {
+  filter: drop-shadow(0 0 0 #fff) drop-shadow(3px 0 0 #fbf8f1) drop-shadow(-3px 0 0 #fbf8f1) drop-shadow(0 3px 0 #fbf8f1)
+    drop-shadow(0 -3px 0 #fbf8f1) drop-shadow(0 10px 14px rgb(40 26 10 / 0.28));
+}
+.tape {
+  background: var(--tape);
+  box-shadow: 0 1px 2px rgb(60 40 10 / 0.18);
+  mix-blend-mode: multiply;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .grain,
+  .boil {
+    animation: none;
+  }
+}
