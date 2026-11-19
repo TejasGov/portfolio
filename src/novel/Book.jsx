@@ -2,11 +2,11 @@ import { useEffect, useRef, useState } from 'react'
 import { store } from './lib/store'
 
 export const CONTENTS = [
-  { id: 'prologue', n: '—', title: 'Prologue', sub: 'Signal' },
-  { id: 'one', n: 'I', title: 'Chai, Cricket & Cinema', sub: 'Prayagraj, the early years' },
-  { id: 'two', n: 'II', title: 'Things I Built', sub: 'Five holograms' },
-  { id: 'three', n: 'III', title: 'Places I Worked', sub: 'An index' },
-  { id: 'epilogue', n: '—', title: 'Epilogue', sub: 'Write to me' },
+  { id: 'prologue', n: '—', title: 'Prologue', sub: 'Lights down' },
+  { id: 'one', n: 'I', title: 'Chai, Cricket & Cinema', sub: 'A flashback to Prayagraj' },
+  { id: 'two', n: 'II', title: 'Now Showing', sub: 'Five projects' },
+  { id: 'three', n: 'III', title: 'Places I Worked', sub: 'The credits' },
+  { id: 'epilogue', n: '—', title: 'Epilogue', sub: 'House lights' },
 ]
 
 /**
@@ -14,7 +14,7 @@ export const CONTENTS = [
  * mix-blend-mode: difference keeps it legible on both night and paper without swapping colours.
  */
 export default function Book() {
-  const [label, setLabel] = useState('Prologue · Signal')
+  const [label, setLabel] = useState('Prologue · Lights down')
   const page = useRef(null)
   const dialog = useRef(null)
 

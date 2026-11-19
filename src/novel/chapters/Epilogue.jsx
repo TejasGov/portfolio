@@ -8,8 +8,8 @@ import Assemble from '../lib/Assemble'
 const TITLE = [['Write to ', false], ['me.', true]]
 
 /*
- * Epilogue: the last project's pixels fold back into the orb (stage/timeline.js), and the book
- * closes on contact details, then the colophon with every image credit.
+ * Epilogue: the projector dims and the house lights come up over the hall (a second Blender bake,
+ * crossfaded in cinema/world.js). Contact details, then the colophon with every credit.
  */
 const BEATS = [
   { at: [0.05, 0.42], kind: 'line' },
@@ -20,7 +20,7 @@ const ext = { target: '_blank', rel: 'noreferrer' }
 export default function Epilogue() {
   const ref = useRef(null)
   useProgress(ref, 'epilogue')
-  useRunningHead(ref, 'Epilogue · Write to me')
+  useRunningHead(ref, 'Epilogue · House lights')
   const bind = useBeats('epilogue', BEATS)
 
   return (
@@ -30,7 +30,7 @@ export default function Epilogue() {
           <div className="absolute inset-0 grid px-6 md:px-[6vw]">
             <div ref={bind(0)} className="pointer-events-none col-start-1 row-start-1 self-center opacity-0">
               <p className="max-w-[16ch] font-display text-[clamp(2.4rem,5vw,4.6rem)] leading-[1] italic [text-shadow:0_4px_50px_rgb(3_5_11/0.95)]">
-                Everything goes back into the noise, eventually. That’s where the next thing starts.
+                House lights up. I’m already working on the next one.
               </p>
             </div>
             <div ref={bind(1)} className="col-start-1 row-start-1 self-end pb-[11svh] opacity-0">
@@ -65,9 +65,9 @@ export default function Epilogue() {
         <div className="mx-auto max-w-5xl border-t border-night-ink/15 pt-10">
           <h2 className="font-display text-4xl italic">Colophon</h2>
           <p className="mt-4 max-w-[62ch] font-serif text-base leading-relaxed text-night-ink/65">
-            Set in Instrument Serif, Newsreader, Geist Mono, Anton and Caveat. The orb and the holograms are drawn live in WebGL, about ninety
-            thousand pixels at a time. Photographs in Chapter One come from Wikimedia Commons under the licences below; they were cut out, torn and
-            taped for this book.
+            Set in Instrument Serif, Newsreader, Geist Mono, Anton and Caveat. The cinema was modelled and light-baked in Blender; the projector,
+            the recliners and the five project models were generated with Meshy; the beam, the haze and the dust are drawn live in WebGL.
+            Photographs in Chapter One come from Wikimedia Commons under the licences below; they were cut out, torn and taped for this book.
           </p>
           <ul className="mt-8 grid gap-x-10 gap-y-2 font-mono text-[11px] leading-relaxed text-night-ink/50 md:grid-cols-2">
             {credits.map(c => (

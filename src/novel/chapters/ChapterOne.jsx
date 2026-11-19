@@ -92,10 +92,22 @@ function Piece({ it }) {
       )
     case 'ticket':
       return (
-        <div className="piece ticket" data-in="img" style={style}>
-          <span className="ticket-kicker">Admit one</span>
-          <span className="ticket-title">First day · first show</span>
-          <span className="ticket-meta">Balcony · Row F</span>
+        <div className={`piece ticket ${it.tone ?? ''}`} data-in="img" style={style}>
+          <span className="ticket-kicker">{it.kicker ?? 'Admit one'}</span>
+          <span className="ticket-title">{it.title ?? 'First day · first show'}</span>
+          <span className="ticket-meta">{it.meta ?? 'Balcony · Row F'}</span>
+        </div>
+      )
+    case 'cast':
+      // A lineup of small cut-outs, overlapping like a poster's billing block.
+      return (
+        <div className="piece cast" data-in="cast" data-depth={it.depth ?? 0} style={{ ...style, '--w': it.w }}>
+          {it.people.map(([name, file], i) => (
+            <figure key={name} className="cast-member" style={{ '--i': i, '--r': `${((i * 37) % 9) - 4}deg` }}>
+              <img src={src(file)} alt={name} draggable="false" />
+              <figcaption>{name}</figcaption>
+            </figure>
+          ))}
         </div>
       )
     case 'card':
@@ -150,7 +162,7 @@ function Route() {
 
 const TITLE = 'Chai, Cricket & Cinema'
 
-export default function ChapterOne() {
+export default function ChapterOne({ spreads = SPREADS }) {
   const ref = useRef(null)
   const strip = useRef(null)
   usePaper(ref)
@@ -175,7 +187,7 @@ export default function ChapterOne() {
         scrollTrigger: { trigger: section, start: 'top top', end: 'bottom bottom', scrub: 0.7 },
       })
 
-      // Title letters assemble from scattered paper scraps as the page rises over the orb.
+      // Title letters assemble from scattered paper scraps as the page takes over from the light.
       gsap.from('.title-letter', {
         x: () => gsap.utils.random(-260, 260),
         y: () => gsap.utils.random(-220, 220),
@@ -199,6 +211,7 @@ export default function ChapterOne() {
           if (kind === 'img') tl.from(it, { y: 160, rotation: gsap.utils.random(-22, 22), scale: 0.86, opacity: 0, duration: 0.6, ease: 'expo.out' }, at)
           else if (kind === 'poster') tl.from(it, { yPercent: 40, opacity: 0, duration: 0.6, ease: 'expo.out' }, at)
           else if (kind === 'stamp') tl.from(it, { scale: 2.2, opacity: 0, rotation: '+=18', duration: 0.3, ease: 'back.out(3)' }, at + 0.3)
+          else if (kind === 'cast') tl.from(it.querySelectorAll('.cast-member'), { y: 140, rotation: () => gsap.utils.random(-25, 25), opacity: 0, duration: 0.5, ease: 'back.out(1.5)', stagger: 0.06 }, at)
           else tl.from(it, { y: 18, opacity: 0, duration: 0.4, ease: 'power3.out' }, at + 0.25)
         })
         // Tape slaps down after the photo lands; marker swipes and circles draw on last.
@@ -234,11 +247,10 @@ export default function ChapterOne() {
   const still = reducedMotion()
   return (
     <section ref={ref} id="one" aria-labelledby="one-title" className="paper relative z-20" style={{ height: still ? 'auto' : 'var(--one-height)' }}>
-      <PixelFringe edge="top" />
       <PixelFringe edge="bottom" />
       <div className={still ? 'relative' : 'sticky top-0 h-svh overflow-hidden'}>
         <div ref={strip} className={`strip relative flex ${still ? 'flex-col' : 'h-full'}`}>
-          {SPREADS.map((s, i) => (
+          {spreads.map((s, i) => (
             <div key={s.id} className={`spread relative shrink-0 ${still ? 'h-svh' : 'h-full'}`} aria-label={s.label}>
               {i === 0 && (
                 <div className="absolute top-[18%] left-[7%] max-w-[60%]">

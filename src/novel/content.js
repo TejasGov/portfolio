@@ -5,7 +5,7 @@ const project = id => projectsData.find(p => p.id === id)
 const role = org => workData.find(w => w.org === org)
 const real = url => (url && url !== '#' ? url : null)
 
-/** The five holograms of Chapter Two, in order. `shape` keys into stage/sculptures.js SHAPES. */
+/** The five screenings of Chapter Two, in order. Models are keyed by id in cinema/world.js PROJECT_MODELS. */
 export const PROJECTS = [
   { id: 'smash-cricket', shape: 'hand', line: 'Hand cricket, played with your actual hand. A webcam reads 1–6 fingers in under half a second.' },
   { id: 'cognifight', shape: 'brain', title: 'CogniFlow', line: 'Predicting when someone with ADHD is about to abandon a task, early enough to help.' },

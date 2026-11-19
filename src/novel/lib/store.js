@@ -3,8 +3,8 @@
  * `scene` picks what the pixels are doing; `p` values are 0..1 progress through each chapter.
  */
 export const store = {
-  prologue: 0, // vortex → orb → home marker
-  work: 0, // through the five project holograms
+  prologue: 0, // booth → beam → hall → the takeover
+  work: 0, // through the five screenings
   epilogue: 0,
   night: true, // is a night (WebGL) chapter on screen?
   mouse: { x: 0, y: 0, active: 0 },

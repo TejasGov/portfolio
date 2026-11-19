@@ -6,7 +6,7 @@ import ChapterOne from './chapters/ChapterOne'
 import ChapterTwo from './chapters/ChapterTwo'
 import ChapterThree from './chapters/ChapterThree'
 import Epilogue from './chapters/Epilogue'
-import Hud from './stage/Hud'
+import Takeover from './stage/Takeover'
 
 const Stage = lazy(() => import('./stage/Stage'))
 
@@ -47,7 +47,7 @@ export default function App() {
           </Suspense>
         </StageBoundary>
       )}
-      <Hud />
+      <Takeover />
       <Book />
       <main className="relative z-10">
         <Prologue />

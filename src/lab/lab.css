@@ -1,0 +1,34 @@
+/* Sandbox pages only. Shares tokens and fonts with the real site via ../novel/index.css. */
+html, body { margin: 0; background: var(--night); }
+body { overflow-x: hidden; }
+
+.gl { position: fixed; inset: 0; width: 100vw; height: 100svh; display: block; z-index: 0; }
+.px { position: fixed; inset: 0; width: 100vw; height: 100svh; display: block; z-index: 2; pointer-events: none; image-rendering: pixelated; }
+
+.lab-tag {
+  position: fixed; left: 16px; bottom: 16px; z-index: 50;
+  font: 500 11px/1.4 var(--font-mono); letter-spacing: .08em; text-transform: uppercase;
+  color: #fff; mix-blend-mode: difference; opacity: .7;
+}
+.lab-tag a { color: inherit; }
+
+.stage-copy { position: fixed; inset: 0; z-index: 3; pointer-events: none; display: grid; place-items: center; }
+.stage-copy > * { grid-area: 1 / 1; will-change: opacity, filter, transform; }
+.stage-copy > [data-beat="0"] { align-self: end; margin-bottom: 13svh; }
+
+.kick { font: 500 12px/1 var(--font-mono); letter-spacing: .32em; text-transform: uppercase; color: #cfe2ff; opacity: .8; }
+.title {
+  font-family: var(--font-display); font-weight: 400; color: #f4f8ff; margin: 0;
+  font-size: clamp(3.6rem, 11vw, 11rem); line-height: .86; letter-spacing: -.02em; text-align: center;
+  text-shadow: 0 0 40px rgb(140 190 255 / .35);
+}
+.title em { font-style: italic; }
+.line { font: italic 400 clamp(1.4rem, 3vw, 2.6rem)/1.15 var(--font-display); color: #e8f0ff; text-align: center; max-width: 22ch; text-shadow: 0 0 24px rgb(0 0 0 / .6); }
+.cue { position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%); z-index: 3; font: 500 11px/1 var(--font-mono); letter-spacing: .3em; color: #cfe2ff; opacity: .6; }
+
+.paper-title { color: var(--ink); text-align: center; }
+.paper-title .kick { color: var(--stamp); opacity: 1; }
+.paper-title h2 { font: 400 clamp(3.4rem, 9vw, 9rem)/.88 var(--font-display); margin: .3em 0 0; letter-spacing: -.02em; }
+.paper-title h2 em { font-style: italic; }
+
+.after { position: relative; z-index: 4; background: var(--paper); color: var(--ink); min-height: 100svh; display: grid; place-items: center; font: italic 1.4rem var(--font-serif); }
