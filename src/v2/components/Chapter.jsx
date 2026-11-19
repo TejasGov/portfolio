@@ -1,5 +1,26 @@
-import { contact } from '@/v2/data/chapters'
+import { lazy, Suspense, useState } from 'react'
+import { contact, sampleLabels } from '@/v2/data/chapters'
+import { hasWebGL } from '@/v2/lib/webgl'
 import PixelDisplaceField from '@/v2/components/pixel-perfect/pixel-displace-field'
+
+const SceneView = lazy(() => import('@/v2/three/SceneView'))
+
+/** 3D still life for chapters that have objects; the CSS sketch everywhere else (and without WebGL). */
+function Tableau({ id, note, objects }) {
+  const [index, setIndex] = useState(0)
+  if (!objects || !hasWebGL) return <TableauSketch note={note} />
+  const key = objects[index]
+  return (
+    <figure className="flex flex-col items-center gap-2" aria-hidden="true">
+      <Suspense fallback={<TableauSketch note={note} />}>
+        <SceneView className="h-[min(62svh,560px)] w-full" objects={objects} sectionId={id} onIndex={setIndex} />
+      </Suspense>
+      <figcaption className="caption opacity-70">
+        sample {String(index).padStart(3, '0')} — {sampleLabels[key]}
+      </figcaption>
+    </figure>
+  )
+}
 
 /** Stand-in for the Phase 2 3D tableau: an inked orb on a plinth. */
 function TableauSketch({ note }) {
@@ -13,14 +34,14 @@ function TableauSketch({ note }) {
 }
 
 export default function Chapter({ chapter }) {
-  const { id, caption, title, line, tableau, accent } = chapter
+  const { id, caption, title, line, tableau, accent, objects, height = '170svh' } = chapter
   const isInterval = id === 'interval'
 
   return (
-    // Tall section + sticky stage gives each act dwell time; Phase 2 pins the 3D here.
-    <section id={id} tabIndex={-1} aria-labelledby={`${id}-title`} className="chapter relative min-h-[170svh] outline-none" style={{ viewTimeline: `--ch-${id}` }}>
+    // Tall section + sticky stage gives each act dwell time; the 3D tableau scrubs against this runway.
+    <section id={id} tabIndex={-1} aria-labelledby={`${id}-title`} className="chapter relative outline-none" style={{ minHeight: height, viewTimeline: `--ch-${id}` }}>
       <div className="sticky top-0 grid min-h-svh items-center gap-10 px-6 pt-24 pb-24 md:grid-cols-[1.2fr_1fr] md:px-12">
-        {id === 'boot' && <PixelDisplaceField className="absolute inset-0 opacity-50" />}
+        {id === 'boot' && <PixelDisplaceField className="absolute inset-0 -z-10 opacity-50" />}
         <div className={isInterval ? 'text-center md:col-span-2' : ''}>
           <p className="caption mb-5 opacity-80">{caption}</p>
           <h2 id={`${id}-title`} className={`act-title ${isInterval ? 'text-[clamp(4rem,16vw,14rem)]' : 'text-[clamp(3rem,9vw,8rem)]'}`}>
@@ -56,7 +77,7 @@ export default function Chapter({ chapter }) {
           )}
         </div>
 
-        {!isInterval && <TableauSketch note={tableau} />}
+        {!isInterval && <Tableau id={id} note={tableau} objects={objects} />}
       </div>
     </section>
   )

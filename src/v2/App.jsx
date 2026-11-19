@@ -1,4 +1,7 @@
-import { useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect, useState } from 'react'
+import { hasWebGL } from '@/v2/lib/webgl'
+
+const Stage = lazy(() => import('@/v2/three/Stage'))
 import { chapters } from '@/v2/data/chapters'
 import { startSmoothScroll } from '@/v2/lib/scroll'
 import Chrome from '@/v2/components/Chrome'
@@ -37,8 +40,14 @@ export default function App() {
         Skip intro
       </a>
       <div className="colour-field" style={{ background: current.field }} aria-hidden="true" />
+      {hasWebGL && (
+        <Suspense fallback={null}>
+          <Stage />
+        </Suspense>
+      )}
+      <div className="paper-grain" aria-hidden="true" />
       <Chrome active={active} />
-      <main>
+      <main className="relative z-10">
         {chapters.map(c => (
           <Chapter key={c.id} chapter={c} />
         ))}

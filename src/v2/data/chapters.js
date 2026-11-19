@@ -17,6 +17,7 @@ export const chapters = [
     label: 'The model',
     field: 'var(--field-hero)',
     caption: 'specimen — one human, CS @ UB, class of 2027',
+    objects: ['orb'],
     title: 'Hello, model',
     line: ['I build for the messy, human corners most products', 'skip'],
     tableau: 'inked orb on a plinth',
@@ -27,6 +28,9 @@ export const chapters = [
     label: 'Training data',
     field: 'var(--field-training)',
     caption: 'samples 001–003 — cricket ball · kulhad · film reel',
+    // Scroll-morphs orb → ball → kulhad → reel, so it needs a longer runway than other acts.
+    objects: ['orb', 'ball', 'kulhad', 'reel'],
+    height: '340svh',
     title: 'Training data',
     line: ['Every model is what it was trained on. Mine was cricket, chai and', 'Bollywood'],
     tableau: 'orb with cricket ball, kulhad of chai, film reel',
@@ -85,6 +89,14 @@ export const chapters = [
     tableau: 'NYC skyline above dark water, diyas drifting down',
   },
 ]
+
+// Museum-tag captions for each still-life object, keyed like src/v2/three/objects.jsx.
+export const sampleLabels = {
+  orb: 'the model, untrained',
+  ball: 'cricket ball, gully edition',
+  kulhad: 'kulhad of chai, 4 p.m.',
+  reel: 'film reel, Friday first show',
+}
 
 export const contact = {
   email: 'tejasgov2005@gmail.com',

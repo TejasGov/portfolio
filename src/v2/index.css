@@ -66,6 +66,31 @@
   transition: background-color 1s ease;
 }
 
+/* human-md floor: a lighter band below the horizon so plinths stand on something. Desktop only,
+   where the tableau sits beside the text at a predictable height. */
+@media (min-width: 768px) {
+  .colour-field::after {
+    content: "";
+    position: absolute;
+    inset: 64% 0 0;
+    background: color-mix(in srgb, var(--paper) 38%, transparent);
+  }
+  html[data-tone="dark"] .colour-field::after {
+    background: color-mix(in srgb, var(--ink) 28%, transparent);
+  }
+}
+
+/* Paper grain over everything (Monolith). Static SVG noise, multiplied in. */
+.paper-grain {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  pointer-events: none;
+  opacity: 0.32;
+  mix-blend-mode: multiply;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.5 0 0 0 0 0.45 0 0 0 0 0.4 0 0 0 0.55 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
 /* Monolith-style act bars: one per chapter, filling as you read it. */
 .act-bar-track {
   display: block;
