@@ -22,6 +22,7 @@ export const WINDOW = new THREE.Vector3(0.9, 7.6, -11.5)
 export const SCREEN = new THREE.Vector3(0, 4.15, 15.44)
 export const STAGE = new THREE.Vector3(0, 3.5, 11.2) // where the projects materialize
 const SCREEN_W = 18, SCREEN_H = 7.5
+const PROJ_SCALE = 1.8 // projects are seen from row ten, in front of an 18 m screen
 
 // Recliner layout: identical to the Blender bake's seat proxies (hall_build.py).
 const ROWS = 15, COLS = 22, ROW_D = 1.02, ROW_H = 0.346, Z0 = 4.4
@@ -31,11 +32,11 @@ const seatAt = (r, c) => {
 }
 
 export const PROJECT_MODELS = {
-  'smash-cricket': { url: '/cinema/cricket.glb', size: 2.3, yaw: -0.25, tint: '#ffb46b', field: ['#2a1606', '#7a4512'] },
-  cognifight: { url: '/cinema/brain.glb', size: 2.2, yaw: -0.6, tint: '#c9b4ff', field: ['#160f2c', '#4d3a8c'] },
-  revere: { url: '/cinema/glasses.glb', size: 2.4, yaw: 0.35, tint: '#9fd2ff', field: ['#06142a', '#1f4f86'] },
-  yudhveer: { url: '/cinema/sword.glb', size: 2.4, yaw: 0.55 + Math.PI, tint: '#ffb08c', field: ['#260a06', '#8a2a16'] },
-  'commit-city': { url: '/cinema/city.glb', size: 2.5, yaw: 0.6, tint: '#9ef2d2', field: ['#04201a', '#1a6b55'] },
+  'smash-cricket': { url: '/cinema/cricket.glb', still: '/smash.png', size: 2.3, yaw: -0.25, tint: '#ffb46b', field: ['#2a1606', '#7a4512'] },
+  cognifight: { url: '/cinema/brain.glb', still: '/cognitive.png', size: 2.2, yaw: -0.6, tint: '#c9b4ff', field: ['#160f2c', '#4d3a8c'] },
+  revere: { url: '/cinema/glasses.glb', still: '/revere.png', size: 2.4, yaw: 0.35, tint: '#9fd2ff', field: ['#06142a', '#1f4f86'] },
+  yudhveer: { url: '/cinema/sword.glb', still: '/projects/yudhveer.webp', size: 2.4, yaw: 0.55 + Math.PI, tint: '#ffb08c', field: ['#260a06', '#8a2a16'] },
+  'commit-city': { url: '/cinema/city.glb', still: '/projects/commit-city.webp', size: 2.5, yaw: 0.6, tint: '#9ef2d2', shade: '#a8d9c8', field: ['#04201a', '#1a6b55'] },
 }
 
 const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder)
@@ -208,8 +209,9 @@ export async function createCinema(canvas, { mobile = false, onProgress } = {}) 
   // Studio light for whatever is being screened: a warm key from the front-left, a tinted rim from the
   // screen side, and a soft room reflection so metal, glass and lacquer read as real.
   const env = new THREE.PMREMGenerator(renderer).fromScene(new RoomEnvironment(), 0.04).texture
-  const stageKey = new THREE.SpotLight('#fff1de', 0, 0, 0.42, 0.7, 2)
-  stageKey.position.set(-3.2, 8.2, 5.5)
+  // Steep from above, so what passes the object lands on the stage floor, not on the screen.
+  const stageKey = new THREE.SpotLight('#fff1de', 0, 0, 0.3, 0.6, 2)
+  stageKey.position.set(-1.6, 11.5, 8.6)
   stageKey.target.position.copy(STAGE)
   const stageRim = new THREE.SpotLight('#9ec2ff', 0, 0, 0.5, 0.6, 2)
   stageRim.position.set(2.8, 6.5, 14.6)
@@ -270,7 +272,16 @@ export async function createCinema(canvas, { mobile = false, onProgress } = {}) 
   // The spot's projective map is square; the screen fills its full width and a centred band of its height.
   const band = SCREEN_H / SCREEN_W
   let lastCard = ''
-  function card(key, { kicker = '', title = '', field = ['#0a1220', '#3b5d8f'], ink = '#ffffff' } = {}) {
+  const stills = {}
+  const still = url => {
+    if (!stills[url]) {
+      stills[url] = new Image()
+      stills[url].onload = () => { lastCard = '' } // redraw the frame once the footage arrives
+      stills[url].src = url
+    }
+    return stills[url]
+  }
+  function card(key, { kicker = '', title = '', field = ['#0a1220', '#3b5d8f'], ink = '#ffffff', image } = {}) {
     if (key === lastCard) return
     lastCard = key
     const g = frame.getContext('2d')
@@ -278,6 +289,21 @@ export async function createCinema(canvas, { mobile = false, onProgress } = {}) 
     const h = S * band, y0 = (S - h) / 2
     g.fillStyle = '#000'
     g.fillRect(0, 0, S, S)
+    const img = image && still(image)
+    if (img?.complete && img.naturalWidth) {
+      // A flat (16:9) print on a scope screen: masked at the sides, cropped to its middle.
+      const w = h * 16 / 9, x0 = (S - w) / 2
+      const sh = Math.min(img.naturalHeight, img.naturalWidth * 9 / 16)
+      g.drawImage(img, 0, (img.naturalHeight - sh) / 2, img.naturalWidth, sh, x0, y0, w, h)
+      const vg = g.createRadialGradient(S / 2, S / 2, h * 0.3, S / 2, S / 2, w * 0.62)
+      vg.addColorStop(0, 'rgba(0,0,0,0)')
+      vg.addColorStop(1, 'rgba(0,0,0,0.55)')
+      g.fillStyle = vg
+      g.fillRect(x0, y0, w, h)
+      frameTex.needsUpdate = true
+      return
+    }
+    if (img) lastCard = '' // still loading: show the colour field meanwhile, then redraw
     const grad = g.createRadialGradient(S / 2, S / 2, h * 0.1, S / 2, S / 2, S * 0.62)
     grad.addColorStop(0, field[1])
     grad.addColorStop(1, field[0])
@@ -321,6 +347,7 @@ export async function createCinema(canvas, { mobile = false, onProgress } = {}) 
     group.traverse(o => {
       if (!o.isMesh) return
       o.material = o.material.clone()
+      if (spec.shade) o.material.color.multiply(new THREE.Color(spec.shade)) // a white maquette reads pale under the beam
       o.material.envMap = env
       o.material.envMapIntensity = 0.9
       dissolvable(o.material, u)
@@ -341,6 +368,7 @@ export async function createCinema(canvas, { mobile = false, onProgress } = {}) 
       b.copy(LENS).lerp(STAGE, 1 - t).sub(STAGE)
       b.x += (Math.random() - 0.5) * 3.5 * t
       b.y += (Math.random() - 0.5) * 2.0 * t
+      b.divideScalar(PROJ_SCALE) // these live inside the scaled root
       ;(v.clone().add(b)).toArray(from, i * 3)
       seed.set([Math.random(), Math.random(), Math.random()], i * 3)
     }
@@ -375,6 +403,7 @@ export async function createCinema(canvas, { mobile = false, onProgress } = {}) 
     const root = new THREE.Group()
     root.add(group, points)
     root.position.copy(STAGE)
+    root.scale.setScalar(PROJ_SCALE)
     root.visible = false
     scene.add(root)
     projects[id] = { root, group, points, pmat, u, spec }
@@ -409,7 +438,10 @@ export async function createCinema(canvas, { mobile = false, onProgress } = {}) 
     if (state.card) card(state.card.key, state.card)
 
     const lampK = state.lamp ?? 1
-    lamp.intensity = 1600 * lampK * (1 - (state.house ?? 0))
+    // A shutter at 24 fps never gives perfectly even light.
+    const flicker = 1 + 0.015 * Math.sin(Math.floor(t * 24) * 12.9898)
+    // Like the end credits: the house lights come up while the film is still running.
+    lamp.intensity = 1600 * lampK * (1 - 0.6 * (state.house ?? 0)) * flicker
     vol.uniforms.uTime.value = t
     vol.uniforms.uLamp.value = lampK * (1 - (state.house ?? 0) * 0.9)
     // Inside the beam you look along all of it at once: thin the haze there so it reads as light, not fog.
@@ -421,12 +453,14 @@ export async function createCinema(canvas, { mobile = false, onProgress } = {}) 
     if (state.beamColor) vol.uniforms.uBeamColor.value.lerp(state.beamColor, 0.06)
     const du = dust.material.uniforms
     du.uTime.value = t
-    du.uLamp.value = vol.uniforms.uLamp.value * (1 - 0.6 * inBeam)
+    du.uLamp.value = vol.uniforms.uLamp.value * (1 - 0.6 * inBeam) * (state.dust ?? 1)
     du.uPull.value = state.pull ?? 0
     du.uSwirl.value = state.swirl ?? 1
     du.uFocus.value = state.focus ?? 8
     bloom.intensity = state.bloom ?? 1
-    const fl = state.flare ?? 1
+    // The lens only flares for someone looking into it, not from behind the projector.
+    const facing = THREE.MathUtils.smoothstep(camera.position.clone().sub(LENS).normalize().dot(beam.axis), 0.1, 0.7)
+    const fl = (state.flare ?? 1) * facing
     flare.material.color.setRGB(0.7, 0.82, 1).multiplyScalar(2.2 * fl)
     streak.material.color.setRGB(0.36, 0.6, 1).multiplyScalar(3 * Math.min(fl, 4))
     streak.scale.set(14 + 6 * fl, 0.2 + 0.06 * fl, 1)
@@ -458,6 +492,7 @@ export async function createCinema(canvas, { mobile = false, onProgress } = {}) 
     composer.render()
   }
 
+  for (const m of Object.values(PROJECT_MODELS)) still(m.still)
   card('prologue', { kicker: 'Now showing', title: 'Tejas Govind' })
   onProgress?.(1)
   return {

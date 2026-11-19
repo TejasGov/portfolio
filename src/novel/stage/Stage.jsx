@@ -49,6 +49,7 @@ export default function Stage() {
       lens.copy(LENS).project(world.camera)
       store.lens = [(lens.x * 0.5 + 0.5) * 100, (0.5 - lens.y * 0.5) * 100]
       store.takeover = { flood: st.flood, sweep: st.sweep }
+      store.camDist = world.camera.position.distanceTo(LENS)
     }
 
     addEventListener('resize', resize)

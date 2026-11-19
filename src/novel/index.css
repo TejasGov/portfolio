@@ -29,6 +29,13 @@
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
+/* Assembling letters and parallax pieces may poke past the edge; never let that become a sideways
+   scroll. clip (not hidden) so sticky chapters keep working. */
+html,
+body {
+  overflow-x: clip;
+}
+
 @theme inline {
   --color-night: var(--night);
   --color-night-ink: var(--night-ink);
@@ -570,4 +577,30 @@ figure.piece {
     filter: none;
     transition: none;
   }
+}
+
+/* Sound toggle: three bars that dance while the cinema is audible. */
+.sound-bars {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 0.8em;
+}
+.sound-bars i {
+  width: 2px;
+  height: 30%;
+  background: currentColor;
+  transition: height 0.3s;
+}
+.sound-bars.is-on i {
+  animation: sound-bar 0.9s ease-in-out infinite alternate;
+}
+.sound-bars.is-on i:nth-child(2) { animation-delay: -0.3s; }
+.sound-bars.is-on i:nth-child(3) { animation-delay: -0.6s; }
+@keyframes sound-bar {
+  from { height: 25%; }
+  to { height: 100%; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sound-bars.is-on i { animation: none; height: 70%; }
 }

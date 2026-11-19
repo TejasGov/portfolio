@@ -105,8 +105,11 @@ void main() {
   vec3 L = vec3(0.0);
   for (int i = 0; i < 96; i++) {
     if (float(i) >= uSteps) break;
-    vec3 p = uCamPos + dir * ((float(i) + j) * dt);
+    float tt = (float(i) + j) * dt;
+    vec3 p = uCamPos + dir * tt;
     float h = haze(p);
+    // Haze right at the lens would fog the whole frame; real air only reads at a distance.
+    float nearK = smoothstep(0.4, 3.0, tt);
     vec2 buv; float z;
     float b = beamAt(p, buv, z);
     if (b > 0.0005) {
@@ -116,9 +119,9 @@ void main() {
       float streak = 0.06 + 1.7 * smoothstep(0.4, 0.78, s1 * 0.6 + s2 * 0.4);
       vec3 col = mix(uBeamColor, uWarm, 0.45 * smoothstep(0.5, 0.85, texture(tNoise, vec3(buv * 0.35 + 0.5, 0.7)).r));
       float ph = hg(dot(dir, -normalize(p - uApexV)), 0.6) * 2.2;
-      L += col * b * streak * (0.05 + h) * (0.3 + ph) * uLamp;
+      L += col * b * streak * (0.03 + h * (0.35 + h)) * (0.3 + ph) * uLamp * nearK;
     }
-    L += uAmbient * (0.1 + h);
+    L += uAmbient * h * nearK;
   }
   gl_FragColor = vec4(L * dt * uDensity, 1.0);
 }
@@ -212,7 +215,7 @@ attribute vec3 aSeed;
 uniform float uTime; uniform float uFocus; uniform float uAperture; uniform float uSize; uniform float uDpr;
 uniform float uSwirl; uniform float uPull;
 ${BEAM_GLSL}
-varying float vB; varying float vCoc; varying float vTw;
+varying float vB; varying float vCoc; varying float vTw; varying float vNear;
 void main() {
   vec3 p = position;
   float t = uTime;
@@ -233,21 +236,23 @@ void main() {
   vec4 mv = modelViewMatrix * vec4(p, 1.0);
   float dist = -mv.z;
   vCoc = abs(dist - uFocus) * uAperture;
-  gl_PointSize = clamp((uSize * (0.5 + aSeed.y) / dist + vCoc * 10.0) * uDpr, 1.0, 80.0);
+  // Motes brushing the lens would be huge grey discs: let them pass out of view instead.
+  vNear = smoothstep(0.3, 1.6, dist);
+  gl_PointSize = clamp((uSize * (0.5 + aSeed.y) / dist + vCoc * 10.0) * uDpr, 1.0, 56.0);
   gl_Position = projectionMatrix * mv;
 }
 `
 
 const DUST_FRAG = /* glsl */ `
-uniform vec3 uColor;
-varying float vB; varying float vCoc; varying float vTw;
+uniform vec3 uColor; uniform float uLamp;
+varying float vB; varying float vCoc; varying float vTw; varying float vNear;
 void main() {
   vec2 c = gl_PointCoord - 0.5;
   float r = length(c);
   // In focus a mote is a crisp square pixel; out of focus it opens into a soft bokeh disc.
   float k = smoothstep(0.12, 0.7, vCoc);
   float shape = mix(1.0, smoothstep(0.5, 0.36, r) * (0.7 + 0.3 * smoothstep(0.25, 0.47, r)), k);
-  float a = shape * (vB * vTw * 2.4 + 0.004) / (1.0 + vCoc * vCoc * 5.0);
+  float a = shape * (vB * vTw * 2.4 + 0.004 * min(uLamp, 1.0)) * vNear / (1.0 + vCoc * vCoc * 5.0);
   if (a < 0.002) discard;
   gl_FragColor = vec4(uColor * a, 1.0);
 }

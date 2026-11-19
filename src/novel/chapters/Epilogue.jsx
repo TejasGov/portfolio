@@ -28,8 +28,9 @@ export default function Epilogue() {
       <section ref={ref} id="epilogue" aria-labelledby="epilogue-title" className="relative" style={{ height: '320svh' }}>
         <div className="sticky top-0 h-svh">
           <div className="absolute inset-0 grid px-6 md:px-[6vw]">
-            <div ref={bind(0)} className="pointer-events-none col-start-1 row-start-1 self-center opacity-0">
-              <p className="max-w-[16ch] font-display text-[clamp(2.4rem,5vw,4.6rem)] leading-[1] italic [text-shadow:0_4px_50px_rgb(3_5_11/0.95)]">
+            {/* Bottom-left, over the seats: the screen above is still showing "The End". */}
+            <div ref={bind(0)} className="pointer-events-none col-start-1 row-start-1 self-end pb-[11svh] opacity-0">
+              <p className="max-w-[18ch] font-display text-[clamp(2rem,3.6vw,3.4rem)] leading-[1] italic [text-shadow:0_4px_50px_rgb(3_5_11/0.95)]">
                 House lights up. I’m already working on the next one.
               </p>
             </div>
@@ -66,7 +67,7 @@ export default function Epilogue() {
           <h2 className="font-display text-4xl italic">Colophon</h2>
           <p className="mt-4 max-w-[62ch] font-serif text-base leading-relaxed text-night-ink/65">
             Set in Instrument Serif, Newsreader, Geist Mono, Anton and Caveat. The cinema was modelled and light-baked in Blender; the projector,
-            the recliners and the five project models were generated with Meshy; the beam, the haze and the dust are drawn live in WebGL.
+            the recliners and the five project models were generated with Meshy; the beam, the haze and the dust are drawn live in WebGL, and the projector you can hear is synthesized in the browser.
             Photographs in Chapter One come from Wikimedia Commons under the licences below; they were cut out, torn and taped for this book.
           </p>
           <ul className="mt-8 grid gap-x-10 gap-y-2 font-mono text-[11px] leading-relaxed text-night-ink/50 md:grid-cols-2">

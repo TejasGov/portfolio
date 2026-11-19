@@ -22,7 +22,7 @@ export const projectsData = [
       { label: "Score & stats", bg: "#0a1628" },
     ],
     info: { Type: "Full Stack App", Domain: "Computer Vision", Backend: "Flask + Python", Frontend: "React + TS" },
-    link: "https://smash-cricket.vercel.app/",
+    link: "#", // smash-cricket.vercel.app returns 404; restore when it is redeployed
     github: "#"
   },
   {

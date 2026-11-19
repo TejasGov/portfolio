@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { store } from './lib/store'
+import { sound } from './lib/sound'
 
 export const CONTENTS = [
   { id: 'prologue', n: '—', title: 'Prologue', sub: 'Lights down' },
@@ -15,6 +16,8 @@ export const CONTENTS = [
  */
 export default function Book() {
   const [label, setLabel] = useState('Prologue · Lights down')
+  const [audible, setAudible] = useState(sound.on)
+  useEffect(() => sound.subscribe(setAudible), [])
   const page = useRef(null)
   const dialog = useRef(null)
 
@@ -48,9 +51,15 @@ export default function Book() {
       <header className="pointer-events-none fixed inset-x-0 top-0 z-50 flex items-start justify-between p-5 text-white mix-blend-difference md:p-7">
         <a href="#prologue" className="kicker pointer-events-auto">Tejas Govind</a>
         <p className="kicker hidden opacity-70 md:block">{label}</p>
-        <button type="button" onClick={() => dialog.current?.showModal()} className="kicker pointer-events-auto underline-offset-4 hover:underline">
-          Contents
-        </button>
+        <div className="flex items-start gap-6">
+          <button type="button" aria-pressed={audible} onClick={() => sound.toggle()} className="kicker pointer-events-auto flex items-center gap-2 underline-offset-4 hover:underline">
+            <span className={`sound-bars${audible ? ' is-on' : ''}`} aria-hidden="true"><i /><i /><i /></span>
+            Sound<span aria-hidden="true">{audible ? ' on' : ' off'}</span>
+          </button>
+          <button type="button" onClick={() => dialog.current?.showModal()} className="kicker pointer-events-auto underline-offset-4 hover:underline">
+            Contents
+          </button>
+        </div>
       </header>
       <p ref={page} className="kicker pointer-events-none fixed right-5 bottom-5 z-50 text-white tabular-nums opacity-70 mix-blend-difference md:right-7 md:bottom-7" aria-hidden="true">
         p. 01 / 96

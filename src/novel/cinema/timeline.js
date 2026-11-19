@@ -24,14 +24,16 @@ const PRO_LOOK = new THREE.CatmullRomCurve3([
   V(0.5, 6.4, -11.2), V(0.7, 6.9, -11.4), V(0.9, 7.4, -11.6), V(0.9, 7.58, -12.15),
 ], false, 'centripetal')
 
-// Chapter Two: a seat in the middle of the hall, the stage in front of the screen.
-const WORK_POS = V(0, 3.05, 5.9)
-const WORK_LOOK = V(1.25, 3.6, 12) // +x is screen-left when facing the screen: the object sits right of the card
-const WORK_POS_PORTRAIT = V(0, 3.2, 3.2)
-const WORK_LOOK_PORTRAIT = V(0, 3.0, 12)
+// Chapter Two: seated at eye height in row ten, the whole screen between the curtains and a few seat
+// backs in silhouette below. +x is screen-left facing the screen, so a target at +0.5 sits the screen a
+// little right of centre and leaves its dark left masking under the text card.
+const WORK_POS = V(0, 4.0, -4.8)
+const WORK_LOOK = V(0.5, 3.2, 15)
+const WORK_POS_PORTRAIT = V(0, 5.4, -8.2)
+const WORK_LOOK_PORTRAIT = V(0.2, 3.6, 15)
 // Epilogue: back up the rake as the house lights come up.
-const EPI_POS = new THREE.CatmullRomCurve3([V(0, 3.05, 5.9), V(-1.2, 4.6, -2.5), V(-2.6, 6.4, -8.4)], false, 'centripetal')
-const EPI_LOOK = new THREE.CatmullRomCurve3([V(1.25, 3.6, 12), V(0, 3.9, 14), V(0, 4.1, 15)], false, 'centripetal')
+const EPI_POS = new THREE.CatmullRomCurve3([V(0, 4.0, -4.8), V(-1.4, 5.2, -7.4), V(-2.6, 6.4, -9.4)], false, 'centripetal')
+const EPI_LOOK = new THREE.CatmullRomCurve3([V(0.5, 3.2, 15), V(0.2, 3.7, 15), V(0, 4.1, 15)], false, 'centripetal')
 
 export const PROJECT_IDS = PROJECTS.map(p => p.id)
 const tints = Object.fromEntries(PROJECT_IDS.map(id => [id, new THREE.Color(PROJECT_MODELS[id].tint).lerp(new THREE.Color('#9ec2ff'), 0.45)]))
@@ -71,6 +73,10 @@ export function stateAt(s, mouse, aspect) {
     st.flood = ss(0.8, 0.93, p)
     st.sweep = ss(0.9, 0.995, p) * 1.3
     st.card = { key: 'prologue', kicker: 'Now showing', title: 'Tejas Govind' }
+    // Clear the air while the camera faces the screen, so the name reads through the beam.
+    const facingScreen = ss(0.18, 0.28, p) * (1 - ss(0.4, 0.5, p))
+    st.density = 0.6 * (1 - 0.55 * facingScreen)
+    st.dust = 1 - 0.6 * facingScreen
     // A booth this close to the lens: the projector's own glow is softer until you leave it.
     st.exposure = 3
   } else if (sec === 'work') {
@@ -84,7 +90,7 @@ export function stateAt(s, mouse, aspect) {
     } else {
       const p = PROJECTS[i]
       const m = PROJECT_MODELS[id]
-      st.card = { key: id, kicker: `${String(i + 1).padStart(2, '0')} / ${String(PROJECT_IDS.length).padStart(2, '0')} · ${p.category}`, title: p.title, field: m.field }
+      st.card = { key: id, kicker: `${String(i + 1).padStart(2, '0')} / ${String(PROJECT_IDS.length).padStart(2, '0')} · ${p.category}`, title: p.title, field: m.field, image: m.still }
       // Dust streams down the beam and condenses (0–.35), the shell glows (.3–.5), the solid dissolves in
       // (.42–.7), holds, then breaks back into dust for the next reel (.9–1).
       const out1 = ss(0.9, 1, t)
@@ -97,11 +103,12 @@ export function stateAt(s, mouse, aspect) {
       }
       st.beamColor = tints[id]
     }
-    st.focus = 8.5
+    st.focus = 15
     st.exposure = 3
-    // Sitting under the beam: thinner haze and a dimmer lamp so the screened object stays the subject.
-    st.density = 0.26
-    st.lamp = 0.65
+    // A bright picture and clean air: you are watching the screen now, not the beam.
+    st.lamp = 1.6
+    st.density = 0.08
+    st.dust = 0.05
   } else {
     const e = s.epilogue
     const u = ss(0.05, 0.85, e)
@@ -110,6 +117,7 @@ export function stateAt(s, mouse, aspect) {
     st.house = ss(0.15, 0.55, e)
     st.lamp = 1 - 0.55 * ss(0.1, 0.4, e)
     st.exposure = THREE.MathUtils.lerp(3, 1.6, st.house)
+    st.dust = 0.3
     st.card = { key: 'end', kicker: 'Thank you for watching', title: 'The End' }
   }
 
