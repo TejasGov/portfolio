@@ -3,6 +3,9 @@ import { useBeats } from '../lib/Beats'
 import { useProgress, useRunningHead } from '../lib/chapters'
 import { CONTACT } from '../content'
 import credits from '../credits.json'
+import Assemble from '../lib/Assemble'
+
+const TITLE = [['Write to ', false], ['me.', true]]
 
 /*
  * Epilogue: the last project's pixels fold back into the orb (stage/timeline.js), and the book
@@ -32,9 +35,7 @@ export default function Epilogue() {
             </div>
             <div ref={bind(1)} className="col-start-1 row-start-1 self-end pb-[11svh] opacity-0">
               <p className="kicker text-glow/80">Epilogue</p>
-              <h2 id="epilogue-title" className="mt-5 font-display text-[clamp(3.6rem,9vw,8rem)] leading-[0.86] tracking-[-0.02em]">
-                Write to <em>me.</em>
-              </h2>
+              <Assemble as="h2" id="epilogue-title" parts={TITLE} className="mt-5 block font-display text-[clamp(3.6rem,9vw,8rem)] leading-[0.86] tracking-[-0.02em]" />
               <a
                 href={`mailto:${CONTACT.email}`}
                 className="mt-8 inline-block border-b border-night-ink/40 pb-1 font-serif text-[clamp(1.2rem,2vw,1.6rem)] transition-colors hover:border-glow hover:text-glow"

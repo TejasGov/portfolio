@@ -87,6 +87,8 @@ function Rig({ orb, field }) {
       v.project(camera)
       const x = (v.x * 0.5 + 0.5) * width
       const y = (-v.y * 0.5 + 0.5) * height
+      // Readouts extend ~190px to the right of their point; fade them before they hit the edge.
+      a *= THREE.MathUtils.smoothstep(width - x, 120, 220) * THREE.MathUtils.smoothstep(y, 40, 90)
       el.style.transform = `translate3d(${x.toFixed(1)}px, ${y.toFixed(1)}px, 0)`
       el.style.opacity = a.toFixed(3)
       return { x, y, a }

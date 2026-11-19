@@ -6,14 +6,19 @@ import { pixelState } from './timeline'
 
 export const N = typeof window !== 'undefined' && matchMedia('(max-width: 767px)').matches ? 42000 : 90000
 export const SHAPE_KEYS = ['hand', 'brain', 'glasses', 'sword', 'city']
+/** Each project hologram keeps its own light, so five shapes never read as one template. */
+const TINT = { hand: '#8fdcff', brain: '#c3b0ff', glasses: '#ffd79a', sword: '#ffab8c', city: '#9df2cf' }
+const focusAt = new THREE.Vector3()
 
 const vertexShader = /* glsl */ `
   attribute vec3 aTo;
   attribute vec4 aRand;
-  uniform float uMix, uScatter, uTime, uCell, uSpinFrom, uSpinTo, uFromGalaxy, uToGalaxy, uOpacity, uMouseOn, uBright;
+  uniform float uMix, uScatter, uTime, uCell, uSpinFrom, uSpinTo, uFromGalaxy, uToGalaxy, uOpacity, uMouseOn, uBright, uFocus, uAperture, uBokeh;
   uniform vec2 uViewport, uMouse;
+  uniform vec3 uTintFrom, uTintTo;
   varying vec3 vColor;
   varying float vAlpha;
+  varying float vSoft;
 
   vec3 rotY(vec3 p, float a) { float c = cos(a), s = sin(a); return vec3(c * p.x - s * p.z, p.y, s * p.x + c * p.z); }
 
@@ -59,31 +64,48 @@ const vertexShader = /* glsl */ `
     dir.x *= uViewport.y / uViewport.x;
     ndc += dir * push;
 
-    // Grid-lock: every pixel snaps to a screen cell, so the cloud reads as crisp squares.
-    vec2 px = (ndc * 0.5 + 0.5) * uViewport;
-    px = (floor(px / uCell) + 0.5) * uCell;
-    ndc = px / uViewport * 2.0 - 1.0;
+    // Depth of field: in focus, a pixel is a tiny crisp square locked to the screen grid;
+    // out of focus, it opens into a soft bokeh disc. Detail where you look, dream at the edges.
+    float coc = clamp(abs(-mv.z - uFocus) * uAperture - 0.08, 0.0, 1.0);
+    vSoft = smoothstep(0.12, 0.45, coc);
+    if (vSoft < 0.5) {
+      vec2 px = (ndc * 0.5 + 0.5) * uViewport;
+      px = (floor(px / uCell) + 0.5) * uCell;
+      ndc = px / uViewport * 2.0 - 1.0;
+    }
     gl_Position = vec4(ndc * clip.w, clip.z, clip.w);
-    gl_PointSize = uCell;
+    float size = uCell + coc * uBokeh * (0.6 + aRand.z * 0.8);
+    gl_PointSize = size;
 
     float k = aRand.y;
     float twinkle = 0.75 + 0.25 * sin(uTime * (1.5 + aRand.z * 3.0) + aRand.w * 40.0);
-    vec3 ca = uFromGalaxy > 0.5 ? galaxyColor(length(position.xz), k) : shapeColor(k);
-    vec3 cb = uToGalaxy > 0.5 ? galaxyColor(length(aTo.xz), k) : shapeColor(k);
+    vec3 ca = uFromGalaxy > 0.5 ? galaxyColor(length(position.xz), k) : shapeColor(k) * uTintFrom;
+    vec3 cb = uToGalaxy > 0.5 ? galaxyColor(length(aTo.xz), k) : shapeColor(k) * uTintTo;
     float depth = smoothstep(14.0, 3.0, -mv.z);
     // Additive pixels pile up fast; uBright keeps dense states (the orb) from blowing out.
-    vColor = mix(ca, cb, m) * twinkle * (0.4 + 0.7 * depth) * uBright;
+    // A bokeh disc spreads the same light over more pixels, so it dims as it grows.
+    float spread = (uCell * uCell) / (size * size);
+    vColor = mix(ca, cb, m) * twinkle * (0.4 + 0.7 * depth) * uBright * mix(1.0, max(spread * 2.2, 0.08), vSoft);
     vAlpha = uOpacity;
   }`
 
 const fragmentShader = /* glsl */ `
   varying vec3 vColor;
   varying float vAlpha;
+  varying float vSoft;
   void main() {
-    // A one-pixel gap between cells keeps the grid legible.
-    vec2 c = abs(gl_PointCoord - 0.5);
-    if (max(c.x, c.y) > 0.4) discard;
-    gl_FragColor = vec4(vColor * vAlpha, 1.0);
+    vec2 c = gl_PointCoord - 0.5;
+    if (vSoft < 0.5) {
+      // A sliver of gap between cells keeps the grid legible.
+      if (max(abs(c.x), abs(c.y)) > 0.42) discard;
+      gl_FragColor = vec4(vColor * vAlpha, 1.0);
+      return;
+    }
+    // Bokeh: a soft disc with a faintly brighter rim, like an out-of-focus light.
+    float r = length(c) * 2.0;
+    if (r > 1.0) discard;
+    float disc = smoothstep(1.0, 0.82, r) * (0.75 + 0.25 * smoothstep(0.5, 0.95, r));
+    gl_FragColor = vec4(vColor * vAlpha * disc, 1.0);
   }`
 
 /** The 90k-pixel cloud: galaxy, orb, dust and every project shape are positions it moves between. */
@@ -129,6 +151,11 @@ export default function Field() {
         uToGalaxy: { value: 0 },
         uOpacity: { value: 0 },
         uBright: { value: 1 },
+        uFocus: { value: 7 },
+        uAperture: { value: 0.32 },
+        uBokeh: { value: 14 },
+        uTintFrom: { value: new THREE.Color(1, 1, 1) },
+        uTintTo: { value: new THREE.Color(1, 1, 1) },
         uMouseOn: { value: 0 },
         uViewport: { value: new THREE.Vector2(1, 1) },
         uMouse: { value: new THREE.Vector2(9, 9) },
@@ -143,8 +170,9 @@ export default function Field() {
 
   useEffect(() => {
     material.uniforms.uViewport.value.set(size.width * dpr, size.height * dpr)
-    // ~2.5 CSS px squares: fine enough to read as detail, big enough to stay square.
-    material.uniforms.uCell.value = Math.max(2, Math.round(2.5 * dpr))
+    // ~2 CSS px squares: fine enough to read as detail, big enough to stay square.
+    material.uniforms.uCell.value = Math.max(2, Math.round(2 * dpr))
+    material.uniforms.uBokeh.value = 12 * dpr
   }, [material, size, dpr])
 
   const reveal = useRef(0)
@@ -169,6 +197,10 @@ export default function Field() {
     u.uToGalaxy.value = st.to === 'galaxy' ? 1 : 0
     u.uOpacity.value = st.opacity * reveal.current
     u.uBright.value = st.bright ?? 1
+    u.uTintFrom.value.set(TINT[st.from] ?? '#ffffff')
+    u.uTintTo.value.set(TINT[st.to] ?? '#ffffff')
+    // Focus on the cloud's centre, wherever it sits in the frame.
+    u.uFocus.value = state.camera.position.distanceTo(points.current.parent.getWorldPosition(focusAt))
     u.uTime.value = state.clock.elapsedTime
     u.uMouse.value.lerp({ x: store.mouse.x, y: store.mouse.y }, 0.2)
     u.uMouseOn.value = THREE.MathUtils.damp(u.uMouseOn.value, store.mouse.active, 4, delta)

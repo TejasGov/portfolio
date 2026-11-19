@@ -65,7 +65,7 @@
 /* Small caps instrument text: kickers, running heads, readouts. */
 @utility kicker {
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: 12px;
   letter-spacing: 0.18em;
   text-transform: uppercase;
 }
@@ -109,7 +109,7 @@
 .hud-label {
   display: block;
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: 12px;
   letter-spacing: 0.06em;
   white-space: pre;
   color: rgb(226 236 255 / 0.92);
@@ -159,7 +159,7 @@
   inset: -50%;
   pointer-events: none;
   z-index: 60;
-  opacity: 0.055;
+  opacity: 0.04;
   mix-blend-mode: overlay;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)'/%3E%3C/svg%3E");
   animation: grain 0.5s steps(4) infinite;
@@ -229,7 +229,7 @@ figure.piece {
   max-width: 34ch;
   font-family: var(--font-serif);
   font-style: italic;
-  font-size: max(12px, calc(0.95 * var(--strip-unit)));
+  font-size: max(13px, calc(1 * var(--strip-unit)));
   line-height: 1.35;
   color: rgb(23 20 15 / 0.72);
 }
@@ -272,17 +272,60 @@ figure.piece {
   stroke-linejoin: round;
 }
 .steam {
-  left: 18%;
-  bottom: 86%;
-  width: 62%;
+  position: absolute;
+  left: 16%;
+  bottom: 84%;
+  width: 64%;
+  overflow: visible;
+  fill: none;
+  stroke: rgb(120 104 84 / 0.55);
+  stroke-width: 5;
+  stroke-linecap: round;
+  filter: blur(2.2px);
 }
+/* Wisps rise, sway and thin out, each on its own phase. */
 .steam path {
-  stroke-dasharray: 16 12;
-  animation: steam 1.6s linear infinite;
-  opacity: 0.8;
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+  animation: wisp 3.3s ease-in-out infinite;
+  opacity: 0;
 }
-@keyframes steam {
-  to { stroke-dashoffset: -56; }
+@keyframes wisp {
+  0% { opacity: 0; transform: translateY(18px) scaleY(0.7); }
+  30% { opacity: 0.85; }
+  100% { opacity: 0; transform: translateY(-26px) scaleY(1.15) skewX(-6deg); }
+}
+.sangam-map {
+  width: 100%;
+  overflow: visible;
+}
+.sangam-map .river {
+  fill: none;
+  stroke: #2f6f9a;
+  stroke-width: 5;
+  stroke-linecap: round;
+  stroke-dasharray: 1;
+}
+.sangam-map .river-out {
+  stroke-width: 8;
+}
+.sangam-map .river-hidden {
+  stroke: #9a8a74;
+  stroke-width: 2.5;
+}
+.map-label {
+  font-family: var(--font-hand);
+  font-weight: 700;
+  font-size: 24px;
+  fill: #2a2116;
+}
+.map-faint {
+  fill: #8a7b66;
+  font-size: 19px;
+}
+.map-here,
+.map-star {
+  fill: var(--stamp);
 }
 .circle {
   inset: -38% -16% -30% -14%;
@@ -421,10 +464,14 @@ figure.piece {
 .route-line {
   fill: none;
   stroke: #2a2116;
-  stroke-width: 1.8;
-  stroke-dasharray: 3 9;
+  stroke-width: 2.8;
   stroke-linecap: round;
+  stroke-linejoin: round;
   vector-effect: non-scaling-stroke;
+}
+.route-ghost {
+  stroke-width: 1.2;
+  opacity: 0.45;
 }
 .route-mask {
   fill: none;
@@ -456,5 +503,31 @@ figure.piece {
   .steam path,
   .spin-slow {
     animation: none;
+  }
+}
+
+/* ---------------------------------------------- assembling titles (Assemble.jsx) */
+.assemble-letter {
+  display: inline-block;
+  opacity: 0;
+  transform: translate(var(--tx), var(--ty)) rotate(var(--tr)) scale(0.85);
+  filter: blur(6px);
+  transition:
+    transform 1.25s var(--ease-out) var(--d),
+    opacity 0.7s ease var(--d),
+    filter 0.9s ease var(--d);
+}
+[data-on="1"] .assemble-letter,
+.assemble[data-on="1"] .assemble-letter {
+  opacity: 1;
+  transform: none;
+  filter: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .assemble-letter {
+    opacity: 1;
+    transform: none;
+    filter: none;
+    transition: none;
   }
 }

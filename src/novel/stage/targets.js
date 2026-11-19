@@ -1,5 +1,5 @@
 import { BANDS, field } from './noise.js'
-import { SHAPES, sliceShape } from './sculptures.js'
+import { SHAPES, YAW, sliceShape } from './sculptures.js'
 
 /*
  * Point "targets": where each of the N pixels sits in every state of the story.
@@ -68,6 +68,8 @@ export function shapeRings(key, n, seed = 9) {
   const r = rng(seed)
   const out = new Float32Array(n * 3)
   const scale = 0.21
+  const cy = Math.cos(YAW[key] ?? 0)
+  const sy = Math.sin(YAW[key] ?? 0)
   for (let i = 0; i < n; i++) {
     const target = r() * total
     let lo = 0, hi = count - 1
@@ -78,9 +80,11 @@ export function shapeRings(key, n, seed = 9) {
     }
     const o = lo * 6
     const t = r()
-    out[i * 3] = (segs[o] + (segs[o + 3] - segs[o]) * t) * scale
+    const x = (segs[o] + (segs[o + 3] - segs[o]) * t) * scale
+    const z = (segs[o + 2] + (segs[o + 5] - segs[o + 2]) * t) * scale
+    out[i * 3] = x * cy + z * sy
     out[i * 3 + 1] = ((segs[o + 1] + (segs[o + 4] - segs[o + 1]) * t) - 7.5) * scale
-    out[i * 3 + 2] = (segs[o + 2] + (segs[o + 5] - segs[o + 2]) * t) * scale
+    out[i * 3 + 2] = -x * sy + z * cy
   }
   return out
 }

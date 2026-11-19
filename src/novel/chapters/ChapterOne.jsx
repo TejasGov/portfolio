@@ -7,10 +7,24 @@ import { SPREADS, src } from './collage'
 /* ------------------------------------------------------------- doodles */
 
 const Steam = () => (
-  <svg className="doodle steam boil" viewBox="0 0 120 160" aria-hidden="true">
-    {[[30, 0], [58, 0.6], [86, 1.2]].map(([x, d]) => (
-      <path key={x} style={{ animationDelay: `${d}s` }} d={`M${x} 150 C ${x - 18} 120, ${x + 18} 100, ${x} 72 S ${x - 16} 30, ${x + 4} 6`} />
+  <svg className="steam" viewBox="0 0 120 170" aria-hidden="true">
+    {[[34, 0], [60, 1.1], [86, 2.2]].map(([x, d]) => (
+      <path key={x} style={{ animationDelay: `${d}s` }} d={`M${x} 160 C ${x - 22} 128, ${x + 20} 104, ${x} 76 S ${x - 18} 34, ${x + 6} 4`} />
     ))}
+  </svg>
+)
+/** Hand-drawn map of the Sangam: the Ganga and the Yamuna meet; the Saraswati runs unseen. */
+const SangamMap = () => (
+  <svg className="sangam-map" viewBox="0 0 420 300" aria-hidden="true">
+    <path className="river" pathLength="1" d="M410 18 C 340 60, 330 120, 262 150 S 200 168, 176 176" />
+    <path className="river" pathLength="1" d="M8 104 C 70 120, 118 168, 176 176" />
+    <path className="river river-hidden" pathLength="1" d="M120 292 C 140 250, 168 214, 176 176" />
+    <path className="river river-out" pathLength="1" d="M176 176 C 200 214, 236 250, 300 290" />
+    <text x="330" y="40" className="map-label">Ganga</text>
+    <text x="14" y="94" className="map-label">Yamuna</text>
+    <text x="70" y="280" className="map-label map-faint">Saraswati (unseen)</text>
+    <path className="map-star" d="M176 160 l5 11 12 1 -9 8 3 12 -11 -6 -11 6 3 -12 -9 -8 12 -1z" />
+    <text x="196" y="196" className="map-label map-here">Sangam: home</text>
   </svg>
 )
 const Circle = () => (
@@ -58,6 +72,12 @@ function Piece({ it }) {
           {it.circle && <Circle />}
         </p>
       )
+    case 'map':
+      return (
+        <figure className="piece" data-in="img" data-depth={it.depth ?? 0} style={{ ...style, '--w': it.w, filter: 'none' }}>
+          <SangamMap />
+        </figure>
+      )
     case 'stamp':
       return (
         <p className="piece stamp" data-in="stamp" style={style}>
@@ -100,8 +120,8 @@ function Piece({ it }) {
 
 // A hand-drawn route through all six spreads, in (vw within the strip, % of height).
 const ROUTE =
-  'M 30 92 C 60 96, 80 70, 104 84 S 140 96, 160 82 S 196 60, 214 88 S 250 96, 270 80 S 300 58, 318 86 S 360 96, 380 74 S 420 60, 436 88 S 480 96, 505 86 S 545 70, 560 78'
-const STOPS = [[104, 84, 'Prayagraj'], [214, 88, 'Chai'], [318, 86, 'Cricket'], [436, 88, 'Cinema'], [560, 78, 'Then']]
+  'M 30 93 C 60 97, 80 72, 104 85 S 140 97, 160 83 S 196 62, 214 89 S 250 97, 270 81 S 300 60, 318 87 S 360 97, 380 75 S 420 62, 436 89 S 480 97, 500 88 S 512 76, 514 70'
+const STOPS = [[104, 85, 'Prayagraj'], [214, 89, 'Chai'], [318, 87, 'Cricket'], [436, 89, 'Cinema'], [514, 70, 'Then']]
 
 function Route() {
   return (
@@ -112,6 +132,8 @@ function Route() {
             <path className="route-mask" d={ROUTE} pathLength="1" />
           </mask>
         </defs>
+        {/* Two passes of the pen, a hair apart, so the line reads hand-drawn rather than plotted. */}
+        <path className="route-line route-ghost" d={ROUTE} mask="url(#route-reveal)" transform="translate(0.15 0.35)" />
         <path className="route-line" d={ROUTE} mask="url(#route-reveal)" />
       </svg>
       {STOPS.map(([x, y, label]) => (
@@ -180,9 +202,12 @@ export default function ChapterOne() {
           else tl.from(it, { y: 18, opacity: 0, duration: 0.4, ease: 'power3.out' }, at + 0.25)
         })
         // Tape slaps down after the photo lands; marker swipes and circles draw on last.
-        tl.from(spread.querySelectorAll('[data-in="tape"]'), { scale: 1.9, opacity: 0, duration: 0.18, ease: 'back.out(3)', stagger: 0.06 }, '>-0.25')
-        tl.from(spread.querySelectorAll('[data-in="mark"]'), { scaleX: 0, transformOrigin: 'left center', duration: 0.3, ease: 'power2.out' }, '>-0.1')
-        tl.fromTo(spread.querySelectorAll('.circle path'), { strokeDashoffset: 1 }, { strokeDashoffset: 0, duration: 0.35, ease: 'power2.inOut' }, '<')
+        // (Each only if the spread has one — GSAP warns on empty targets.)
+        const all = q => spread.querySelectorAll(q)
+        if (all('[data-in="tape"]').length) tl.from(all('[data-in="tape"]'), { scale: 1.9, opacity: 0, duration: 0.18, ease: 'back.out(3)', stagger: 0.06 }, '>-0.25')
+        if (all('[data-in="mark"]').length) tl.from(all('[data-in="mark"]'), { scaleX: 0, transformOrigin: 'left center', duration: 0.3, ease: 'power2.out' }, '>-0.1')
+        if (all('.circle path').length) tl.fromTo(all('.circle path'), { strokeDashoffset: 1 }, { strokeDashoffset: 0, duration: 0.35, ease: 'power2.inOut' }, '<')
+        if (all('.river').length) tl.fromTo(all('.river'), { strokeDashoffset: 1 }, { strokeDashoffset: 0, duration: 0.5, ease: 'power2.inOut', stagger: 0.12 }, 0.2)
 
         // Depth: nearer pieces slide a little faster than the page — cheap, convincing parallax.
         items.forEach(it => {

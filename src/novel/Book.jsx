@@ -64,7 +64,7 @@ export default function Book() {
       >
         <div className="p-8 md:p-10">
           <div className="flex items-baseline justify-between">
-            <h2 className="font-display text-4xl italic">Contents</h2>
+            <p className="font-display text-4xl italic">Contents</p>
             <button type="button" autoFocus onClick={() => dialog.current?.close()} className="kicker underline-offset-4 hover:underline">
               Close
             </button>

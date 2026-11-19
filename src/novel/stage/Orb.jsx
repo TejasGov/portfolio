@@ -5,6 +5,7 @@ import { glslField } from './noise'
 import { ORB_R } from './targets'
 import { store } from '../lib/store'
 import { orbState } from './timeline'
+import Instrument from './Instrument'
 
 const vertex = /* glsl */ `
   varying vec3 vPos;
@@ -135,6 +136,7 @@ export default function Orb({ group }) {
       <mesh material={surface}>
         <sphereGeometry args={[ORB_R, 160, 120]} />
       </mesh>
+      <Instrument />
       <mesh material={shell} renderOrder={-1}>
         <planeGeometry args={[ORB_R * 3.4, ORB_R * 3.4]} />{/* 1.7 × diameter */}
       </mesh>

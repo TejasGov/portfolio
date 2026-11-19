@@ -22,6 +22,9 @@ export function useBeats(key, beats) {
         el.style.transform = `translate3d(0, ${((1 - k) * (rising ? 22 : -18)).toFixed(1)}px, 0)`
         el.style.filter = k > 0.995 ? 'none' : `blur(${((1 - k) * 8).toFixed(1)}px)`
         el.inert = k < 0.5
+        // Titles inside a beat assemble once it is mostly visible (see Assemble.jsx).
+        const on = k > 0.55 ? '1' : '0'
+        if (el.dataset.on !== on) el.dataset.on = on
       })
       raf = requestAnimationFrame(tick)
     }

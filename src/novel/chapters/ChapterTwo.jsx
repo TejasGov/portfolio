@@ -2,6 +2,9 @@ import { useMemo, useRef } from 'react'
 import { useBeats } from '../lib/Beats'
 import { useProgress, useRunningHead } from '../lib/chapters'
 import { PROJECTS } from '../content'
+import Assemble from '../lib/Assemble'
+
+const TITLE = [['Things I ', false], ['built', true]]
 
 /*
  * Chapter Two: the pixel cloud becomes each project as an annotated hologram (drawn by the stage),
@@ -26,9 +29,7 @@ export default function ChapterTwo() {
             b.kind === 'title' ? (
               <div key="title" ref={bind(k)} className="pointer-events-none col-start-1 row-start-1 self-center opacity-0">
                 <p className="kicker text-glow/80">Chapter Two</p>
-                <h2 id="two-title" className="mt-5 font-display text-[clamp(3.6rem,9vw,8.5rem)] leading-[0.86] tracking-[-0.02em]">
-                  Things I <em>built</em>
-                </h2>
+                <Assemble as="h2" id="two-title" parts={TITLE} className="mt-5 block font-display text-[clamp(3.6rem,9vw,8.5rem)] leading-[0.86] tracking-[-0.02em]" />
                 <p className="mt-6 max-w-[34ch] font-serif text-lg leading-relaxed text-night-ink/70">
                   Five of them, drawn the way I see them: as contour lines, and the parts that make them work.
                 </p>

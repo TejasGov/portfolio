@@ -52,7 +52,7 @@ export default function ChapterThree() {
                 <span className="min-w-0">
                   <span className="font-display text-[clamp(1.5rem,2.6vw,2.3rem)] leading-tight group-open:italic">{r.role}</span>
                   <span className="ml-3 font-serif text-base text-ink/60 italic md:text-lg">{r.org}</span>
-                  {r.current && <sup className="ml-1 font-mono text-[10px] text-stamp">now</sup>}
+                  {r.current && <span className="ml-2 inline-block size-1.5 -translate-y-1 rounded-full bg-stamp" title="Current" aria-label="current" />}
                 </span>
                 <span className="kicker col-start-2 mt-1 text-ink/55 md:col-start-auto md:mt-0">{r.period}</span>
               </summary>

@@ -31,14 +31,15 @@ export function pixelState(s) {
   if (ch === 'prologue') {
     const p = s.prologue
     // Desktop: the orb sits right of centre while lines of text are up, centred again for home.
-    const k = ss(0.3, 0.5, p) * (1 - ss(0.74, 0.86, p))
-    const shift = mobile() ? [0, 0.95 * k, 0] : [1.05 * k, 0, 0]
-    if (p < 0.56) {
-      const mix = ss(0.1, 0.5, p)
-      return { from: 'galaxy', to: 'orb', mix, scatter: 0.55, spin: ss(0.04, 0.52, p) * 1.4, opacity: 1, bright: 1 - 0.62 * mix, offset: shift }
+    // The orb moves aside once it forms and stays there, leaving a clear column for the words.
+    const k = ss(0.2, 0.36, p)
+    const shift = mobile() ? [0, 0.95 * k, 0] : [(1.1 + 0.25 * ss(0.74, 0.9, p)) * k, 0, 0]
+    if (p < 0.42) {
+      const mix = ss(0.07, 0.36, p)
+      return { from: 'galaxy', to: 'orb', mix, scatter: 0.55, spin: ss(0.03, 0.38, p) * 1.4, opacity: 1, bright: 1 - 0.62 * mix, offset: shift }
     }
     // Once the drawn orb takes over, the pixels loosen into dust around it.
-    return { from: 'orb', to: 'dust', mix: ss(0.56, 0.78, p), scatter: 0.2, spin: 0, opacity: 1 - 0.88 * ss(0.56, 0.66, p), bright: 0.32, offset: shift }
+    return { from: 'orb', to: 'dust', mix: ss(0.42, 0.62, p), scatter: 0.2, spin: 0, opacity: 1 - 0.88 * ss(0.42, 0.52, p), bright: 0.32, offset: shift }
   }
   if (ch === 'work') {
     const w = s.work
@@ -60,7 +61,7 @@ export function pixelState(s) {
 export function orbState(s) {
   const ch = chapter(s)
   // Fades out under the paper fringe at the very end, so Chapter Two can start from loose dust.
-  if (ch === 'prologue') return { opacity: ss(0.46, 0.6, s.prologue) * (1 - ss(0.955, 1, s.prologue)) }
+  if (ch === 'prologue') return { opacity: ss(0.33, 0.45, s.prologue) * (1 - ss(0.955, 1, s.prologue)) }
   if (ch === 'epilogue') return { opacity: ss(0.4, 0.62, s.epilogue) }
   return { opacity: 0 }
 }
@@ -70,7 +71,7 @@ export function hudState(s) {
   const ch = chapter(s)
   if (ch === 'prologue') {
     const p = s.prologue
-    return { orb: ss(0.58, 0.66, p) * (1 - ss(0.95, 1, p)), home: ss(0.72, 0.8, p) * (1 - ss(0.97, 1, p)), work: 0 }
+    return { orb: ss(0.44, 0.52, p) * (1 - ss(0.95, 1, p)), home: ss(0.74, 0.82, p) * (1 - ss(0.97, 1, p)), work: 0 }
   }
   if (ch === 'work') return { orb: 0, home: 0, work: 1 }
   return { orb: ss(0.6, 0.75, s.epilogue), home: 0, work: 0 }
@@ -81,9 +82,9 @@ const lerp3 = (a, b, t) => a.map((v, i) => v + (b[i] - v) * t)
 /** Camera keyframes per chapter: [p, position, lookAt]. */
 const PROLOGUE_CAM = [
   [0, [0, 3.6, 8.2], [0, -0.2, 0]],
-  [0.48, [0, 0.9, 6.6], [0, 0, 0]],
-  [0.7, [0.15, 0.35, 6.0], [0, 0, 0]],
-  [1, [0.35, 0.3, 4.1], [0, 0.15, 0]],
+  [0.36, [0, 0.9, 6.6], [0, 0, 0]],
+  [0.7, [0.15, 0.35, 6.0], [0.25, 0, 0]],
+  [1, [0.3, 0.3, 5.9], [0.5, 0.1, 0]],
 ]
 export function cameraState(s) {
   const ch = chapter(s)
