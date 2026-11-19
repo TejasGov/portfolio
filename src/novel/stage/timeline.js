@@ -27,11 +27,12 @@ export function workPosition(w) {
 
 export function pixelState(s) {
   const ch = chapter(s)
-  const side = mobile() ? [0, 0.75, 0] : [1.75, 0, 0]
+  const side = mobile() ? [0, 1.2, 0] : [1.75, 0, 0]
   if (ch === 'prologue') {
     const p = s.prologue
     // Desktop: the orb sits right of centre while lines of text are up, centred again for home.
-    const shift = mobile() ? [0, 0, 0] : [1.05 * ss(0.3, 0.5, p) * (1 - ss(0.74, 0.86, p)), 0, 0]
+    const k = ss(0.3, 0.5, p) * (1 - ss(0.74, 0.86, p))
+    const shift = mobile() ? [0, 0.95 * k, 0] : [1.05 * k, 0, 0]
     if (p < 0.56) {
       const mix = ss(0.1, 0.5, p)
       return { from: 'galaxy', to: 'orb', mix, scatter: 0.55, spin: ss(0.04, 0.52, p) * 1.4, opacity: 1, bright: 1 - 0.62 * mix, offset: shift }
@@ -41,7 +42,8 @@ export function pixelState(s) {
   }
   if (ch === 'work') {
     const w = s.work
-    if (w < 0.06) return { from: 'dust', to: WORK_KEYS[0], mix: ss(0, 0.06, w), scatter: 0.9, spin: 0, opacity: 1, bright: 0.75, offset: lerp3([0, 0, 0], side, ss(0, 0.06, w)) }
+    // The chapter opens on a dim, loose cloud already off to the side, clear of the title.
+    if (w < 0.06) return { from: 'dust', to: WORK_KEYS[0], mix: ss(0.015, 0.06, w), scatter: 0.9, spin: 0, opacity: 1, bright: 0.3 + 0.5 * ss(0.02, 0.06, w), offset: side }
     const { i, local } = workPosition(w)
     // Hold the shape for most of its span; morph to the next only in the last 30%.
     if (i < WORK_KEYS.length - 1 && local > 0.7) {
@@ -50,12 +52,15 @@ export function pixelState(s) {
     return { from: WORK_KEYS[i], to: WORK_KEYS[i], mix: 0, scatter: 0, spin: 0, opacity: 1, bright: 0.8, offset: side }
   }
   const e = s.epilogue
-  return { from: WORK_KEYS[WORK_KEYS.length - 1], to: 'orb', mix: ss(0, 0.45, e), scatter: 0.8, spin: 0, opacity: 1 - 0.55 * ss(0.5, 0.7, e), bright: 0.5, offset: lerp3(side, [0, 0, 0], ss(0, 0.4, e)) }
+  // The orb re-forms off to the side (above, on phones) so the closing words have clear sky.
+  const rest = mobile() ? [0, 0.95, 0] : [1.35, 0.1, 0]
+  return { from: WORK_KEYS[WORK_KEYS.length - 1], to: 'orb', mix: ss(0, 0.45, e), scatter: 0.8, spin: 0, opacity: 1 - 0.55 * ss(0.5, 0.7, e), bright: 0.5, offset: lerp3(side, rest, ss(0, 0.4, e)) }
 }
 
 export function orbState(s) {
   const ch = chapter(s)
-  if (ch === 'prologue') return { opacity: ss(0.46, 0.6, s.prologue) }
+  // Fades out under the paper fringe at the very end, so Chapter Two can start from loose dust.
+  if (ch === 'prologue') return { opacity: ss(0.46, 0.6, s.prologue) * (1 - ss(0.955, 1, s.prologue)) }
   if (ch === 'epilogue') return { opacity: ss(0.4, 0.62, s.epilogue) }
   return { opacity: 0 }
 }
@@ -87,7 +92,7 @@ export function cameraState(s) {
     const a = s.work * Math.PI * 0.6
     return { pos: [Math.sin(a) * 0.6, 0.5, 6.8], look: [mobile() ? 0 : 0.35, mobile() ? 0.5 : 0, 0] }
   }
-  return { pos: [0, 0.6, 7.2 - s.epilogue * 0.6], look: [0, 0, 0] }
+  return { pos: [0, 0.6, 7.6 - s.epilogue * 0.5], look: [mobile() ? 0 : 0.35, mobile() ? 0.5 : 0, 0] }
 }
 
 function sample(keys, p) {

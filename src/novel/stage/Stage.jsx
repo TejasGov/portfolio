@@ -38,6 +38,12 @@ function Rig({ orb, field }) {
       camera.position.y += store.mouse.y * 0.08
     }
     camera.lookAt(look)
+    // Portrait screens get a wider lens so the orb and holograms fit the narrow frame.
+    const fov = camera.aspect < 0.75 ? 64 : camera.aspect < 1.05 ? 50 : 38
+    if (camera.fov !== fov) {
+      camera.fov = fov
+      camera.updateProjectionMatrix()
+    }
 
     // The orb turns slowly; near the end of the prologue it swings home so Prayagraj faces you.
     const hud = hudState(store)

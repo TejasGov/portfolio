@@ -41,7 +41,7 @@ export default function Prologue() {
                   <p className="kicker mt-5 text-glow">Prayagraj · Uttar Pradesh · India</p>
                 </div>
               ) : (
-                <p className="max-w-[15ch] self-center font-display text-[clamp(2.2rem,4.2vw,3.9rem)] leading-[1.02] italic [text-shadow:0_4px_50px_rgb(3_5_11/0.95)]">
+                <p className="max-w-[15ch] self-end pb-[14svh] font-display md:self-center md:pb-0 text-[clamp(2.2rem,4.2vw,3.9rem)] leading-[1.02] italic [text-shadow:0_4px_50px_rgb(3_5_11/0.95)]">
                   {b.text}
                 </p>
               )}

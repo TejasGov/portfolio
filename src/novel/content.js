@@ -5,7 +5,7 @@ const project = id => projectsData.find(p => p.id === id)
 const role = org => workData.find(w => w.org === org)
 const real = url => (url && url !== '#' ? url : null)
 
-/** The five landmarks down the valley, in walking order. `shape` keys into sculptures.js SHAPES. */
+/** The five holograms of Chapter Two, in order. `shape` keys into stage/sculptures.js SHAPES. */
 export const PROJECTS = [
   { id: 'smash-cricket', shape: 'hand', line: 'Hand cricket, played with your actual hand. A webcam reads 1–6 fingers in under half a second.' },
   { id: 'cognifight', shape: 'brain', title: 'CogniFlow', line: 'Predicting when someone with ADHD is about to abandon a task, early enough to help.' },
@@ -25,7 +25,10 @@ export const PROJECTS = [
   }
 })
 
-/** Lamps along the dusk path: one per chapter of work, newest first. */
+/** Every role, newest first, for Chapter Three's index. */
+export const ALL_ROLES = workData.map(w => ({ org: w.org, role: w.role, period: w.period, year: w.year, place: w.location, type: w.type, impact: w.impact, bullets: w.bullets, current: w.current, future: w.future }))
+
+/** A shorter list of headline roles. */
 export const ROLES = ['Daiwa Capitals Market America', 'COA', 'UB College of Arts & Sciences', 'MedTourEasy', 'Sunflower Association'].map(org => {
   const w = role(org)
   return { org: w.org, role: w.role, period: w.period, place: w.location, impact: w.impact }
