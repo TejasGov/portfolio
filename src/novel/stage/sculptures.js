@@ -27,6 +27,9 @@ function ellipsoid(px, py, pz, cx, cy, cz, rx, ry, rz) {
   return k1 === 0 ? -Math.min(rx, ry, rz) : (k0 * (k0 - 1)) / k1
 }
 
+/** Three-quarter turns per shape, so depth (temples, towers, the shield) reads from the camera. */
+export const YAW = { hand: -0.12, brain: 0.45, glasses: 0.62, sword: 0.35, city: 0.6 }
+
 /** Shapes, roughly 12–15 m tall, standing on y = 0. */
 export const SHAPES = {
   // Smash Cricket: an open hand, fingers up — the gesture the game reads.

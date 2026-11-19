@@ -1,0 +1,533 @@
+@import "tailwindcss" source("./");
+@import "@fontsource/instrument-serif/400.css";
+@import "@fontsource/instrument-serif/400-italic.css";
+@import "@fontsource-variable/newsreader";
+@import "@fontsource-variable/newsreader/opsz-italic.css";
+@import "@fontsource-variable/geist-mono";
+@import "@fontsource/anton";
+@import "@fontsource-variable/caveat";
+
+/*
+ * Two worlds, one book: NIGHT (the WebGL chapters) and PAPER (the collage and the index).
+ * Type: Instrument Serif for display, Newsreader for reading, Geist Mono for instruments,
+ * Anton for collage labels, Caveat for margin notes.
+ */
+:root {
+  --night: #03050b;
+  --night-ink: #e6eefc;
+  --glow: #9cc7ff;
+  --dim: #6f7f9f;
+
+  --paper: #efe8da;
+  --paper-deep: #e4dac6;
+  --ink: #17140f;
+  --stamp: #c8361e;
+  --marker: #ffe14a;
+  --kraft: #c9a47a;
+  --tape: rgb(246 239 214 / 0.82);
+
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@theme inline {
+  --color-night: var(--night);
+  --color-night-ink: var(--night-ink);
+  --color-glow: var(--glow);
+  --color-dim: var(--dim);
+  --color-paper: var(--paper);
+  --color-paper-deep: var(--paper-deep);
+  --color-ink: var(--ink);
+  --color-stamp: var(--stamp);
+  --color-marker: var(--marker);
+  --color-kraft: var(--kraft);
+
+  --font-display: "Instrument Serif", "Times New Roman", serif;
+  --font-serif: "Newsreader Variable", Georgia, serif;
+  --font-mono: "Geist Mono Variable", ui-monospace, monospace;
+  --font-poster: "Anton", Impact, sans-serif;
+  --font-hand: "Caveat Variable", "Comic Sans MS", cursive;
+}
+
+@layer base {
+  html {
+    background: var(--night);
+    color: var(--night-ink);
+    font-family: var(--font-serif);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  ::selection {
+    background: var(--marker);
+    color: var(--ink);
+  }
+}
+
+/* Small caps instrument text: kickers, running heads, readouts. */
+@utility kicker {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+/* ------------------------------------------------------------------ HUD */
+/* Each marker: a dot on the tracked point, and a bracketed readout whose bottom-left corner sits on it. */
+.hud-mark {
+  position: absolute;
+  left: 0;
+  top: 0;
+  color: rgb(205 225 255);
+  opacity: 0;
+  will-change: transform, opacity;
+}
+.hud-dot {
+  position: absolute;
+  width: 4px;
+  height: 4px;
+  margin: -2px 0 0 -2px;
+  background: currentColor;
+  box-shadow: 0 0 8px 1px rgb(120 170 255 / 0.9);
+}
+.hud-box {
+  position: absolute;
+  left: -7px;
+  bottom: -7px;
+  padding: 7px 12px 8px 14px;
+  /* Corner brackets: eight 1px strokes, no extra elements. */
+  --c: rgb(200 222 255 / 0.85);
+  background:
+    linear-gradient(var(--c), var(--c)) top left / 9px 1px no-repeat,
+    linear-gradient(var(--c), var(--c)) top left / 1px 9px no-repeat,
+    linear-gradient(var(--c), var(--c)) top right / 9px 1px no-repeat,
+    linear-gradient(var(--c), var(--c)) top right / 1px 9px no-repeat,
+    linear-gradient(var(--c), var(--c)) bottom left / 9px 1px no-repeat,
+    linear-gradient(var(--c), var(--c)) bottom left / 1px 9px no-repeat,
+    linear-gradient(var(--c), var(--c)) bottom right / 9px 1px no-repeat,
+    linear-gradient(var(--c), var(--c)) bottom right / 1px 9px no-repeat;
+  transform: translateY(-14px);
+}
+.hud-label {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  white-space: pre;
+  color: rgb(226 236 255 / 0.92);
+  text-shadow: 0 0 10px rgb(80 140 255 / 0.7);
+}
+.hud-link {
+  stroke: rgb(214 230 255);
+  stroke-width: 0.7;
+  opacity: 0;
+}
+.hud-home {
+  color: #fff;
+}
+.hud-home .hud-label {
+  font-size: 12.5px;
+  color: #fff;
+}
+.hud-home .hud-dot {
+  width: 7px;
+  height: 7px;
+  margin: -3.5px 0 0 -3.5px;
+  background: #fff;
+  box-shadow: 0 0 0 5px rgb(255 255 255 / 0.12), 0 0 18px 3px rgb(150 190 255 / 0.9);
+}
+.hud-note .hud-box {
+  background-color: rgb(4 8 20 / 0.5);
+}
+@media (max-width: 767px) {
+  .hud-label {
+    font-size: 9.5px;
+  }
+}
+
+/* --------------------------------------------------------------- paper */
+.paper {
+  background-color: var(--paper);
+  color: var(--ink);
+  /* Paper fibre: two static noise layers, multiplied in. Rasterised once by the browser. */
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='320' height='320'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .36 0 0 0 0 .3 0 0 0 0 .22 0 0 0 .32 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='600' height='600'%3E%3Cfilter id='f'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.012 .09' numOctaves='2' seed='4'/%3E%3CfeColorMatrix values='0 0 0 0 .5 0 0 0 0 .42 0 0 0 0 .3 0 0 0 .12 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23f)'/%3E%3C/svg%3E");
+}
+
+/* Grain over the whole book; strongest on paper, a whisper at night. */
+.grain {
+  position: fixed;
+  inset: -50%;
+  pointer-events: none;
+  z-index: 60;
+  opacity: 0.04;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)'/%3E%3C/svg%3E");
+  animation: grain 0.5s steps(4) infinite;
+}
+@keyframes grain {
+  0% { transform: translate(0, 0); }
+  25% { transform: translate(-3%, 2%); }
+  50% { transform: translate(2%, -3%); }
+  75% { transform: translate(-1%, 3%); }
+}
+
+/* Stop-motion "boil": collage pieces breathe at ~12fps, like animated cut paper. */
+@keyframes boil {
+  0% { transform: rotate(var(--r, 0deg)) translate(0, 0); }
+  33% { transform: rotate(calc(var(--r, 0deg) + 0.45deg)) translate(0.6px, -0.6px); }
+  66% { transform: rotate(calc(var(--r, 0deg) - 0.35deg)) translate(-0.6px, 0.5px); }
+}
+.boil {
+  animation: boil 0.25s steps(1) infinite;
+}
+
+/* Sticker cut: a white paper rim and a soft lift shadow round a transparent PNG. */
+.sticker {
+  filter: drop-shadow(0 0 0 #fff) drop-shadow(3px 0 0 #fbf8f1) drop-shadow(-3px 0 0 #fbf8f1) drop-shadow(0 3px 0 #fbf8f1)
+    drop-shadow(0 -3px 0 #fbf8f1) drop-shadow(0 10px 14px rgb(40 26 10 / 0.28));
+}
+.tape {
+  background: var(--tape);
+  box-shadow: 0 1px 2px rgb(60 40 10 / 0.18);
+  mix-blend-mode: multiply;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .grain,
+  .boil {
+    animation: none;
+  }
+}
+
+/* ================================================== Chapter One: the scrapbook */
+:root {
+  --strip-unit: 1vw;
+  --one-height: 660svh;
+}
+/* Portrait screens: each spread gets wider than the screen so the compositions keep their shape. */
+@media (max-aspect-ratio: 1/1) {
+  :root {
+    --strip-unit: 1.75vw;
+    --one-height: 820svh;
+  }
+}
+.spread {
+  width: calc(100 * var(--strip-unit));
+}
+.piece {
+  position: absolute;
+  margin: 0;
+  will-change: transform, opacity;
+}
+figure.piece {
+  width: calc(var(--w) * var(--strip-unit));
+  /* Soft contact shadow: the paper lifts off the page. */
+  filter: drop-shadow(0 14px 16px rgb(48 30 12 / 0.24)) drop-shadow(0 2px 2px rgb(48 30 12 / 0.18));
+}
+.caption-fig {
+  margin-top: 0.7em;
+  max-width: 34ch;
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: max(13px, calc(1 * var(--strip-unit)));
+  line-height: 1.35;
+  color: rgb(23 20 15 / 0.72);
+}
+.poster {
+  font-family: var(--font-poster);
+  font-size: calc(var(--s) * var(--strip-unit));
+  line-height: 0.84;
+  letter-spacing: -0.005em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.poster-outline {
+  color: transparent !important;
+  -webkit-text-stroke: max(1.5px, calc(0.16 * var(--strip-unit))) var(--ink);
+}
+.note {
+  font-family: var(--font-hand);
+  font-weight: 600;
+  font-size: calc(var(--s) * var(--strip-unit));
+  line-height: 1;
+  white-space: nowrap;
+  color: #2a2116;
+}
+.marker {
+  position: absolute;
+  inset: 38% -6% 2% -4%;
+  background: var(--marker);
+  mix-blend-mode: multiply;
+  transform: skewX(-8deg) rotate(-1deg);
+  border-radius: 3px 8px 4px 10px;
+  opacity: 0.85;
+}
+.doodle {
+  position: absolute;
+  overflow: visible;
+  fill: none;
+  stroke: #2a2116;
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.steam {
+  position: absolute;
+  left: 16%;
+  bottom: 84%;
+  width: 64%;
+  overflow: visible;
+  fill: none;
+  stroke: rgb(120 104 84 / 0.55);
+  stroke-width: 5;
+  stroke-linecap: round;
+  filter: blur(2.2px);
+}
+/* Wisps rise, sway and thin out, each on its own phase. */
+.steam path {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+  animation: wisp 3.3s ease-in-out infinite;
+  opacity: 0;
+}
+@keyframes wisp {
+  0% { opacity: 0; transform: translateY(18px) scaleY(0.7); }
+  30% { opacity: 0.85; }
+  100% { opacity: 0; transform: translateY(-26px) scaleY(1.15) skewX(-6deg); }
+}
+.sangam-map {
+  width: 100%;
+  overflow: visible;
+}
+.sangam-map .river {
+  fill: none;
+  stroke: #2f6f9a;
+  stroke-width: 5;
+  stroke-linecap: round;
+  stroke-dasharray: 1;
+}
+.sangam-map .river-out {
+  stroke-width: 8;
+}
+.sangam-map .river-hidden {
+  stroke: #9a8a74;
+  stroke-width: 2.5;
+}
+.map-label {
+  font-family: var(--font-hand);
+  font-weight: 700;
+  font-size: 24px;
+  fill: #2a2116;
+}
+.map-faint {
+  fill: #8a7b66;
+  font-size: 19px;
+}
+.map-here,
+.map-star {
+  fill: var(--stamp);
+}
+.circle {
+  inset: -38% -16% -30% -14%;
+  width: 130%;
+  height: 168%;
+  stroke: var(--stamp);
+  stroke-width: 2.6;
+}
+.circle path {
+  stroke-dasharray: 1;
+}
+.whoosh {
+  right: 92%;
+  top: 8%;
+  width: 110%;
+  stroke-width: 3;
+}
+.stamp {
+  padding: 0.5em 0.8em 0.4em;
+  font-family: var(--font-poster);
+  font-size: max(13px, calc(1.35 * var(--strip-unit)));
+  letter-spacing: 0.14em;
+  color: var(--stamp);
+  border: 3px solid currentColor;
+  border-radius: 4px;
+  opacity: 0.86;
+  mix-blend-mode: multiply;
+  /* Uneven ink: the stamp is pressed, not printed. */
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='s'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.55' numOctaves='2'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 -2.2 2.1'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23s)'/%3E%3C/svg%3E");
+}
+.pricetag {
+  padding: 0.35em 0.9em 0.3em 1.5em;
+  font-family: var(--font-poster);
+  font-size: calc(2.2 * var(--strip-unit));
+  color: var(--ink);
+  background: var(--kraft);
+  clip-path: polygon(18% 0, 100% 0, 100% 100%, 18% 100%, 0 50%);
+  filter: drop-shadow(0 6px 8px rgb(48 30 12 / 0.25));
+}
+.pricetag::before {
+  content: "";
+  position: absolute;
+  left: 0.55em;
+  top: 50%;
+  width: 0.4em;
+  height: 0.4em;
+  margin-top: -0.2em;
+  border-radius: 50%;
+  background: var(--paper);
+}
+.ticket {
+  display: grid;
+  gap: 0.35em;
+  width: calc(19 * var(--strip-unit));
+  min-width: 190px;
+  padding: 1em 1.2em 1em 1.6em;
+  background: #f2c9a6;
+  color: #3a1a0c;
+  border-left: 2px dashed rgb(58 26 12 / 0.45);
+  box-shadow: 0 10px 14px rgb(48 30 12 / 0.22);
+}
+.ticket-kicker,
+.ticket-meta {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+.ticket-title {
+  font-family: var(--font-poster);
+  font-size: max(18px, calc(1.8 * var(--strip-unit)));
+  line-height: 0.95;
+  text-transform: uppercase;
+}
+.notecard {
+  width: calc(30 * var(--strip-unit));
+  min-width: 240px;
+  padding: 1.4em 1.6em;
+  background: #fbf8f0;
+  background-image: repeating-linear-gradient(to bottom, transparent 0 1.55em, rgb(90 120 170 / 0.18) 1.55em calc(1.55em + 1px));
+  box-shadow: 0 16px 22px rgb(48 30 12 / 0.22);
+}
+.notecard-year {
+  font-family: var(--font-poster);
+  font-size: calc(2.6 * var(--strip-unit));
+  color: var(--stamp);
+  line-height: 1;
+}
+.notecard-text {
+  margin-top: 0.4em;
+  font-family: var(--font-serif);
+  font-size: max(15px, calc(1.35 * var(--strip-unit)));
+  line-height: 1.55;
+  color: var(--ink);
+}
+.closing {
+  max-width: calc(52 * var(--strip-unit));
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: calc(5.2 * var(--strip-unit));
+  line-height: 0.98;
+  color: var(--ink);
+}
+.tape {
+  position: absolute;
+  width: calc(7 * var(--strip-unit));
+  height: calc(2.1 * var(--strip-unit));
+  translate: -50% -50%;
+}
+.duotone {
+  filter: grayscale(1) contrast(1.18) brightness(1.04);
+}
+.duotone-ink {
+  position: absolute;
+  inset: 2.2% 2% 9%;
+  background: var(--stamp);
+  mix-blend-mode: multiply;
+  opacity: 0.62;
+  pointer-events: none;
+}
+.spin-slow {
+  animation: spin 22s linear infinite;
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+.route {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: calc(600 * var(--strip-unit));
+  height: 100%;
+  pointer-events: none;
+  overflow: visible;
+}
+.route-line {
+  fill: none;
+  stroke: #2a2116;
+  stroke-width: 2.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+.route-ghost {
+  stroke-width: 1.2;
+  opacity: 0.45;
+}
+.route-mask {
+  fill: none;
+  stroke: #fff;
+  stroke-width: 10;
+  stroke-dasharray: 1 1;
+}
+.route-stop {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  translate: -6px -6px;
+}
+.route-pin {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--stamp);
+  box-shadow: 0 0 0 4px rgb(200 54 30 / 0.18);
+}
+.route-label {
+  font-family: var(--font-hand);
+  font-weight: 700;
+  font-size: max(16px, calc(1.6 * var(--strip-unit)));
+  color: var(--stamp);
+}
+@media (prefers-reduced-motion: reduce) {
+  .steam path,
+  .spin-slow {
+    animation: none;
+  }
+}
+
+/* ---------------------------------------------- assembling titles (Assemble.jsx) */
+.assemble-letter {
+  display: inline-block;
+  opacity: 0;
+  transform: translate(var(--tx), var(--ty)) rotate(var(--tr)) scale(0.85);
+  filter: blur(6px);
+  transition:
+    transform 1.25s var(--ease-out) var(--d),
+    opacity 0.7s ease var(--d),
+    filter 0.9s ease var(--d);
+}
+[data-on="1"] .assemble-letter,
+.assemble[data-on="1"] .assemble-letter {
+  opacity: 1;
+  transform: none;
+  filter: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .assemble-letter {
+    opacity: 1;
+    transform: none;
+    filter: none;
+    transition: none;
+  }
+}
