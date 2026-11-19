@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Lab · The seams</title>
+    <style>
+      .sheet { position: fixed; inset: 0; z-index: 0; overflow: hidden; display: grid; place-items: center; }
+      .sheet h2 { font: 400 clamp(3.4rem, 9vw, 8.4rem)/.86 var(--font-display); margin: .3em 0 0; letter-spacing: -.02em; text-align: center; }
+      .sheet h2 em { font-style: italic; }
+      .sheet .k { font: 500 12px/1 var(--font-mono); letter-spacing: .32em; text-transform: uppercase; color: var(--stamp); text-align: center; }
+      .sheet img { position: absolute; filter: drop-shadow(0 10px 18px rgb(40 25 10 / .25)); }
+      #b { visibility: hidden; }
+      .gl { z-index: 5 !important; pointer-events: none; }
+    </style>
+  </head>
+  <body>
+    <section class="sheet paper" id="a">
+      <img src="/novel/collage/kulhad-trio.webp" alt="" style="left: 6vw; top: 12vh; width: 22vw; rotate: -6deg" />
+      <img src="/novel/collage/srk-s.webp" alt="" style="right: 7vw; top: 8vh; width: 17vw; rotate: 4deg" />
+      <img src="/novel/collage/pvr-t.webp" alt="" style="left: 10vw; bottom: 8vh; width: 24vw; rotate: 3deg" />
+      <img src="/novel/collage/dhoni-s.webp" alt="" style="right: 9vw; bottom: 6vh; width: 15vw; rotate: -4deg" />
+      <div>
+        <p class="k">End of Chapter One</p>
+        <h2>Then the lights<br /><em>went down.</em></h2>
+      </div>
+    </section>
+    <section class="sheet paper" id="b">
+      <div>
+        <p class="k">Chapter Three</p>
+        <h2>Places I <em>worked</em></h2>
+      </div>
+    </section>
+    <canvas class="gl" id="gl" aria-hidden="true"></canvas>
+    <p class="cue" id="cue" style="color: var(--ink)">SCROLL</p>
+    <main><section style="height: 900svh"></section></main>
+    <p class="lab-tag"><a href="/lab/">← lab</a> · the seams · page burns into the cinema · light washes back to paper</p>
+    <script type="module" src="/src/lab/wave.js"></script>
+  </body>
+</html>

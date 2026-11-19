@@ -9,6 +9,8 @@ import {
   VignetteEffect, ToneMappingEffect, ToneMappingMode, BlendFunction,
 } from 'postprocessing'
 import { noiseVolume, beamFrame, VolumetricPass, makeDust, glowTexture } from './core'
+import { createFilm } from './film'
+import { WavePass } from './wave'
 
 /*
  * The one 3D world of the site: a cinema. A projection booth (with the Meshy projector) behind a window
@@ -22,6 +24,11 @@ export const WINDOW = new THREE.Vector3(0.9, 7.6, -11.5)
 export const SCREEN = new THREE.Vector3(0, 4.15, 15.44)
 export const STAGE = new THREE.Vector3(0, 3.5, 11.2) // where the projects materialize
 const SCREEN_W = 18, SCREEN_H = 7.5
+/** Where the camera stands, on the screen's axis, when the screen exactly fills (covers) the frame. */
+export function insideDistance(fovDeg, aspect) {
+  const t = Math.tan(THREE.MathUtils.degToRad(fovDeg / 2))
+  return aspect <= SCREEN_W / SCREEN_H ? SCREEN_H / 2 / t : SCREEN_W / 2 / (t * aspect)
+}
 const PROJ_SCALE = 1.8 // projects are seen from row ten, in front of an 18 m screen
 
 // Recliner layout: identical to the Blender bake's seat proxies (hall_build.py).
@@ -126,7 +133,8 @@ function dissolvable(mat, u) {
 }
 
 export async function createCinema(canvas, { mobile = false, onProgress } = {}) {
-  const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, stencil: false, powerPreference: 'high-performance' })
+  // alpha: the seams to the paper chapters let the page show through the frame (see wave.js).
+  const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: false, stencil: false, powerPreference: 'high-performance' })
   const dpr = Math.min(devicePixelRatio, mobile ? 1.5 : 1.75)
   renderer.setPixelRatio(dpr)
   renderer.outputColorSpace = THREE.SRGBColorSpace
@@ -238,6 +246,25 @@ export async function createCinema(canvas, { mobile = false, onProgress } = {}) 
   screen.rotation.y = Math.PI
   screen.receiveShadow = true
   scene.add(screen)
+  // Chapter Two's film plays on this, a hair in front of the lit screen.
+  // Built on first use: its render target and 150k-point cloud cost nothing until Chapter Two needs them.
+  let film = null
+  const getFilm = () => {
+    if (!film) {
+      film = createFilm(renderer, { mobile, loader, normalize, models: PROJECT_MODELS, noise })
+      filmScreen.material.map = film.rt.texture
+      filmScreen.material.needsUpdate = true
+    }
+    return film
+  }
+  const filmScreen = new THREE.Mesh(
+    new THREE.PlaneGeometry(SCREEN_W, SCREEN_H),
+    new THREE.MeshBasicMaterial({ fog: false }), // opaque: the film's additive light piles alpha past 1
+  )
+  filmScreen.position.copy(SCREEN).add(new THREE.Vector3(0, 0, -0.02))
+  filmScreen.rotation.y = Math.PI
+  filmScreen.visible = false
+  scene.add(filmScreen)
 
   // ------------------------------------------------------------ beam, dust, lens glow
   const beam = beamFrame(LENS, SCREEN, (SCREEN_W / 2) / (SCREEN.z - LENS.z), (SCREEN_H / 2) / (SCREEN.z - LENS.z), 0.09)
@@ -258,7 +285,8 @@ export async function createCinema(canvas, { mobile = false, onProgress } = {}) 
 
   // ------------------------------------------------------------ post
   const composer = new EffectComposer(renderer, { frameBufferType: THREE.HalfFloatType })
-  composer.addPass(new RenderPass(scene, camera))
+  const renderPass = new RenderPass(scene, camera)
+  composer.addPass(renderPass)
   const vol = new VolumetricPass(camera, beam, noise, { scale: 0.5, steps: mobile ? 26 : 46 })
   vol.uniforms.uDensity.value = 0.6
   vol.uniforms.uMaxDist.value = 46
@@ -267,6 +295,8 @@ export async function createCinema(canvas, { mobile = false, onProgress } = {}) 
   const grain = new NoiseEffect({ blendFunction: BlendFunction.SOFT_LIGHT })
   grain.blendMode.opacity.value = 0.16
   composer.addPass(new EffectPass(camera, new ChromaticAberrationEffect({ offset: new THREE.Vector2(0.0008, 0.0005), radialModulation: true, modulationOffset: 0.25 }), bloom, new ToneMappingEffect({ mode: ToneMappingMode.AGX }), new VignetteEffect({ offset: 0.28, darkness: 0.72 }), grain))
+  const wave = new WavePass(noise)
+  composer.addPass(wave)
 
   // ------------------------------------------------------------ film frames on the screen
   // The spot's projective map is square; the screen fills its full width and a centred band of its height.
@@ -412,6 +442,7 @@ export async function createCinema(canvas, { mobile = false, onProgress } = {}) 
 
   // ------------------------------------------------------------ per-frame state
   const look = new THREE.Vector3()
+  const drawSize = new THREE.Vector2()
   const timer = new THREE.Timer()
   let active = true
   function resize(w, h) {
@@ -497,6 +528,24 @@ export async function createCinema(canvas, { mobile = false, onProgress } = {}) 
       p.root.rotation.y = s.spin ?? 0
       p.root.position.y = STAGE.y + Math.sin(t * 0.7) * 0.04
     }
+    // The film: on the screen from the seats, or the whole frame once the camera is inside it.
+    const f = state.film
+    const inFilm = !!f && f.inside >= 1
+    filmScreen.visible = !!f && !inFilm && (f.show ?? 1) > 0.001
+    if (f) {
+      getFilm().update(f, t)
+      filmScreen.material.color.setScalar(f.show ?? 1)
+      if (inFilm) film.cropFor(camera.aspect, renderer.getDrawingBufferSize(drawSize).y)
+      else film.renderToTexture()
+    }
+    renderPass.mainScene = inFilm ? film.scene : scene // inFilm implies the film exists
+    renderPass.mainCamera = inFilm ? film.camera : camera
+    vol.enabled = !inFilm
+    const w = state.wave
+    wave.uniforms.uMode.value = w?.mode === 'burn' ? 0 : 1
+    wave.uniforms.uP.value = w ? w.p : 0
+    if (w?.origin) wave.uniforms.uOrigin.value.set(...w.origin)
+    wave.uniforms.uTime.value = t
     composer.render()
   }
 
@@ -504,7 +553,7 @@ export async function createCinema(canvas, { mobile = false, onProgress } = {}) 
   card('prologue', { kicker: 'Now showing', title: 'Tejas Govind' })
   onProgress?.(1)
   return {
-    renderer, scene, camera, render, resize, loadProject, setDpr, get dpr() { return renderer.getPixelRatio() },
+    renderer, scene, camera, render, resize, loadProject, loadFilm: id => getFilm().load(id), setDpr, get dpr() { return renderer.getPixelRatio() },
     setActive: v => { active = v },
     debug: { vol, bloom, dust, lamp, hallMat, seats, projector, screenLight, hemi, bulb, flare, streak, projects },
   }

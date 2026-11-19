@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Lab · Into the screen</title>
+    <style>
+      .label { position: fixed; z-index: 3; left: 62%; top: 28%; color: #eef4ff; pointer-events: none; opacity: 0; transition: opacity .6s; }
+      .label .kick { margin: 0 0 .9rem; font-size: 11px; letter-spacing: .3em; white-space: nowrap; }
+      .label h2 { font: 400 clamp(2.8rem, 6vw, 5.6rem)/.9 var(--font-display); margin: 0; letter-spacing: -.02em; }
+      .label p { font: 400 clamp(1rem, 1.3vw, 1.2rem)/1.45 var(--font-serif); color: #c9d6ee; margin: .9rem 0 0; max-width: 26ch; }
+      .label .tech { font: 500 10.5px/1.6 var(--font-mono); letter-spacing: .14em; text-transform: uppercase; color: #8fb0e8; margin-top: 1rem; max-width: 34ch; }
+      .label::before { content: ''; position: absolute; right: calc(100% + 18px); top: .45rem; width: clamp(60px, 10vw, 180px); height: 1px; background: linear-gradient(90deg, transparent, #cfe2ff); }
+      .chapter { position: fixed; inset: 0; z-index: 3; display: grid; place-items: center; pointer-events: none; opacity: 0; }
+      @media (max-width: 760px) { .label { left: 8vw; top: auto; bottom: 14svh; } .label::before { display: none; } }
+    </style>
+  </head>
+  <body>
+    <canvas class="gl" id="gl" aria-hidden="true"></canvas>
+    <div class="label" id="label">
+      <p class="kick" id="kick"></p>
+      <p class="tech" id="cat" style="margin: -.4rem 0 1rem"></p>
+      <h2 id="ptitle"></h2>
+      <p id="pline"></p>
+      <p class="tech" id="ptech"></p>
+    </div>
+    <p class="cue" id="cue">SCROLL</p>
+    <main><section style="height: 1400svh"></section></main>
+    <p class="lab-tag"><a href="/lab/">← lab</a> · into the screen · row ten → inside the film → back out</p>
+    <script type="module" src="/src/lab/film.js"></script>
+  </body>
+</html>
