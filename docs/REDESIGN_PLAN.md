@@ -1,117 +1,78 @@
-# Contours: Portfolio Plan
+# A Design Novel: Portfolio Plan
 
-The portfolio is one continuous 3D world that you scroll through, not a page of sections. It grows out of a single image, a topographic orb, and keeps to one visual rule: **soft painted forms drawn over with glowing contour lines.**
+The portfolio reads as **a design novel in four chapters**. Two worlds alternate:
 
-The 2023 macOS-style site still lives at `/os/`, linked from the contact card.
+- **Night:** live WebGL, a cloud of about 90,000 pixels and a glowing scientific orb.
+- **Paper:** an editorial collage and a typeset index.
 
----
+Pixel-dithered fringes stitch the two together as you scroll. The 2023 macOS site lives at `/os/`.
 
-## 1. Why this direction
+## 1. Why this, after Contours
 
-The first redesign (v2, now deleted) stitched together other people's signatures: HUD labels, colour walls and plinths, ink outlines, a registry pixel field. The result had no identity of its own, and its 3D sat in small boxes on a scrolling page.
+Contours, a procedural 3D landscape, read as "PS3", not premium, and invented details: a hilltop cricket field in the middle of nowhere, when Tejas grew up in Prayagraj. This version is built from three things he asked for:
 
-Contours fixes both problems:
+1. **The orb image he brought,** rebuilt at its own level of detail: near-black sphere, glowing multi-strand contour ribbons, a hot rim, bracketed live-coordinate labels and survey lines.
+2. **A morphing pixel vortex** that condenses into that orb, and later into each project.
+3. **India as a Vox-style paper collage** with real photographs: chai in a kulhad, cricket and MS Dhoni, Bollywood. The design references are human-md for editorial pacing, Monolith for scene-to-scene motion, and bricelab for restraint. None of their signature elements is copied.
 
-- **It is built from things that are Tejas's own.** The topographic orb image he brought, and the birthday garden he built: a real place, light changing as you move, lamps on water.
-- **It is a world, not a page.** One canvas, one camera path. Scene changes are camera moves through haze, cloud and light, which is where the dreamy feeling comes from.
+Every claim in the copy comes from Tejas's own words or `src/data`.
 
-## 2. The rule
+## 2. The book
 
-Every surface uses the same contour material:
+| Chapter | World | What happens |
+|---|---|---|
+| Prologue · Signal | Night | Your name assembles over a two-armed pixel vortex with depth of field. The pixels spiral in and settle onto the orb's contour lines. The drawn orb takes over, with instrument rings, survey markers and lines, then turns so Prayagraj (25.4358° N, 81.8463° E) faces you: "Mine started here." |
+| I · Chai, Cricket & Cinema | Paper | A horizontal scrapbook pinned to the scroll: title card with a hand-drawn Sangam map → Prayagraj (Sangam, Naini Bridge, Kumbh) → chai (kulhad, chaiwala) → cricket (gully cricket, MS Dhoni, bat, ball) → cinema (Elgin Talkies, SRK, Deepika, Amitabh, ticket) → 2022 Sunflower Association → "Somewhere in there, I started building things." A double-pass ink route draws itself across the spreads. |
+| II · Things I Built | Night | The pixel cloud forms each project as a tinted, annotated hologram. Each shape is a signed distance function sliced into contour rings and given a three-quarter turn: Smash Cricket (hand), CogniFlow (brain), Revere (glasses), Yudhveer (sword and shield), Commit City (towers). An editorial spread with links sits beside each. |
+| III · Places I Worked | Paper | Every role in `workData`, typeset as a book index. Each entry is a `<details>` that opens to its impact line and bullets. |
+| Epilogue · Write to me | Night | The last hologram folds back into the orb. Contact details, then a colophon that credits every photograph. |
 
-- wrapped light softly posterised into painted planes
-- brush mottling
-- a height colour ramp
-- contour lines every few metres, with every fifth line heavier
+## 3. Code map (`src/novel`)
 
-The lines glow at night and recede by day, so landmarks read clearly in daylight and the world lights up after dark. The land, trees, props, buildings and water all share this material; the project sculptures are made only of lines. One shared set of atmosphere uniforms (sky, horizon, ground, line colour, sun, fog) moves the whole world from night to day and back.
-
-Nothing borrowed carries the look. The only dependency added for it is bloom (`@react-three/postprocessing`).
-
-## 3. The journey
-
-Scroll progress `p` runs from 0 to 1 over a 3200svh runway. The camera glides along a Catmull-Rom path through keyframes, with damped inertia. Everything below lives in `src/world/route.js`.
-
-| p | Time | Place | What happens |
-|---|---|---|---|
-| 0.00–0.10 | Night | **The orb** | Dark sphere of drifting glowing contours, dust, stars. The camera falls into it; inside, the lines wrap all around you, and a white haze hides the cut. |
-| 0.10–0.20 | Night → dawn | **Above the land** | Top-down, the terrain reads like the orb's surface. The camera descends as dawn turns pink, then sinks through a cloud bank. |
-| 0.24–0.30 | Dawn | **The hilltop** | Levelled summit with a pitch, three crooked stumps, a leaning bat and a taped tennis ball. The view faces the valley and the rising sun. |
-| 0.33–0.38 | Morning | **Chai stall** | Roadside tapri on a ridge: tin roof, brass kettle with steam, kulhads, a bench. |
-| 0.40–0.45 | Midday | **The cinema** | Single-screen talkies: deco front, red canopy with chasing bulbs, lit posters. |
-| 0.47–0.70 | Golden hour | **Project valley** | Five landmarks down the eastern valley, each the project's shape as stacked contour rings that rise as you arrive. A card beside each one. |
-| 0.72–0.82 | Dusk | **Lamp path** | Five lamp posts, one per role, lighting as you reach them. A card per role. |
-| 0.85–1.00 | Night | **The lake** | A skyline across the water drawn in the orb's blue lines, diyas drifting on the near water, then the contact card. |
-
-### Landmarks (`src/world/sculptures.js`)
-
-Each project is a signed distance function, sliced horizontally and traced with marching squares into rings, then drawn with `LineSegments2`.
-
-| Project | Shape |
+| Path | Role |
 |---|---|
-| Smash Cricket | open hand, fingers fanned (a "five") |
-| CogniFlow | brain: two folded hemispheres on a stem |
-| Revere | glasses, lenses facing you |
-| Yudhveer | planted sword plus a leaning round shield |
-| Commit City | 4×4 block of towers |
-
-### Story lines (draft, in Tejas's voice)
-
-Edit these in `BEATS` in `src/world/App.jsx`.
-
-- "Everything I build starts as a line I can't stop following."
-- "Follow enough of them, and they turn into a place."
-- "It started here. A hilltop, a taped tennis ball, three stumps that were never quite straight."
-- Chai: after-match cutting chai and arguments about who was really out.
-- Cinema: Friday first shows, then Interstellar.
-- "Some lines I followed further…"
-- "Every place I've worked left a light on."
-- "Right now I'm in New York. Next, I'd like to be in San Francisco."
-
-## 4. Code map
-
-| File | Role |
-|---|---|
-| `index.html` → `src/world/main.jsx` | Entry. `os/index.html` → `src/main.jsx` is the 2023 site (separate Vite page). |
-| `src/world/App.jsx` | Lenis smooth scroll, the scroll runway, the white-out veil, and `BEATS`: lines and cards with `[in, out]` windows in `p`. |
-| `src/world/Scene.jsx` | Lazy chunk: the `<Canvas>`. |
-| `src/world/World.jsx` | Camera rig (path, inertia, cursor parallax, portrait lens), palette and sun application, sky, orb, terrain, trees, hilltop props, cloud bank, post-processing. |
-| `src/world/route.js` | Camera keyframes, `PROJECT_P` / `LAMP_P` stops, the day palette, the sun arc, the veil curve. |
-| `src/world/terrain.js` | Heightfield (Perlin fbm), the hill, levelled pads (`SITES`), the lake basin, tree scatter. Heights come from one function shared by mesh, props and camera. |
-| `src/world/materials.js` | `atmosphere` uniforms; the contour, sky and orb materials. |
-| `src/world/places.jsx` | Chai stall, cinema, landmarks, lamps, and the lake (water, skyline, diyas). |
-| `src/world/sculptures.js` | SDF shapes and the slicer. |
-| `src/world/content.js` | Featured projects and roles, read from `src/data/projectsData.js` and `src/data/workData.js`, plus contact links. |
-| `src/world/progress.js` | Shared `{ target, current }` scroll progress. |
+| `main.jsx`, `App.jsx`, `index.css` | Entry, the chapter order, design tokens (night/paper, five typefaces), HUD and collage styles. |
+| `Book.jsx` | Running head (difference blend, so it reads on both worlds), Contents dialog, page counter. |
+| `lib/scroll.js` | Lenis on GSAP's ticker, with ScrollTrigger. |
+| `lib/store.js` | Per-chapter progress plus mouse, read every frame by the stage. |
+| `lib/chapters.js` | `useProgress` (progress into the store), `usePaper` (pauses WebGL while paper covers the screen), `useRunningHead`. |
+| `lib/Beats.jsx`, `lib/Assemble.jsx` | Text that surfaces at scroll windows; titles whose letters fly in. |
+| `lib/PixelFringe.jsx` | The dithered night↔paper edge. |
+| `stage/Stage.jsx` | Canvas, camera rig, HUD projector, post-processing (bloom, chromatic aberration, grain, vignette). |
+| `stage/timeline.js` | Scroll → state for pixels, orb, camera and HUD. **Tune timing here.** |
+| `stage/Field.jsx` + `targets.js` + `targets.worker.js` | The pixel cloud. Targets (galaxy, orb lines, dust, five shapes) are built in a Web Worker. |
+| `stage/noise.js` | The orb's domain-warped field, written in both JS and GLSL so the pixels land on the drawn lines. |
+| `stage/Orb.jsx`, `stage/Instrument.jsx` | The orb shader (ribbons, emboss, rim, graticule, scan) and its tick-ring rig. |
+| `stage/Hud.jsx`, `stage/anchors.js` | Bracketed readouts, survey lines, home marker, project annotations. |
+| `stage/sculptures.js` | Project shape functions, the slicer, and per-shape yaw. |
+| `chapters/*` | One file per chapter. `collage.js` holds the scrapbook layout as data. |
+| `content.js`, `credits.json` | Projects and roles (from `src/data`); photo licences and attribution. |
+| `public/novel/collage/` | Processed photos: `*-s` stickers (cut out with rembg, white rim baked in) and `*-t` torn prints. |
 
 ### Common edits
 
-- **Change copy:** edit `BEATS` in `App.jsx`, or `line` in `content.js` for project one-liners.
-- **Swap a featured project:** change its `id` or `shape` in `content.js`. For a new shape, add an SDF to `SHAPES`.
-- **Move a place:** edit its pad in `SITES` (`terrain.js`). Camera keys reference sites, so they follow.
-- **Retime the journey:** adjust `p` in `route.js` keys and `BEATS` windows together.
+- **Copy:** `BEATS` in `chapters/Prologue.jsx` and `chapters/Epilogue.jsx`; `chapters/collage.js` for the scrapbook; `content.js` for project one-liners.
+- **A different featured project:** edit `PROJECTS` in `content.js`. For a new shape, add it to `SHAPES` and `YAW` in `sculptures.js`, its key to `SHAPE_KEYS` in `Field.jsx` and to `WORK_KEYS` in `timeline.js`, and its labels to `WORK_NOTES` in `anchors.js`.
+- **Pacing:** section heights in each chapter file, and windows in `timeline.js`.
 
-## 5. Quality bar
+## 4. Quality bar
 
 - **Performance:**
-  - The page's own JS is about 35 KB.
-  - The 3D chunk is about 133 KB plus three.js, lazy-loaded after the first text paint.
-  - Mobile gets a coarser terrain (180 vs 320 segments) and fewer trees.
+  - The page's own JS is about 55 KB.
+  - The stage chunk is about 90 KB plus three.js, lazy-loaded; target generation runs in a 5 KB worker.
+  - Phones get 42k pixels instead of 90k and a wider lens.
+  - WebGL rendering stops while a paper chapter covers the screen.
   - DPR is capped at 1.75.
 - **Accessibility:**
-  - All text and links are real DOM, with the name as the page's `h1`.
-  - Cards that aren't showing are `inert`, so they leave the tab order.
-  - Under reduced motion, scroll still drives the camera, but inertia, drift, idle animation and sculpture rise easing are off.
-  - Without WebGL2, the page shows a short note instead of a blank canvas.
-- **SEO:** the crawler payload and JSON-LD in `index.html` are unchanged, and `llms.txt` still describes the work.
+  - All text and links are real DOM, with one `h1`.
+  - Hidden beats are `inert`.
+  - Reduced motion removes drift, inertia and the sideways scrapbook travel; spreads stack instead.
+  - The 3D sits behind an error boundary, with a WebGL2 check.
+- **Licensing:** Chapter One's photographs are from Wikimedia Commons (CC BY, CC BY-SA, CC0, public domain), credited in the colophon. They are photos of public figures, used as a personal collage, not as an endorsement.
 
-## 6. Known gaps / next
+## 5. Open items
 
-1. **Real-device performance.** So far it has only been checked in headless Chromium, which renders the 3D in software. Profile on a mid-range laptop GPU and a phone. Likely levers: terrain segments, tree count, bloom resolution.
-2. **Safari and iOS:** check WebGL2, `svh` units, and fat-line (`LineSegments2`) rendering.
-3. **Copy pass** on all story lines, by Tejas.
-4. **Hilltop and ground detail** up close: grass tufts, or a finer mottle on the plateau.
-5. **Navigation:** a tiny progress indicator and a "skip to contact" link for people who won't scroll the whole day.
-6. **Optional sound:** off by default, behind a toggle. Wind, a distant bat-on-ball, the hum of the cinema, water at night.
-7. **Update `llms.txt`, the OG image and JSON-LD** to match the new site.
-8. **Deploy:** confirm the host serves `/os/` as a directory index (it is a separate Vite page in `dist/os/index.html`).
+1. **Real-device check:** so far the site has only been rendered in headless Chromium, which renders WebGL in software. Profile on a laptop GPU and a phone. The levers are pixel count `N` and bloom.
+2. **The Smash Cricket live link** (`smash-cricket.vercel.app`) returned 404 in QA. Fix it or drop it in `src/data/projectsData.js`.
+3. **Copy pass by Tejas,** especially the prologue lines and the collage notes.
+4. **Optional:** hover previews in the Chapter Three index, sound, and an updated OG image and `llms.txt`.
