@@ -21,6 +21,7 @@ const PALETTES = [
   { wall: '#f9f6ee', trim: '#bfe7f2', accent: '#4fb0d6', neon: '#3dd6ff' },
   { wall: '#c9e8f7', trim: '#ffffff', accent: '#f08ab0', neon: '#ff5fb0' },
 ]
+export const CLUB_W = 24
 const NAMES = ['Solara', 'Miramar', 'Coral Bay', 'Paloma', 'Starlite', 'Azura', 'Neptune', 'Estrella', 'Laguna']
 
 /** One mesh per material: a hotel is ~60 pieces but only ~8 materials, and draw calls are the cost here. */
@@ -52,6 +53,8 @@ function box(w, h, d, tile = 3) {
   return g
 }
 
+export const neonSignTexture = (...a) => neonTexture(...a)
+
 /** Neon lettering on a dark-transparent canvas: a glowing core and a soft halo, for an emissive plane. */
 function neonTexture(text, color, { vertical = false, font = 'Caveat', weight = 700 } = {}) {
   const c = document.createElement('canvas')
@@ -68,7 +71,7 @@ function neonTexture(text, color, { vertical = false, font = 'Caveat', weight = 
     g.strokeStyle = col
     g.lineWidth = lw
     if (vertical) {
-      const letters = text.toUpperCase().replace(/ /g, '').split('')
+      const letters = text.toUpperCase().split('') // a space stays a gap between words
       const step = H / (letters.length + 1)
       g.font = `400 ${Math.min(step * 0.92, 180)}px Anton, Impact, sans-serif`
       letters.forEach((ch, i) => g.fillText(ch, W / 2, step * (i + 1)))
@@ -135,8 +138,9 @@ export function buildOceanDrive(scene, { wrap = m => m, mobile = false } = {}) {
   const road = std({ ...pbrSet('asphalt', [L / 4, 1.2]), color: '#5c5868', roughness: 0.55 }) // damp at dusk
   strip(-6.2, -1.8, road)
   strip(-1.8, 1.8, std({ ...pbrSet('pavement', [L / 2.5, 1.4]), color: '#f6d9cf' }), 0.1)
-  strip(1.8, 6.5, std({ color: '#86b062', roughness: 0.95 }), 0.05)
-  strip(6.5, 26, std({ ...pbrSet('sand', [L / 4, 5]), color: '#f6dcae' }), 0.02)
+  // Each lower strip tucks under its higher neighbour, so no crack opens at the step between them.
+  strip(1.5, 6.5, std({ color: '#86b062', roughness: 0.95 }), 0.05)
+  strip(6.2, 26, std({ ...pbrSet('sand', [L / 4, 5]), color: '#f6dcae' }), 0.02)
   // Kerbs and lane marks.
   for (const z of [-6.2, -1.8]) {
     const k = new THREE.Mesh(box(L, 0.16, 0.25, 1), std({ color: '#d9d2cf', roughness: 0.8 }))
@@ -261,12 +265,46 @@ export function buildOceanDrive(scene, { wrap = m => m, mobile = false } = {}) {
     return g
   }
   const hotels = []
-  let hx = -18
+  let hx = -18, clubX = 0
   for (let i = 0; i < 9; i++) {
+    if (i === 4) {
+      // A gap in the row for the club (arcade.js places it): the landmark at the end of your walk.
+      clubX = hx + CLUB_W / 2
+      hx += CLUB_W + 1.2
+    }
     const w = [12, 10, 14, 11, 12, 13, 10, 12, 11][i % 9]
     hotel(hx + w / 2, i)
     hotels.push({ x: hx + w / 2, w, floors: [3, 4, 3, 5, 3, 4, 3, 4, 3][i % 9] })
     hx += w + 1.2
+  }
+
+  // A city skyline across the water at the end of the boulevard, lit windows and red beacons in the haze.
+  const winTex = (() => {
+    const c = document.createElement('canvas')
+    c.width = 64
+    c.height = 128
+    const g = c.getContext('2d')
+    g.fillStyle = '#2a2140'
+    g.fillRect(0, 0, 64, 128)
+    for (let y = 4; y < 128; y += 8) for (let x = 4; x < 64; x += 8) if (Math.random() < 0.38) {
+      g.fillStyle = Math.random() < 0.7 ? '#ffd9a0' : '#bfe4ff'
+      g.fillRect(x, y, 4, 5)
+    }
+    const t = new THREE.CanvasTexture(c)
+    t.colorSpace = THREE.SRGBColorSpace
+    t.wrapS = t.wrapT = THREE.RepeatWrapping
+    return t
+  })()
+  for (let k = 0; k < 16; k++) {
+    const h = 28 + ((k * 37) % 60), w = 9 + ((k * 13) % 9)
+    const tx = winTex.clone()
+    tx.needsUpdate = true
+    tx.repeat.set(w / 8, h / 16)
+    const tower = new THREE.Mesh(new THREE.BoxGeometry(w, h, w), wrap(new THREE.MeshBasicMaterial({ map: tx, fog: true, color: new THREE.Color(1.3, 1.3, 1.3) })))
+    tower.position.set(175 + k * 7 + ((k * 29) % 11), h / 2 - 2, -70 + ((k * 23) % 60))
+    const beacon = new THREE.Mesh(new THREE.SphereGeometry(0.6, 8, 6), glow('#ff3030', 6))
+    beacon.position.set(tower.position.x, h - 1.4, tower.position.z)
+    scene.add(tower, beacon)
   }
   // A handful of real lights for the neon (the rest is bloom): the nearest few to where you walk.
   const pool = Array.from({ length: mobile ? 2 : 4 }, () => {
@@ -350,7 +388,7 @@ export function buildOceanDrive(scene, { wrap = m => m, mobile = false } = {}) {
     updates.forEach(f => f(t))
   }
 
-  return { signs, hotels, update }
+  return { signs, hotels, clubX, update }
 }
 
 /** A dusk sky (deep blue overhead, violet, a peach-orange horizon, a low sun and lit clouds); `uDay` turns it to clear day. */

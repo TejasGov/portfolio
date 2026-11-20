@@ -1,6 +1,6 @@
 import * as THREE from 'three'
 import { loadTraveller, toon } from './films/kit'
-import { buildOceanDrive, duskSky } from './oceandrive'
+import { buildOceanDrive, duskSky, neonSignTexture } from './oceandrive'
 
 /*
  * Chapter Four, "Press Start": an ode to the games Tejas grew up on, in two original worlds that share
@@ -12,7 +12,7 @@ import { buildOceanDrive, duskSky } from './oceandrive'
  * glowing, rippling front the coast is gone and the blocks are there (every coast material discards
  * inside the wave, every block material outside it), with glowing cubes lifting off the front.
  */
-export const ARCADE_X = 34.5
+let ARCADE_X = 34.5 // set from the street's layout: the arcade stands opposite the club's door
 const WAVE_GLSL = /* glsl */ `
 uniform vec3 uWaveO; uniform float uWaveR; uniform float uWaveSide; uniform float uWaveT;
 varying vec3 vWaveP;
@@ -72,6 +72,8 @@ export function createArcade(renderer, { loader, normalize, mobile = false }) {
 
   // ------------------------------------------------------------ the neon coast (oceandrive.js)
   const drive = buildOceanDrive(scene, { wrap: coast, mobile })
+  ARCADE_X = drive.clubX
+  U.uWaveO.value.set(ARCADE_X, 1, 0.8)
   // The sea: the dusk in a long, low swell, a broken path of light toward the sun.
   const sea = new THREE.Mesh(new THREE.PlaneGeometry(500, 300).rotateX(-Math.PI / 2), onWave(new THREE.ShaderMaterial({
     uniforms: { ...U },
@@ -114,13 +116,77 @@ export function createArcade(renderer, { loader, normalize, mobile = false }) {
   // Palms along the promenade's lawn and on the beach; a few parked coupes; the arcade at the end.
   for (let x = -20; x < 68; x += 7) place('/cinema/arcade/palm.glb', 7.5 + ((x * 7) % 3), [x, 0, 5.6], x, { rough: 0.85 }) // far enough from the chase camera to frame, not block
   for (const [x, z] of [[8, 10], [21, 12], [39, 9], [58, 11]]) place('/cinema/arcade/palm.glb', 8, [x, 0, z], x, { rough: 0.85 })
-  for (const [x, tint] of [[-6, '#ffffff'], [14, '#bff3ea'], [41, '#ffd7e6']]) place('/cinema/arcade/car.glb', 4.4, [x, 0, -2.9], Math.PI / 2 + 0.04, { tint, rough: 0.32, metal: 0.4 })
+  // Traffic, not parked cars (there is no parking lane): coupes driving both lanes, on the right-hand
+  // side, head- and tail-lights on. Each loops the length of the street.
+  const traffic = []
+  const LANES = [{ z: -3.0, dir: 1 }, { z: -5.0, dir: -1 }] // driving on the right
+  for (const [k, tint] of ['#ffffff', '#bff3ea', '#ffd7e6', '#c9d6ff'].entries()) {
+    const lane = LANES[k % 2]
+    const car = { lane, x0: -20 + k * 23, speed: 6 + k * 0.7, g: null }
+    traffic.push(car)
+    // The coupe model's nose points down -x: turn it round for the eastbound lane.
+    place('/cinema/arcade/car.glb', 4.3, [0, 0, lane.z], lane.dir > 0 ? Math.PI : 0, { tint, rough: 0.3, metal: 0.45 }).then(g => {
+      if (!g) return
+      car.g = g
+      const lamp = (c, k2) => new THREE.Mesh(new THREE.SphereGeometry(0.11, 10, 8), coast(new THREE.MeshBasicMaterial({ color: new THREE.Color(c).multiplyScalar(k2) })))
+      car.lights = [lamp('#fff3d6', 5), lamp('#fff3d6', 5), lamp('#ff2a2a', 4), lamp('#ff2a2a', 4)]
+      car.lights.forEach(l => scene.add(l))
+    })
+  }
   place('/cinema/arcade/arcade.glb', 1.9, [ARCADE_X, 0.1, 1.0], -Math.PI / 2 - 0.3, { rough: 0.4 }).then(g => {
     g?.traverse(o => { if (o.isMesh) { o.material.emissiveMap = o.material.map; o.material.emissive.set('#ffffff'); o.material.emissiveIntensity = 0.55 } })
   })
   const cabinetLight = new THREE.PointLight('#d77bff', 14, 7, 1.6)
   cabinetLight.position.set(ARCADE_X - 0.8, 1.4, 1.6)
   scene.add(cabinetLight)
+  // The club: an original 80s streamline moderne nightclub (Meshy), set back behind its entrance
+  // pavilion, its name in our own neon on its marquee, and searchlights sweeping the sky behind it.
+  // Model (22 m deep, measured in Blender): canopy front at CLUB_FRONT, marquee band 3.2 m behind it
+  // at 5-7 m, the central pylon's face 1.3 m behind it from 8.5 m up, roof ~14 m.
+  const CLUB_FRONT = -7.4, MARQUEE = CLUB_FRONT - 3.2, PYLON = CLUB_FRONT - 1.3
+  place('/cinema/arcade/club.glb', 22, [ARCADE_X, 0, CLUB_FRONT - 11], 0, { rough: 0.6 })
+  const dark = coast(new THREE.MeshStandardMaterial({ color: '#160c22', roughness: 0.4 }))
+  const neon = (tex, w, h) => new THREE.Mesh(new THREE.PlaneGeometry(w, h), coast(new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, color: new THREE.Color(2.6, 2.6, 2.6) })))
+  const marquee = new THREE.Mesh(new THREE.BoxGeometry(16.2, 1.7, 0.12), dark)
+  marquee.position.set(ARCADE_X, 6.0, MARQUEE + 0.06)
+  const clubSign = neon(neonSignTexture('Velvet Tide', '#ff4fa3'), 6.8, 1.66)
+  clubSign.position.set(ARCADE_X, 6.0, MARQUEE + 0.14)
+  // A blade sign off the pylon, square to the street, so the name reads as you walk up to it.
+  const blade = new THREE.Mesh(new THREE.BoxGeometry(0.3, 8.4, 2.0), dark)
+  blade.position.set(ARCADE_X, 12.8, PYLON + 1.0)
+  const bladeTex = neonSignTexture('Velvet Tide', '#ff4fa3', { vertical: true })
+  const bladeFaces = [-1, 1].map(s => {
+    const f = neon(bladeTex, 1.9, 8.2)
+    f.rotation.y = s * Math.PI / 2
+    f.position.set(ARCADE_X + s * 0.17, 12.8, PYLON + 1.0)
+    return f
+  })
+  scene.add(marquee, clubSign, blade, ...bladeFaces)
+  const beamTex = (() => {
+    const c = document.createElement('canvas')
+    c.width = 64
+    c.height = 256
+    const g = c.getContext('2d')
+    const gr = g.createLinearGradient(0, 256, 0, 0)
+    gr.addColorStop(0, 'rgba(255,255,255,0.55)')
+    gr.addColorStop(1, 'rgba(255,255,255,0)')
+    g.fillStyle = gr
+    g.fillRect(0, 0, 64, 256)
+    const side = g.createLinearGradient(0, 0, 64, 0)
+    side.addColorStop(0, 'rgba(0,0,0,1)')
+    side.addColorStop(0.5, 'rgba(0,0,0,0)')
+    side.addColorStop(1, 'rgba(0,0,0,1)')
+    g.globalCompositeOperation = 'destination-out'
+    g.fillStyle = side
+    g.fillRect(0, 0, 64, 256)
+    return new THREE.CanvasTexture(c)
+  })()
+  const searchlights = [0, 1, 2].map(k => {
+    const beam = new THREE.Mesh(new THREE.PlaneGeometry(3.2, 70).translate(0, 35, 0), coast(new THREE.MeshBasicMaterial({ map: beamTex, color: new THREE.Color('#dfe8ff').multiplyScalar(0.9), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide })))
+    beam.position.set(ARCADE_X - 6 + k * 6, 14.2, CLUB_FRONT - 16) // on the club's roof
+    scene.add(beam)
+    return beam
+  })
   const HOTELS = drive.hotels.map(h => [h.x, h.floors < 4])
 
   // ------------------------------------------------------------ the block world, in the same place
@@ -288,6 +354,23 @@ export function createArcade(renderer, { loader, normalize, mobile = false }) {
     scene.environment = U.uDay.value > 0.5 ? envDay : envDusk
     scene.environmentIntensity = U.uDay.value > 0.5 ? 1.0 : 1.2
     drive.update(t, x)
+    // Traffic loops the street; its lights ride with it.
+    for (const car of traffic) {
+      if (!car.g) continue
+      const span = 100
+      const cx = -24 + ((((car.x0 + car.lane.dir * car.speed * t) + 24) % span) + span) % span
+      car.g.position.x = cx
+      const d = car.lane.dir
+      car.lights[0].position.set(cx + d * 2.05, 0.62, car.lane.z - 0.62)
+      car.lights[1].position.set(cx + d * 2.05, 0.62, car.lane.z + 0.62)
+      car.lights[2].position.set(cx - d * 2.1, 0.7, car.lane.z - 0.6)
+      car.lights[3].position.set(cx - d * 2.1, 0.7, car.lane.z + 0.6)
+    }
+    // Searchlights: each beam turns to face the camera, then sweeps side to side about its base.
+    for (const [k, b] of searchlights.entries()) {
+      b.rotation.set(0, Math.atan2(camera.position.x - b.position.x, camera.position.z - b.position.z), 0)
+      b.rotateZ(Math.sin(t * 0.35 + k * 2.1) * 0.6)
+    }
     // Shadows ignore the wave's discard, so only the world in front casts them (the coast until the
     // wave has mostly passed, then the blocks); flipped once each way.
     const castSide = U.uWaveR.value > 40 ? -1 : 1

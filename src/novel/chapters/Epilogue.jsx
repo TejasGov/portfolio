@@ -33,7 +33,7 @@ export default function Epilogue() {
             {/* Bottom-left, over the seats: the screen above is still showing "The End". */}
             <div ref={bind(0)} className="pointer-events-none col-start-1 row-start-1 self-end pb-[11svh] opacity-0">
               <p className="max-w-[18ch] font-display text-[clamp(2rem,3.6vw,3.4rem)] leading-[1] italic [text-shadow:0_4px_50px_rgb(3_5_11/0.95)]">
-                House lights up. I’m already working on the next one.
+                House lights up.
               </p>
             </div>
             <div ref={bind(1)} className="col-start-1 row-start-1 self-end pb-[11svh] opacity-0">

@@ -34,7 +34,7 @@ export default function ChapterTwo() {
                 <p className="kicker text-glow/80">Chapter Two · Things I built</p>
                 <Assemble as="h2" id="two-title" parts={TITLE} className="mt-5 block font-display text-[clamp(3.6rem,9vw,8.5rem)] leading-[0.86] tracking-[-0.02em] [text-shadow:0_4px_60px_rgb(3_5_11/0.95)]" />
                 <p className="mt-6 max-w-[34ch] font-serif text-lg leading-relaxed text-night-ink/75 [text-shadow:0_2px_30px_rgb(3_5_11/0.95)]">
-                  Five projects, each its own short film. Take a seat, then walk in.
+                  Five projects, each its own short film.
                 </p>
               </div>
             ) : (

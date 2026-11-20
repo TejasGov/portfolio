@@ -11,7 +11,7 @@ import Assemble from '../lib/Assemble'
 const BEATS = [
   { at: [-0.1, 0.1], kind: 'title' },
   { at: [0.15, 0.27], text: 'Lights down.' },
-  { at: [0.32, 0.5], text: 'I grew up on Friday releases in Prayagraj.' },
+  { at: [0.32, 0.5], text: 'Computer Science, University at Buffalo, class of 2027.' }, // facts only; Tejas's own lines replace these
   { at: [0.56, 0.74], text: 'Roll the flashback.' },
 ]
 

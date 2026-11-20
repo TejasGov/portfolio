@@ -127,7 +127,8 @@ export function stateAt(s, mouse, aspect) {
     // and at the end the colour recedes and the drawing lifts off the page again.
     const p = s.three
     st.journey = { p }
-    const r = THREE.MathUtils.lerp(-6, 3.2, ss(0.025, 0.06, p)) - ss(0.955, 0.985, p) * 60
+    const q = ss(0.955, 0.985, p) // the recede; its tail sweeps past the far ground too, so none is left in colour
+    const r = THREE.MathUtils.lerp(-6, 3.2, ss(0.025, 0.06, p)) - q * 60 - q ** 6 * 2000
     st.sketch = { follow: true, dir: ALONG, r, band: 1.0, ink: ss(0, 0.02, p) * (1 - ss(0.985, 0.999, p)) }
   } else if (sec === 'four') {
     // Press Start: drawn onto the page around you and blooming into the neon coast; the wave to the
