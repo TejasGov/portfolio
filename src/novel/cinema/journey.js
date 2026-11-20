@@ -58,7 +58,7 @@ export function createJourney(renderer, { loader, normalize }) {
     if (!nearPath && !nearStop && z < pathZ(x) - 2.4) spots.push([x, z, 0.6 + rnd() * 0.9, rnd()]) // only behind the path: never between you and the camera
   }
   const trunks = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.08, 0.12, 1, 6).translate(0, 0.5, 0), toon({ color: '#7a5638' }), spots.length)
-  const crowns = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(0.75, 0), toon({ color: '#ffffff', flatShading: true }), spots.length)
+  const crowns = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(0.75, 0), toon({ color: '#ffffff' }), spots.length)
   const m4 = new THREE.Matrix4(), qq = new THREE.Quaternion(), greens = ['#5f9a3e', '#78b04c', '#4f8a3a', '#8cbc58', '#c98f45'].map(c => new THREE.Color(c))
   spots.forEach(([x, z, s, r], i) => {
     const tree = r > 0.45

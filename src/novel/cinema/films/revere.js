@@ -12,9 +12,9 @@ function tree(x, z, s = 1) {
   const g = new THREE.Group()
   const trunk = inkMesh(new THREE.CylinderGeometry(0.12 * s, 0.18 * s, 1.6 * s, 8), '#6b4a34')
   trunk.position.y = 0.8 * s
-  const crown = inkMesh(new THREE.IcosahedronGeometry(1.05 * s, 1), '#5f9a4a', { flatShading: true })
+  const crown = inkMesh(new THREE.IcosahedronGeometry(1.05 * s, 1), '#5f9a4a')
   crown.position.y = 2.1 * s
-  const crown2 = inkMesh(new THREE.IcosahedronGeometry(0.7 * s, 1), '#78b45a', { flatShading: true })
+  const crown2 = inkMesh(new THREE.IcosahedronGeometry(0.7 * s, 1), '#78b45a')
   crown2.position.set(0.45 * s, 2.6 * s, 0.2 * s)
   g.add(trunk, crown, crown2)
   g.position.set(x, 0, z)
