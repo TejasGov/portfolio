@@ -68,6 +68,7 @@ const filmReach = k => (k < 0.7 ? -2 + (k / 0.7) * 16 : 14 + ((k - 0.7) / 0.3) *
 const out = { pos: V(0, 0, 0), target: V(0, 0, 0) }
 const inPos = V(0, 0, 0)
 const ALONG = V(1, 0, 0) // the journey's path runs along +x
+const R3 = 30 // the journey's front runs this far ahead of the traveller: past the right edge, far ground included
 // Each seam's own light (sketch.js): the projector's warm white in the hall, neon in the game, and
 // in the films and the journey the hue of whatever the wave reveals.
 const PROJECTOR = { tint: '#ffd394', tint2: '#fff3dc', grid: 0.3, shimmer: 0.7 }
@@ -89,8 +90,9 @@ export function stateAt(s, mouse, aspect) {
     st.bloom = 1 + 3.2 * ss(0.74, 0.92, p)
     st.flare = 1 + 9 * ss(0.72, 0.9, p)
     st.focus = THREE.MathUtils.lerp(4, 11, ss(0.1, 0.4, p))
-    st.flood = ss(0.8, 0.93, p)
-    st.sweep = ss(0.9, 0.995, p) * 1.3
+    st.flood = ss(0.78, 0.9, p)
+    // All paper (>= 1.25) by p .95; Chapter One rises over the second half of the sweep (--one-overlap).
+    st.sweep = ss(0.86, 0.95, p) * 1.3
     st.card = { key: 'prologue', kicker: 'Now showing', title: 'Tejas Govind' }
     // Clear the air while the camera faces the screen, so the name reads through the beam.
     const facingScreen = ss(0.16, 0.26, p) * (1 - ss(0.42, 0.52, p))
@@ -98,6 +100,16 @@ export function stateAt(s, mouse, aspect) {
     st.dust = 1 - 0.7 * facingScreen
     // A booth this close to the lens: the projector's own glow is softer until you leave it.
     st.exposure = 3
+    // A portrait frame is mostly the dark hall around a thin beam: widen, thicken, brighten and lift it
+    // there (the lift waits until the name has left the screen, so the title card keeps its framing).
+    if (portrait) {
+      const w = ss(0.22, 0.3, p) * (1 - ss(0.66, 0.74, p))
+      st.fov = 62 + 10 * w
+      st.density = (0.6 + 0.6 * w) * (1 - 0.8 * facingScreen)
+      st.lamp *= 1 + 2.2 * w
+      st.exposure = 3 + 3 * w
+      out.target.y += 2.5 * w * (1 - facingScreen)
+    }
   } else if (sec === 'work') {
     const w = s.work
     const seat = portrait ? WORK_POS_PORTRAIT : WORK_POS
@@ -118,22 +130,23 @@ export function stateAt(s, mouse, aspect) {
     if (w <= 0) st.sketch = { r: -4, origin: SCREEN, band: 1.6, ...PROJECTOR } // still on the India chapter's paper
     else if (w < 0.05) st.sketch = { r: -4 + ss(0, 0.045, w) * (HALL_REACH + 4), origin: SCREEN, band: 1.6, ...PROJECTOR }
     // ...and the drawing lifts off the page, so the journey can be drawn on it.
-    else if (w > 0.93) st.sketch = { r: -4 + ss(0.93, 0.975, w) * (HALL_REACH + 4), origin: SCREEN, band: 1.6, colourBehind: false, ink: 1 - ss(0.975, 0.998, w), ...PROJECTOR }
+    else if (w > 0.93) st.sketch = { r: -4 + ss(0.93, 0.97, w) * (HALL_REACH + 4), origin: SCREEN, band: 1.6, colourBehind: false, ink: 1 - ss(0.985, 0.999, w), ...PROJECTOR }
     else if (st.film.inside >= 1) {
       // Inside: each film blooms out of ink, plays, and washes back to ink before the cut to the next.
-      const bloom = ss(0, 0.16, t), wash = ss(0.84, 1, t)
+      // The first film is already on the screen in colour during the push, so it does not restart from ink.
+      const bloom = i === 0 ? 1 : ss(0, 0.09, t), wash = ss(0.91, 1, t)
       st.sketch = wash > 0
         ? { r: filmReach(wash), origin: FILM_ORIGIN, band: 0.8, colourBehind: false, grid: 0.7, shimmer: 1 }
         : { r: bloom >= 1 ? 1e5 : filmReach(bloom), origin: FILM_ORIGIN, band: 0.8, grid: 0.7, shimmer: 1 }
     }
   } else if (sec === 'three') {
     // The journey: drawn onto the page, colour blooms around the traveller and travels with him,
-    // and at the end the colour recedes and the drawing lifts off the page again.
+    // and at the end the colour recedes to a faint drawing that Chapter Four's drawing replaces (never bare paper).
     const p = s.three
     st.journey = { p }
-    const q = ss(0.955, 0.985, p) // the recede; its tail sweeps past the far ground too, so none is left in colour
-    const r = THREE.MathUtils.lerp(-6, 3.2, ss(0.025, 0.06, p)) - q * 60 - q ** 6 * 2000
-    st.sketch = { follow: true, dir: ALONG, r, band: 1.0, ink: ss(0, 0.02, p) * (1 - ss(0.985, 0.999, p)), grid: 0.3, shimmer: 0.6 }
+    const q = ss(0.97, 0.99, p) // the recede; its tail sweeps past the far ground too, so none is left in colour
+    const r = THREE.MathUtils.lerp(-6, R3, ss(0.025, 0.06, p)) - q * 60 - q ** 6 * 2000
+    st.sketch = { follow: true, dir: ALONG, r, band: 1.0, ink: ss(0, 0.02, p) * (1 - 0.65 * ss(0.99, 0.999, p)), grid: 0.3, shimmer: 0.6, tint: '#3b2f22', tint2: '#7a6448' } // an ink crest, not the grass's lime
   } else if (sec === 'four') {
     // Press Start: drawn onto the page around you and blooming into the neon coast; the wave to the
     // block world is the chapter's own (arcade.js). It ends as a film does: the game is on the cinema's
@@ -141,7 +154,7 @@ export function stateAt(s, mouse, aspect) {
     const p = s.four
     st.arcade = { p }
     const bloom = ss(0.012, 0.07, p)
-    if (bloom < 1) st.sketch = { follow: true, r: -4 + bloom * 70, origin: SCREEN, band: 1.4, ink: ss(0, 0.012, p), ...NEON }
+    if (bloom < 1) st.sketch = { follow: true, r: -4 + bloom * 70, origin: SCREEN, band: 1.4, ink: 0.35 + 0.65 * ss(0, 0.012, p), ...NEON }
     else if (p > 0.93) {
       const back = ss(0.93, 0.995, p)
       st.arcade.onScreen = true
@@ -153,14 +166,16 @@ export function stateAt(s, mouse, aspect) {
     }
   } else {
     const e = s.epilogue
-    const u = ss(0.05, 0.85, e)
+    const u = ss(0.05, 1.0, e) // the dolly runs to the last frame, so the house never freezes under the panel
     EPI_POS.getPoint(u, out.pos)
     EPI_LOOK.getPoint(u, out.target)
-    st.house = ss(0.15, 0.55, e)
-    st.lamp = 1 - 0.55 * ss(0.1, 0.4, e)
+    st.house = ss(0.08, 0.6, e)
+    // The house lights wash the screen, so the projector rises with them. The screen keeps "The End":
+    // the address lives only in the contact card below it (Epilogue.jsx), so it is never shown twice.
+    st.lamp = 1 + 2.5 * st.house
     st.exposure = THREE.MathUtils.lerp(3, 1.6, st.house)
     st.dust = 0.3
-    st.density = 0.2 // a thinner beam than the prologue's, so "The End" reads through it
+    st.density = 0.2 // a thinner beam than the prologue's, so the card reads through it
     st.card = { key: 'end', kicker: 'Thank you for watching', title: 'The End' }
     // Arriving from Chapter Four's back-out: the game is still on the screen; it fades out as the
     // epilogue rises, and "The End" comes up behind it.

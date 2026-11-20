@@ -226,4 +226,11 @@ export function frameLeft(camera, subject, shift = 0.9) {
   camera.lookAt(subject)
   _right.set(1, 0, 0).applyQuaternion(camera.quaternion)
   camera.lookAt(_right.multiplyScalar(shift).add(subject))
+  if (FRAME.portrait) lookBelow(camera, subject)
+}
+const _down = new THREE.Vector3()
+/** Phone: aim below `subject` so it sits in the top half, above the bottom sheet of text (index.css). */
+export function lookBelow(camera, subject, k = 0.38) {
+  const d = camera.position.distanceTo(subject)
+  camera.lookAt(_down.copy(subject).addScaledVector(camera.up, -d * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) * k))
 }

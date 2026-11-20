@@ -18,6 +18,7 @@ export function createPixelSweep(canvas, { origin = [0.5, 0.42] } = {}) {
   }
 
   function resize() {
+    last = -1 // resizing clears the canvas, so the flat paper fill must be redrawn
     W = canvas.width = Math.ceil(innerWidth / 8) * 8
     H = canvas.height = Math.ceil(innerHeight / 8) * 8
     canvas.style.width = `${W}px`

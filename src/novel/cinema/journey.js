@@ -1,5 +1,6 @@
 import * as THREE from 'three'
-import { loadTraveller, toon, sky, paintTexture, frameLeft } from './films/kit'
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js'
+import { loadTraveller, toon, sky, paintTexture, frameLeft, lookBelow } from './films/kit'
 
 /*
  * Chapter Three: the traveller's journey. A path across a painted land, from Prayagraj in 2022 to
@@ -10,45 +11,88 @@ import { loadTraveller, toon, sky, paintTexture, frameLeft } from './films/kit'
  */
 export const STOP_GAP = 11
 const IDS = ['prayagraj', 'campus', 'gym', 'library', 'garage', 'nyc']
-const SKIES = [ // morning → day → afternoon → golden hour → dusk → night
+const SKIES = [ // morning → day → afternoon → golden hour → dusk → late dusk
   { top: '#7fb6e6', mid: '#cfe4f2', low: '#fff1d6', sun: '#fff6e0', light: '#fff1dc', k: 2.6 },
   { top: '#5f9fe0', mid: '#b9dcf5', low: '#f3f6ea', sun: '#ffffff', light: '#ffffff', k: 2.8 },
   { top: '#6c96d6', mid: '#d7d8e6', low: '#ffe6c4', sun: '#fff0d0', light: '#fff0d8', k: 2.6 },
   { top: '#5a6fb8', mid: '#f0b98a', low: '#ffd7a0', sun: '#ffe2b0', light: '#ffd9a8', k: 2.3 },
-  { top: '#2f2c66', mid: '#b86d7a', low: '#f2a27a', sun: '#ffb38a', light: '#ffb58f', k: 1.7 },
-  { top: '#0b1030', mid: '#24305e', low: '#4a4f86', sun: '#c8d2ff', light: '#9fb0ff', k: 1.0 },
+  { top: '#3a2f78', mid: '#c46a7e', low: '#f6a46e', sun: '#ffb98e', light: '#ffbe96', k: 1.9 },
+  { top: '#2b1c58', mid: '#7a4a8e', low: '#f0915c', sun: '#ffc49a', light: '#ffcaa0', k: 1.5 }, // a violet dusk, not night: New York stays lit and in colour
 ].map(s => Object.fromEntries(Object.entries(s).map(([k, v]) => [k, typeof v === 'string' ? new THREE.Color(v) : v])))
+
+/**
+ * The Meshy bakes leave a few large triangles with no area in UV space; each samples one stray texel
+ * (the pale wedge on the NYC slab). Paint each with the colour of its nearest same-facing neighbour.
+ * The geometry is already in metres (normalize), and these triangles share no vertices.
+ */
+function mendUVs(geo) {
+  const p = geo.attributes.position, uv = geo.attributes.uv, idx = geo.index
+  if (!uv) return
+  const n = (idx ? idx.count : p.count) / 3, vi = (t, k) => (idx ? idx.getX(t * 3 + k) : t * 3 + k)
+  const a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3()
+  const mid = new Float32Array(n * 3), nrm = new Float32Array(n * 3), bad = []
+  for (let t = 0; t < n; t++) {
+    const [i, j, k] = [vi(t, 0), vi(t, 1), vi(t, 2)]
+    a.fromBufferAttribute(p, i), b.fromBufferAttribute(p, j), c.fromBufferAttribute(p, k)
+    mid.set([(a.x + b.x + c.x) / 3, (a.y + b.y + c.y) / 3, (a.z + b.z + c.z) / 3], t * 3)
+    c.sub(a), b.sub(a)
+    const area = b.cross(c).length() / 2
+    nrm.set(b.normalize().toArray(), t * 3)
+    const uvArea = (uv.getX(j) - uv.getX(i)) * (uv.getY(k) - uv.getY(i)) - (uv.getX(k) - uv.getX(i)) * (uv.getY(j) - uv.getY(i))
+    if (Math.abs(uvArea) < 2e-7 && area > 0.01) bad.push(t)
+  }
+  const badSet = new Set(bad)
+  for (const t of bad) {
+    let best = -1, d = Infinity
+    for (let o = 0; o < n; o++) {
+      if (badSet.has(o) || nrm[o * 3] * nrm[t * 3] + nrm[o * 3 + 1] * nrm[t * 3 + 1] + nrm[o * 3 + 2] * nrm[t * 3 + 2] < 0.9) continue
+      const dd = (mid[o * 3] - mid[t * 3]) ** 2 + (mid[o * 3 + 1] - mid[t * 3 + 1]) ** 2 + (mid[o * 3 + 2] - mid[t * 3 + 2]) ** 2
+      if (dd < d) d = dd, best = o
+    }
+    if (best < 0) continue
+    const u = (uv.getX(vi(best, 0)) + uv.getX(vi(best, 1)) + uv.getX(vi(best, 2))) / 3
+    const v = (uv.getY(vi(best, 0)) + uv.getY(vi(best, 1)) + uv.getY(vi(best, 2))) / 3
+    for (let k = 0; k < 3; k++) uv.setXY(vi(t, k), u, v)
+  }
+  uv.needsUpdate = true
+}
 
 /** Where the path runs: gently winding along +x. */
 const pathZ = x => Math.sin(x * 0.12) * 0.8
 
 export function createJourney(renderer, { loader, normalize }) {
   const scene = new THREE.Scene()
-  scene.fog = new THREE.Fog('#dfe6ea', 60, 220)
+  scene.fog = new THREE.Fog('#dfe6ea', 28, 140) // the far land melts into the sky's low colour (set per frame)
   const skyMesh = sky()
   scene.add(skyMesh)
   const su = skyMesh.material.uniforms
 
-  const land = new THREE.Mesh(new THREE.PlaneGeometry(400, 200).rotateX(-Math.PI / 2), toon({ map: paintTexture('#8fbf5e', ['#76ab4a', '#a3cd6c', '#82b553', '#9bc463'], { seed: 41 }) }))
-  land.material.map.repeat.set(30, 15)
+  const land = new THREE.Mesh(new THREE.PlaneGeometry(400, 200).rotateX(-Math.PI / 2), toon({ map: paintTexture('#86b65a', ['#6f9c48', '#9cc56a', '#b3bf72', '#7aa64f', '#c2b47e'], { count: 420, seed: 41 }) }))
+  land.material.map.repeat.set(8, 4) // big patches, so the field reads as painted at walking distance
   land.receiveShadow = true
   scene.add(land)
-  // The path: a ribbon of light earth that winds past every stop.
+  // The path: a ribbon of light earth that winds past every stop, on a wider verge of trodden dirt.
   const L = STOP_GAP * IDS.length + 30
-  const ribbon = new THREE.PlaneGeometry(L, 1.6, 240, 1).rotateX(-Math.PI / 2)
-  const pos = ribbon.attributes.position
-  for (let i = 0; i < pos.count; i++) {
-    const x = pos.getX(i) + L / 2 - 14
-    pos.setX(i, x)
-    pos.setZ(i, pos.getZ(i) + pathZ(x))
-    pos.setY(i, 0.012)
+  const ribbon = (width, y) => {
+    const geo = new THREE.PlaneGeometry(L, width, 240, 1).rotateX(-Math.PI / 2)
+    const pos = geo.attributes.position
+    for (let i = 0; i < pos.count; i++) {
+      const x = pos.getX(i) + L / 2 - 14
+      pos.setX(i, x)
+      pos.setZ(i, pos.getZ(i) + pathZ(x))
+      pos.setY(i, y)
+    }
+    return geo
   }
-  const path = new THREE.Mesh(ribbon, toon({ map: paintTexture('#ead8b4', ['#dcc59a', '#f4e6c8', '#e2cfa8'], { seed: 42 }) }))
+  const verge = new THREE.Mesh(ribbon(2.6, 0.006), toon({ color: '#a88f62' }))
+  verge.receiveShadow = true
+  scene.add(verge)
+  const path = new THREE.Mesh(ribbon(1.6, 0.012), toon({ map: paintTexture('#ead8b4', ['#dcc59a', '#f4e6c8', '#e2cfa8'], { seed: 42 }) }))
   path.material.map.repeat.set(L / 3, 1)
   path.receiveShadow = true
   scene.add(path)
 
-  // Scenery between the stops, so the walk passes through a place: trees and bushes, kept off the path.
+  // Scenery between the stops, so the walk passes through a place: inked poplars, kept off the path.
   const rnd = (() => { let q = 7; return () => ((q = (q * 16807) % 2147483647) / 2147483647) })()
   const spots = []
   while (spots.length < 140) {
@@ -57,19 +101,28 @@ export function createJourney(renderer, { loader, normalize }) {
     const nearStop = IDS.some((_, i) => Math.hypot(x - i * STOP_GAP, z - (pathZ(i * STOP_GAP) - 3.6)) < 4.2)
     if (!nearPath && !nearStop && z < pathZ(x) - 2.4) spots.push([x, z, 0.6 + rnd() * 0.9, rnd()]) // only behind the path: never between you and the camera
   }
-  const trunks = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.08, 0.12, 1, 6).translate(0, 0.5, 0), toon({ color: '#7a5638' }), spots.length)
-  const crowns = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(0.75, 0), toon({ color: '#ffffff' }), spots.length)
-  const m4 = new THREE.Matrix4(), qq = new THREE.Quaternion(), greens = ['#5f9a3e', '#78b04c', '#4f8a3a', '#8cbc58', '#c98f45'].map(c => new THREE.Color(c))
+  // A crown of two stacked cones, centred on its origin so the ink shell can scale about it.
+  const crownGeo = mergeGeometries([new THREE.ConeGeometry(0.62, 1.2, 7).translate(0, -0.25, 0), new THREE.ConeGeometry(0.46, 1.0, 7).translate(0, 0.45, 0)])
+  const trunkGeo = new THREE.CylinderGeometry(0.08, 0.12, 1, 6).translate(0, 0.5, 0)
+  const ink = new THREE.MeshBasicMaterial({ color: '#2a1f14', side: THREE.BackSide })
+  const trunks = new THREE.InstancedMesh(trunkGeo, toon({ color: '#7a5638' }), spots.length)
+  const crowns = new THREE.InstancedMesh(crownGeo, toon({ color: '#ffffff' }), spots.length)
+  const trunkInk = new THREE.InstancedMesh(trunkGeo, ink, spots.length)
+  const crownInk = new THREE.InstancedMesh(crownGeo, ink, spots.length)
+  const m4 = new THREE.Matrix4(), qq = new THREE.Quaternion(), v = new THREE.Vector3(), sc = new THREE.Vector3()
+  const greens = ['#4f7d3a', '#5e8c44', '#6f9a4c', '#3f6b33'].map(c => new THREE.Color(c))
+  const thick = new THREE.Matrix4().makeScale(1.07, 1.07, 1.07)
   spots.forEach(([x, z, s, r], i) => {
-    const tree = r > 0.45
-    m4.compose(new THREE.Vector3(x, 0, z), qq, new THREE.Vector3(s, tree ? s * 1.4 : 0.001, s))
+    m4.compose(v.set(x, 0, z), qq.identity(), sc.set(s, s * 1.4, s))
     trunks.setMatrixAt(i, m4)
-    m4.compose(new THREE.Vector3(x, tree ? s * 1.9 : s * 0.35, z), qq.setFromEuler(new THREE.Euler(0, r * 6, 0)), new THREE.Vector3(s, s * (tree ? 1.1 : 0.7), s))
+    trunkInk.setMatrixAt(i, m4.multiply(thick))
+    m4.compose(v.set(x, s * 2.2, z), qq.setFromEuler(new THREE.Euler(0, r * 6, 0)), sc.set(s, s * 1.15, s))
     crowns.setMatrixAt(i, m4)
+    crownInk.setMatrixAt(i, m4.multiply(thick))
     crowns.setColorAt(i, greens[Math.floor(r * 997) % greens.length])
   })
   trunks.castShadow = crowns.castShadow = true
-  scene.add(trunks, crowns)
+  scene.add(trunks, crowns, trunkInk, crownInk)
 
   const sun = new THREE.DirectionalLight('#fff1dc', 2.6)
   sun.castShadow = true
@@ -89,7 +142,8 @@ export function createJourney(renderer, { loader, normalize }) {
       g.position.y = -box.min.y
       g.traverse(o => {
         if (!o.isMesh) return
-        o.material = toon({ map: o.material.map })
+        mendUVs(o.geometry)
+        o.material = toon({ map: o.material.map, side: THREE.DoubleSide }) // open-backed scans: no pale backface or clipped corner
         o.castShadow = o.receiveShadow = true
       })
       holder.add(g)
@@ -152,17 +206,30 @@ export function createJourney(renderer, { loader, normalize }) {
     sun.intensity = a.k + (b.k - a.k) * k
     hemi.intensity = 0.6 + sun.intensity * 0.3
     scene.fog.color.copy(su.uLow.value)
-    sun.position.set(x - 6, 10, 8)
-    sun.target.position.set(x, 0, -2)
+    frameAt(x, aspect)
+    return { here, stop, dwell }
+  }
+
+  /** The sun and the camera at path position x. */
+  function frameAt(x, aspect) {
     // Camera: high three-quarter behind and to the side, following; you stand right of centre and the
     // story is told top-left.
     camera.aspect = aspect
     camera.updateProjectionMatrix()
     const portrait = aspect < 0.85
-    camera.position.set(x + 1.2, portrait ? 4.0 : 2.9, (portrait ? 11.5 : 7.6) + pathZ(x))
+    camera.position.set(x + 1.2, portrait ? 6.4 : 2.9, (portrait ? 16 : 7.6) + pathZ(x))
     frameLeft(camera, subject.set(x + 0.4, 1.5, pathZ(x) - 1.8), portrait ? 0 : -1.4)
-    return { here, stop, dwell }
+    // Phone: you and the stop sit in the top half, above the job card (a four-role card reaches 44% up).
+    if (portrait) lookBelow(camera, subject, 0.55)
+    sun.position.set(x - 6, 10, 8)
+    sun.target.position.set(x, 0, -2)
   }
 
-  return { scene, camera, update, stops, count: IDS.length }
+  /** Frame stop k without moving the walk, so a warm-up draw can see (and upload) that stop. */
+  function aim(k, aspect) {
+    frameAt(k * STOP_GAP, aspect)
+    sun.target.updateMatrixWorld()
+  }
+
+  return { scene, camera, update, aim, stops, count: IDS.length }
 }

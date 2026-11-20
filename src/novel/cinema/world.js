@@ -270,6 +270,10 @@ export async function createCinema(canvas, { mobile = false, onProgress } = {}) 
       film = createFilm(renderer, { mobile, loader })
       filmScreen.material.map = film.rt.texture
       filmScreen.material.needsUpdate = true
+      // Compile and first-draw the screen now (compile skips hidden meshes; the driver finishes a shader
+      // on its first draw), not on Two's first frame (~75 ms).
+      const withScreen = fn => { filmScreen.visible = true; const out = offscreen(fn, composer.inputBuffer); filmScreen.visible = false; return out }
+      withScreen(() => renderer.compileAsync(scene, camera)).then(() => withScreen(() => renderer.render(scene, camera))).catch(() => {})
     }
     return film
   }
@@ -282,6 +286,28 @@ export async function createCinema(canvas, { mobile = false, onProgress } = {}) 
   // has grown (its models load after it is built), and otherwise costs one traversal.
   const seen = {}
   let compiling = null
+  // Compile against a render target: the composer draws worlds into one, which takes a different
+  // shader variant (no tone mapping, linear output) from drawing to the screen.
+  const offscreen = (fn, target = scratch) => {
+    const prev = renderer.getRenderTarget()
+    renderer.setRenderTarget(target)
+    const out = fn()
+    renderer.setRenderTarget(prev)
+    return out
+  }
+  const nextFrame = () => new Promise(requestAnimationFrame)
+  // Upload a scene's textures a few at a time, about 8 ms a frame.
+  const uploadTextures = async root => {
+    const textures = new Set()
+    root.traverse(o => {
+      for (const m of [o.material].flat()) for (const v of Object.values(m ?? {})) if (v?.isTexture) textures.add(v)
+    })
+    let t0 = performance.now()
+    for (const tex of textures) {
+      renderer.initTexture(tex)
+      if (performance.now() - t0 > 8) await nextFrame(), (t0 = performance.now())
+    }
+  }
   const prepare = name => {
     const fresh = name === 'journey' ? !journey : !arcade
     const w = worlds[name]()
@@ -290,32 +316,20 @@ export async function createCinema(canvas, { mobile = false, onProgress } = {}) 
     w.scene.traverse(() => n++)
     if (compiling || seen[name] === n) return
     seen[name] = n
-    // Compile against a render target: the composer draws worlds into one, which takes a different
-    // shader variant (no tone mapping, linear output) from drawing to the screen.
-    const offscreen = fn => {
-      const prev = renderer.getRenderTarget()
-      renderer.setRenderTarget(scratch)
-      const out = fn()
-      renderer.setRenderTarget(prev)
-      return out
-    }
-    const frame = () => new Promise(requestAnimationFrame)
     compiling = offscreen(() => renderer.compileAsync(w.scene, w.camera)).then(async () => {
-      // Upload its textures a few at a time, about 8 ms a frame.
-      const textures = new Set()
-      w.scene.traverse(o => {
-        for (const m of [o.material].flat()) for (const v of Object.values(m ?? {})) if (v?.isTexture) textures.add(v)
-      })
-      let t0 = performance.now()
-      for (const tex of textures) {
-        renderer.initTexture(tex)
-        if (performance.now() - t0 > 8) await frame(), (t0 = performance.now())
-      }
-      await frame()
+      await uploadTextures(w.scene)
+      await nextFrame()
       offscreen(() => renderer.render(w.scene, w.camera)) // then one real draw: geometry and shadow map
+      // That draw only sees the first stop; frame each of the others in turn, one a frame, so none
+      // uploads its geometry or first shadow pass mid-walk.
+      if (name === 'journey') for (let k = 0; k < w.count; k++) {
+        await nextFrame()
+        w.aim(k, camera.aspect)
+        offscreen(() => renderer.render(w.scene, w.camera))
+      }
       if (name !== 'arcade') return
       // The game also leaves through the cinema's screen: make its screen target now, not mid-exit.
-      await frame()
+      await nextFrame()
       const prev = renderer.getRenderTarget()
       renderer.setRenderTarget(gameTarget())
       renderer.render(w.scene, w.camera)
@@ -323,6 +337,28 @@ export async function createCinema(canvas, { mobile = false, onProgress } = {}) 
     }).finally(() => { compiling = null })
   }
   const scratch = new THREE.WebGLRenderTarget(64, 64)
+  // Warm each film once it loads, in idle time and never alongside prepare(): its shaders for the screen's
+  // target and for the composer's (used once the camera is inside), its textures, and one draw. Without
+  // this the first frame of each film compiled and uploaded mid-scroll in Chapter Two.
+  const warmed = new Set()
+  const warmFilm = (id, s) => {
+    if (!s || warmed.has(id)) return
+    warmed.add(id)
+    const run = async () => {
+      while (compiling) await compiling.catch(() => {})
+      compiling = (async () => {
+        await offscreen(() => renderer.compileAsync(s.scene, s.camera), film.rt)
+        await offscreen(() => renderer.compileAsync(s.scene, s.camera))
+        await uploadTextures(s.scene)
+        await nextFrame()
+        s.update(0)
+        offscreen(() => renderer.render(s.scene, s.camera))
+      })().catch(() => {}).finally(() => { compiling = null })
+    }
+    if (window.requestIdleCallback) requestIdleCallback(run, { timeout: 2000 })
+    else setTimeout(run, 500)
+  }
+  const loadFilm = id => getFilm().load(id).then(s => (warmFilm(id, s), s))
   let gameRT = null
   const gameTarget = () => (gameRT ??= new THREE.WebGLRenderTarget(mobile ? 1152 : 2048, Math.round((mobile ? 1152 : 2048) / FILM_ASPECT), { type: THREE.HalfFloatType, samples: mobile ? 0 : 4 }))
   const showOnScreen = tex => {
@@ -368,7 +404,8 @@ export async function createCinema(canvas, { mobile = false, onProgress } = {}) 
   const toneMap = new ToneMappingEffect({ mode: ToneMappingMode.AGX })
   const vignette = new VignetteEffect({ offset: 0.28, darkness: 0.72 })
   const grain = new NoiseEffect({ blendFunction: BlendFunction.SOFT_LIGHT })
-  grain.blendMode.opacity.value = 0.16
+  const grainBase = mobile ? 0.1 : 0.16
+  grain.blendMode.opacity.value = grainBase
   composer.addPass(new EffectPass(camera, new ChromaticAberrationEffect({ offset: new THREE.Vector2(0.0008, 0.0005), radialModulation: true, modulationOffset: 0.25 }), bloom, toneMap, vignette, grain))
   const sketch = new SketchPass(camera, noise)
   composer.addPass(sketch)
@@ -380,7 +417,8 @@ export async function createCinema(canvas, { mobile = false, onProgress } = {}) 
   function card(key, { kicker = '', title = '', field = ['#03060c', '#1a2a46'], ink = '#ffffff' } = {}) {
     if (key === lastCard) return
     lastCard = key
-    const g = frame.getContext('2d')
+    // A CPU-backed canvas: uploading a GPU canvas after a redraw read it back and stalled a frame ~50 ms.
+    const g = frame.getContext('2d', { willReadFrequently: true })
     const S = frame.width
     const h = S * band, y0 = (S - h) / 2
     g.fillStyle = '#000'
@@ -401,6 +439,9 @@ export async function createCinema(canvas, { mobile = false, onProgress } = {}) 
     }
     if (title) {
       g.font = `400 ${Math.round(h * 0.3)}px "Instrument Serif", serif`
+      // An email of any length stays inside the screen; a portrait phone frames only its middle half.
+      const fit = Math.min(1, ((mobile ? 0.46 : 0.86) * S) / g.measureText(title).width)
+      if (fit < 1) g.font = `400 ${Math.round(h * 0.3 * fit)}px "Instrument Serif", serif`
       g.fillText(title, S / 2, y0 + h * 0.56)
     }
     // A film frame is never clean: faint grain and a soft gate edge.
@@ -520,6 +561,7 @@ export async function createCinema(canvas, { mobile = false, onProgress } = {}) 
     renderPass.mainScene = away ? away.scene : scene
     renderPass.mainCamera = away ? away.camera : camera
     vol.enabled = !away
+    grain.blendMode.opacity.value = grainBase * (away ? 0.45 : 1) // the hall keeps its film grain; the painted worlds read cleaner
     // Backing out of the screen at the end of Chapter Four, the game's own grade gives way to the hall's
     // as the hall comes into view (k: 0 inside the screen, 1 at the seats), so nothing jumps at the cut.
     const k = onScreen ? state.arcade.back ?? 1 : 1
@@ -561,8 +603,8 @@ export async function createCinema(canvas, { mobile = false, onProgress } = {}) 
   toneMap.mode = ToneMappingMode.AGX
   onProgress?.(1)
   return {
-    renderer, scene, camera, render, resize, loadFilm: id => getFilm().load(id), prepare, setDpr, get dpr() { return renderer.getPixelRatio() },
+    renderer, scene, camera, render, resize, loadFilm, prepare, setDpr, get dpr() { return renderer.getPixelRatio() },
     setActive: v => { active = v },
-    debug: { vol, bloom, toneMap, dust, lamp, hallMat, seats, projector, screenLight, hemi, bulb, flare, streak },
+    debug: { vol, bloom, toneMap, grain, dust, lamp, hallMat, seats, projector, screenLight, hemi, bulb, flare, streak },
   }
 }

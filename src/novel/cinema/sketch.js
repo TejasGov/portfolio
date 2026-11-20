@@ -11,7 +11,7 @@ import { Pass } from 'postprocessing'
  *                with no cut
  * The wave is in world space: a wavy sphere growing from `origin` (or a plane along `dir`). Behind its
  * front the world is in full colour, ahead of it the drawing; at the front the colour bleeds into the
- * paper like watercolour, the world refracts and splits into its colours, a crisp line of light with a
+ * paper like watercolour, the world refracts, a crisp line of light with a
  * soft halo runs along it, and the colour arrives first as a grid of light lines. Each seam sets its
  * own crest tint, or takes the hue of the world it reveals (Monolith's wave, in our own materials).
  */
@@ -72,8 +72,9 @@ void main() {
   float lit = max(dot(nw, normalize(uKey)), 0.0);
   float shade = far ? 0.0 : 1.0 - lit;
   float hw = (noise3(vec3(px * 0.003, 1.3)) - 0.5) * 0.8;
-  float h1 = hatch(px, 0.79, 7.0 * uScale, smoothstep(0.6, 1.0, shade) * 0.8, hw) * smoothstep(0.6, 0.72, shade);
-  float h2 = hatch(px, -0.62, 9.0 * uScale, smoothstep(0.8, 1.0, shade) * 0.7, hw * 1.3) * smoothstep(0.8, 0.9, shade);
+  // A light single hatch on turned-away walls; the cross-hatch only in the deepest shade, so flat walls never moire.
+  float h1 = hatch(px, 0.79, 7.0 * uScale, smoothstep(0.68, 1.0, shade) * 0.6, hw) * smoothstep(0.68, 0.8, shade);
+  float h2 = hatch(px, -0.62, 9.0 * uScale, smoothstep(0.9, 1.0, shade) * 0.5, hw * 1.3) * smoothstep(0.9, 0.97, shade);
   // Fade the strokes with distance, as an illustrator would leave the back of the room loose.
   float dist = smoothstep(60.0, 8.0, zc);
   float ink = clamp(line + (h1 * 0.45 + h2 * 0.35) * dist, 0.0, 1.0) * uLines; // uLines fades the drawing on and off the page
@@ -95,13 +96,13 @@ void main() {
   float feather = max(uBand * 0.3, fw * 1.5);
   float behind = 1.0 - smoothstep(-feather, feather, d);
   float colourK = uColorBehind > 0.5 ? behind : 1.0 - behind;
-  // Near the front the world refracts, as through a lens of moving water, split into its colours.
+  // Near the front the world refracts, as through a lens of moving water (one offset: a colour split read as a tear).
   vec2 grad = vec2(dFdx(d), dFdy(d));
   float near = exp(-abs(d) / max(uBand * 0.7, 0.01)) * (far ? 0.0 : 1.0) * uShimmer;
   vec3 world_col = src.rgb;
   if (near > 0.02) {
-    vec2 off = grad / max(length(grad), 1e-5) * uTexel * (7.0 * uScale) * near * sin(d * 6.0 - uTime * 3.0);
-    world_col = vec3(texture2D(inputBuffer, vUv + off * 1.6).r, texture2D(inputBuffer, vUv + off).g, texture2D(inputBuffer, vUv + off * 0.4).b);
+    vec2 off = grad / max(length(grad), 1e-5) * uTexel * (3.5 * uScale) * near * sin(d * 6.0 - uTime * 3.0);
+    world_col = texture2D(inputBuffer, vUv + off).rgb;
   }
   // The crest's colour: the seam's own tint, two-toned along the front, or (uAuto) the hue of the world it reveals.
   vec3 hue = world_col / max(max(world_col.r, max(world_col.g, world_col.b)), 1e-3);
@@ -110,7 +111,9 @@ void main() {
   // Watercolour bleed just on the drawing side of the front: the paper takes the world's hue.
   float ahead = uColorBehind > 0.5 ? max(d, 0.0) : max(-d, 0.0);
   float bleed = exp(-ahead / max(uBand, 0.01)) * (1.0 - colourK);
-  drawing = mix(drawing, drawing * mix(vec3(1.0), hue, 0.75) * 1.05, bleed);
+  // A tinted seam bleeds its own colour, so the journey's paper doesn't go lime from the grass.
+  vec3 bleedHue = mix(tint / max(max(tint.r, max(tint.g, tint.b)), 1e-3), hue, uAuto);
+  drawing = mix(drawing, drawing * mix(vec3(1.0), bleedHue, 0.75) * 1.05, bleed);
   vec3 col = mix(drawing, world_col, colourK);
   // Where colour has just arrived, the world is first drawn in lines of light: a grid that fills in.
   float since = max(-d, 0.0);

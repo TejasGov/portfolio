@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import { toon, paintTexture, textSprite, inkBox, inkMesh, frameLeft } from './kit'
+import { toon, paintTexture, textSprite, inkBox, inkMesh, frameLeft, lookBelow, FRAME } from './kit'
 
 /*
  * CogniFlow, the film: late at night at a desk. A ring of focus glows around your head. Distractions
@@ -69,10 +69,14 @@ export async function cogniflow({ traveller }) {
   scene.fog = new THREE.Fog('#141225', 10, 30)
 
   // The room: a wall with a window on the city, a floor, a desk, a lamp, a laptop.
-  const wall = new THREE.Mesh(new THREE.PlaneGeometry(30, 12), toon({ map: paintTexture('#3a3156', ['#2f2848', '#463c66', '#352d50'], { seed: 21 }) }))
-  wall.position.set(0, 5, -3)
+  // Wall and floor run far to the left: the profile camera sees past x = -15, where a shorter wall's
+  // end read as a pale rectangle behind the lamp.
+  const wall = new THREE.Mesh(new THREE.PlaneGeometry(70, 12), toon({ map: paintTexture('#3a3156', ['#2f2848', '#463c66', '#352d50'], { seed: 21 }) }))
+  wall.material.map.repeat.set(70 / 30, 1)
+  wall.position.set(-20, 5, -3)
   wall.receiveShadow = true
-  const floor = new THREE.Mesh(new THREE.PlaneGeometry(30, 20).rotateX(-Math.PI / 2), toon({ map: paintTexture('#5a3f35', ['#4a332b', '#6b4c40', '#523a31'], { seed: 22 }) }))
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(70, 20).rotateX(-Math.PI / 2).translate(-20, 0, 0), toon({ map: paintTexture('#5a3f35', ['#4a332b', '#6b4c40', '#523a31'], { seed: 22 }) }))
+  floor.material.map.repeat.set(70 / 30, 1)
   floor.receiveShadow = true
   const win = new THREE.Mesh(new THREE.PlaneGeometry(3.2, 2.4), new THREE.MeshBasicMaterial({ map: nightWindow() }))
   win.position.set(-2.4, 2.6, -2.97)
@@ -192,9 +196,13 @@ export async function cogniflow({ traveller }) {
     nudge.position.copy(head).add(new THREE.Vector3(0, 0.7 + n * 0.06, -0.2))
     // Camera: in profile across the desk, breathing in slowly.
     const a = 1.25 + Math.sin(time * 0.1) * 0.06
-    const d = 5.4 - Math.min(t, 6) * 0.06
-    camera.position.set(Math.sin(a) * d - 0.25, 1.7, Math.cos(a) * d + 0.62)
-    frameLeft(camera, subject.set(-0.25, 1.2, 0.5), 0.85)
+    // Phone: the narrow crop sees a sliver of this frame, so stand further back, aim at the middle of
+    // the body (it leans toward the chair back, screen left) and keep you in the top half.
+    const far = FRAME.portrait ? 1.7 : 1
+    const d = (5.4 - Math.min(t, 6) * 0.06) * far
+    camera.position.set(Math.sin(a) * d - 0.25, FRAME.portrait ? 2.2 : 1.7, Math.cos(a) * d + 0.62)
+    frameLeft(camera, subject.set(-0.25, 1.2, FRAME.portrait ? 0.85 : 0.5), 0.85)
+    if (FRAME.portrait) lookBelow(camera, subject, 0.5)
   }
 
   return { scene, camera, update, tick(dt) { you.mixer.update(dt) } }

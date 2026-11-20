@@ -2,9 +2,23 @@ import { useLayoutEffect, useRef } from 'react'
 import PixelFringe from '../lib/PixelFringe'
 import { usePaper, useRunningHead } from '../lib/chapters'
 import { gsap, reducedMotion } from '../lib/scroll'
+import { store } from '../lib/store'
 import { SPREADS, src } from './collage'
 import { ALL_ROLES, CONTACT } from '../content'
 import { SUMMARY } from '@/data/aboutData'
+
+// Intrinsic sizes, so each photo reserves its box before it decodes (and decodes off the main thread).
+const SIZE = {
+  'amitabh2-s': [611, 640], 'ball-s': [1086, 1134], 'bat-s': [177, 1134], 'cathedral-t': [1100, 746], 'chaiwala-t': [1440, 973],
+  'csk-t': [1000, 684], 'deepika-s': [709, 1134], 'dhoni2-s': [776, 900], 'gully-cricket-t': [1440, 973], 'kareena-s': [611, 640],
+  'khusro-bagh-t': [1100, 839], 'kulhad-s': [1044, 1063], 'kulhad-trio-s': [1134, 985], 'mela-night-t': [1440, 973],
+  'muir-college-t': [1100, 720], 'naini-bridge-t': [1440, 973], 'pvr-t': [1000, 762], 'ranbir-s': [611, 640], 'reel-s': [1112, 1134],
+  'sangam-t': [1440, 973], 'srk2-s': [611, 640], 'sunflower-s': [1004, 942], 'tejas-t': [1026, 1266], 'thornhill-t': [1100, 839],
+  'wc2011-t': [1070, 726],
+}
+const photo = name => ({ src: src(name), width: SIZE[name]?.[0], height: SIZE[name]?.[1], decoding: 'async', draggable: 'false' })
+/** Decode a spread's photos ahead of time, so none decodes on the frame it scrolls in. */
+const decodeAll = root => root?.querySelectorAll('img').forEach(img => img.decode().catch(() => {}))
 
 /* ------------------------------------------------------------- doodles */
 
@@ -55,7 +69,7 @@ function AboutCard({ style }) {
   return (
     <div className="piece about" data-in="about" style={style}>
       <figure className="about-photo">
-        <img src={src('tejas-t')} alt="Tejas Govind" draggable="false" />
+        <img {...photo('tejas-t')} alt="Tejas Govind" />
         <span className="tape" style={{ left: '50%', top: '-3%', rotate: '-4deg' }} />
       </figure>
       <div className="about-body">
@@ -86,7 +100,7 @@ function Piece({ it }) {
     case 'img':
       return (
         <figure className="piece" data-in={it.fly ? 'fly' : 'img'} data-depth={it.depth ?? 0} style={{ ...style, '--w': it.w }}>
-          <img src={src(it.src)} alt="" draggable="false" className={`block w-full ${it.duotone ? 'duotone' : ''} ${it.spin ? 'spin-slow' : ''}`} />
+          <img {...photo(it.src)} alt="" className={`block w-full ${it.duotone ? 'duotone' : ''} ${it.spin ? 'spin-slow' : ''}`} />
           {it.duotone && <span className="duotone-ink" aria-hidden="true" />}
           {it.steam && <Steam />}
           {it.whoosh && <Whoosh />}
@@ -148,7 +162,7 @@ function Piece({ it }) {
         <div className="piece cast" data-in="cast" data-depth={it.depth ?? 0} style={{ ...style, '--w': it.w }}>
           {it.people.map(([name, file], i) => (
             <figure key={name} className="cast-member" style={{ '--i': i, '--r': `${((i * 37) % 9) - 4}deg` }}>
-              <img src={src(file)} alt={name} draggable="false" />
+              <img {...photo(file)} alt={name} />
               <figcaption>{name}</figcaption>
             </figure>
           ))}
@@ -239,16 +253,30 @@ export default function ChapterOne({ spreads = SPREADS }) {
 
   useLayoutEffect(() => {
     if (reducedMotion()) return undefined
+    const spreadEls = strip.current.querySelectorAll('.spread')
+    // The first two spreads decode now and again as the prologue nears its end; each later one as the
+    // spread before it scrolls in.
+    const early = () => [0, 1].forEach(i => decodeAll(spreadEls[i]))
+    early()
+    let primed = false
+    const onStore = (key, v) => {
+      if (key === 'prologue' && v > 0.5 && !primed) { primed = true; early() }
+    }
+    store.listeners.add(onStore)
     const ctx = gsap.context(() => {
       const section = ref.current
       const el = strip.current
-      const travel = () => el.scrollWidth - innerWidth
+      // Travel to the strip's end, but never past the closing line's left edge (+ a 20px gutter): a
+      // portrait spread is wider than the screen, so the full run would cut the last sentence off.
+      const last = el.querySelector('.closing')
+      const travel = () => Math.min(el.scrollWidth - innerWidth, last ? last.parentElement.offsetLeft + last.offsetLeft - 20 : Infinity)
       // The scrapbook slides sideways while the page scrolls down.
       const move = gsap.to(el, {
         x: () => -travel(),
         ease: 'none',
-        // Hold on the title card for the first ~60% of a screen before the scrapbook starts to travel.
-        scrollTrigger: { trigger: section, start: () => `top+=${Math.round(innerHeight * 0.6)} top`, end: 'bottom bottom', scrub: 0.7, invalidateOnRefresh: true },
+        // Hold on the title card before the scrapbook starts to travel: ~60% of a screen, or 1.6 on a
+        // portrait screen, where the About card fills the view and needs reading before it moves.
+        scrollTrigger: { trigger: section, start: () => `top+=${Math.round(innerHeight * (innerWidth / innerHeight <= 1 ? 1.6 : 0.6))} top`, end: 'bottom bottom', scrub: 0.7, invalidateOnRefresh: true },
       })
       // The route draws itself across the strip, a red nib at its tip leading you from spread to spread.
       const line = el.querySelector('.route-line:not(.route-ghost)')
@@ -263,29 +291,31 @@ export default function ChapterOne({ spreads = SPREADS }) {
           if (!line || !nib) return
           const k = this.progress()
           const pt = line.getPointAtLength(k * length)
-          nib.style.left = `calc(${pt.x.toFixed(2)} * var(--strip-unit))`
-          nib.style.top = `${pt.y.toFixed(2)}%`
+          // By transform, not left/top, so the nib never relayouts the strip (it is 100svh tall).
+          nib.style.translate = `calc(${pt.x.toFixed(2)} * var(--strip-unit)) ${pt.y.toFixed(2)}svh`
           nib.style.opacity = k > 0.002 && k < 0.998 ? 1 : 0
         },
       })
 
       // Title letters assemble from scattered paper scraps as the page takes over from the light.
       gsap.from('.title-letter', {
-        x: () => gsap.utils.random(-260, 260),
-        y: () => gsap.utils.random(-220, 220),
-        rotation: () => gsap.utils.random(-70, 70),
+        x: () => gsap.utils.random(-160, 160),
+        y: () => gsap.utils.random(-140, 140),
+        rotation: () => gsap.utils.random(-50, 50),
         opacity: 0,
         ease: 'expo.out',
         stagger: { each: 0.02, from: 'random' },
-        scrollTrigger: { trigger: section, start: 'top 85%', end: 'top 5%', scrub: 0.8 },
+        // Done by the time the page is three-quarters up, so a reader who stops mid-seam reads the title whole.
+        scrollTrigger: { trigger: section, start: 'top 85%', end: 'top 40%', scrub: 0.8 },
       })
 
-      el.querySelectorAll('.spread').forEach((spread, i) => {
+      spreadEls.forEach((spread, i) => {
         const items = spread.querySelectorAll(':scope > .piece')
+        const onEnter = () => decodeAll(spreadEls[i + 1])
         const tl = gsap.timeline({
           scrollTrigger: i === 0
-            ? { trigger: section, start: 'top 70%', end: 'top top', scrub: 0.8 }
-            : { trigger: spread, containerAnimation: move, start: 'left 88%', end: 'left 20%', scrub: 0.8 },
+            ? { trigger: section, start: 'top 70%', end: 'top top', scrub: 0.8, onEnter }
+            : { trigger: spread, containerAnimation: move, start: 'left 88%', end: 'left 20%', scrub: 0.8, onEnter },
         })
         // The sheet is laid down first, from its own edge, like a hand sliding a page into the book.
         const sheet = spread.querySelector(':scope > .sheet')
@@ -308,7 +338,7 @@ export default function ChapterOne({ spreads = SPREADS }) {
             const fx = it.dataset.fx
             if (fx === 'build') tl.from(letters, { yPercent: 70, scaleY: 0.2, transformOrigin: '50% 100%', opacity: 0, duration: 0.45, ease: 'power4.out', stagger: 0.07 }, at)
             else if (fx === 'stamp') tl.from(letters, { y: -140, scale: 1.7, rotation: () => gsap.utils.random(-24, 24), opacity: 0, duration: 0.35, ease: 'back.out(2.4)', stagger: 0.08 }, at)
-            else if (fx === 'steam') tl.from(letters, { y: 90, x: () => gsap.utils.random(-30, 30), opacity: 0, filter: 'blur(8px)', duration: 0.6, ease: 'sine.out', stagger: 0.1 }, at)
+            else if (fx === 'steam') tl.from(letters, { y: 90, x: () => gsap.utils.random(-30, 30), opacity: 0, duration: 0.6, ease: 'sine.out', stagger: 0.1 }, at) // no blur: an animated filter repaints every frame
             else if (fx === 'bounce') tl.from(letters, { y: -260, opacity: 0, duration: 0.6, ease: 'bounce.out', stagger: 0.06 }, at)
             else tl.from(letters, { opacity: 0, duration: 0.3, ease: 'steps(4)', stagger: { each: 0.07, from: 'random' } }, at) // marquee: bulbs flicking on
           } else if (kind === 'poster') tl.from(it, { yPercent: 40, opacity: 0, duration: 0.6, ease: 'expo.out' }, at)
@@ -346,13 +376,16 @@ export default function ChapterOne({ spreads = SPREADS }) {
         scrollTrigger: { trigger: section, start: 'top top', end: 'bottom bottom', scrub: 0.7 },
       })
     }, ref)
-    return () => ctx.revert()
+    return () => {
+      store.listeners.delete(onStore)
+      ctx.revert()
+    }
   }, [])
 
   // Reduced motion: no sideways travel — the spreads simply stack and scroll like pages.
   const still = reducedMotion()
   return (
-    <section ref={ref} id="one" aria-labelledby="one-title" className="paper relative z-20" style={{ height: still ? 'auto' : 'var(--one-height)' }}>
+    <section ref={ref} id="one" aria-labelledby="one-title" className="paper relative z-20" style={{ height: still ? 'auto' : 'var(--one-height)', marginTop: still ? 0 : 'calc(-1 * var(--one-overlap))' }}>
       <PixelFringe edge="bottom" />
       <div className={still ? 'relative' : 'sticky top-0 h-svh overflow-hidden'}>
         <div ref={strip} className={`strip relative flex ${still ? 'flex-col' : 'h-full'}`}>
@@ -360,7 +393,7 @@ export default function ChapterOne({ spreads = SPREADS }) {
             <div key={s.id} className={`spread relative shrink-0 ${still ? 'h-svh' : 'h-full'}`} aria-label={s.label}>
               {s.sheet && <Sheet sheet={s.sheet} seed={i + 1} />}
               {i === 0 && (
-                <div className="absolute top-[18%] left-[7%] max-w-[60%]">
+                <div className="absolute top-[18%] left-[max(16px,7%)] max-w-[60%]">
                   <p className="poster text-stamp" style={{ '--s': 4.2 }}>Chapter One</p>
                   <h2 id="one-title" className="mt-4 font-display text-[calc(var(--strip-unit)*8.6)] leading-[0.88] tracking-[-0.02em] text-ink" aria-label={TITLE}>
                     {/* Letters fly in individually, but each word stays unbroken across lines. */}

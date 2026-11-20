@@ -9,6 +9,7 @@ import { createPixelSweep } from '../cinema/sweep'
 export default function Takeover() {
   const flood = useRef(null)
   const px = useRef(null)
+  const grain = useRef(null)
 
   useEffect(() => {
     const sweep = createPixelSweep(px.current, { origin: [0.5, 0.45] })
@@ -27,6 +28,7 @@ export default function Takeover() {
         el.style.background = `radial-gradient(circle at ${x}% ${y}%, #ffffff 0, #dce9ff ${r * 0.18}vmax, rgb(120 170 255 / ${0.95 * f}) ${r * 0.55}vmax, rgb(36 86 230 / ${0.9 * f}) ${r * 0.85}vmax, rgb(20 50 160 / 0) ${r}vmax)`
       }
       sweep.draw(show ? s : 0, (performance.now() - t0) / 1000)
+      grain.current.style.opacity = (show * s).toFixed(3)
     }
     raf = requestAnimationFrame(tick)
     return () => cancelAnimationFrame(raf)
@@ -36,6 +38,7 @@ export default function Takeover() {
     <>
       <div ref={flood} className="pointer-events-none fixed inset-0 z-[2] opacity-0" aria-hidden="true" />
       <canvas ref={px} className="pointer-events-none fixed inset-0 z-[3] [image-rendering:pixelated]" aria-hidden="true" />
+      <div ref={grain} className="paper-grain pointer-events-none fixed inset-0 z-[3] opacity-0" aria-hidden="true" />
     </>
   )
 }

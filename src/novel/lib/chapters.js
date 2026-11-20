@@ -42,15 +42,15 @@ export function usePaper(ref) {
   }, [ref])
 }
 
-/** Report which chapter is on screen, for the running head. */
-export function useRunningHead(ref, label) {
+/** Report which chapter is on screen, for the running head. Pass the 3D's own start/end so the label switches with it. */
+export function useRunningHead(ref, label, { start = 'top 50%', end = 'bottom 50%' } = {}) {
   useEffect(() => {
     const st = ScrollTrigger.create({
       trigger: ref.current,
-      start: 'top 50%',
-      end: 'bottom 50%',
+      start,
+      end,
       onToggle: self => self.isActive && store.set('chapterLabel', label),
     })
     return () => st.kill()
-  }, [ref, label])
+  }, [ref, label, start, end])
 }
