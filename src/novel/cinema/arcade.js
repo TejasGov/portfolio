@@ -1,4 +1,5 @@
 import * as THREE from 'three'
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js'
 import { loadTraveller, toon } from './films/kit'
 import { buildOceanDrive, duskSky, neonSignTexture } from './oceandrive'
 
@@ -197,10 +198,12 @@ export function createArcade(renderer, { loader, normalize, mobile = false }) {
   // One column per metre: top colour by height (sand, grass, stone), sides banded every metre so a
   // column reads as stacked blocks; a little per-block speckle, our own palette, no borrowed textures.
   const blockStd = opts => onWave(new THREE.MeshStandardMaterial(opts), -1, U)
-  // Per-block detail in the shader, our own palette and no borrowed textures: a little speckle per
-  // block, darker seams between blocks, earth under a band of grass on the sides, and a soft occlusion
-  // toward the bottom of every block face so a column reads as stacked cubes.
-  const blockDetail = mat => {
+  // Pixel-block surfaces, drawn in the shader in our own palette (no borrowed textures): 16 pixels to a
+  // block, each a little lighter or darker; dark seams between blocks; occlusion toward each block's
+  // foot. Kinds: 0 terrain (grass tops over earth sides with a ragged grass lip; stone; sand; snow),
+  // 1 leaves (with gaps), 2 wood (bark in vertical streaks), 3 plain (painted blocks, clouds, water).
+  const blockDetail = (mat, kind) => {
+    mat.defines = { ...mat.defines, BLOCK_KIND: kind }
     const prev = mat.onBeforeCompile
     mat.onBeforeCompile = sh => {
       prev(sh)
@@ -212,24 +215,38 @@ export function createArcade(renderer, { loader, normalize, mobile = false }) {
           vWaveN = normal;`)
       sh.fragmentShader = sh.fragmentShader
         .replace('#include <common>', `#include <common>
-          varying float vTop; varying vec3 vWaveN;`)
+          varying float vTop; varying vec3 vWaveN;
+          float bhash(vec3 p) { return fract(sin(dot(p, vec3(12.99, 78.23, 37.71))) * 43758.5); }`)
         .replace('#include <color_fragment>', `#include <color_fragment>
-          vec3 cell = floor(vWaveP + 0.001);
-          float spk = fract(sin(dot(cell, vec3(12.99, 78.23, 37.71))) * 43758.5);
-          vec3 f = fract(vWaveP);
-          float grain = fract(sin(dot(floor(vWaveP * 8.0), vec3(3.1, 7.7, 5.3))) * 9124.7);
+          vec3 bq = vWaveP - vWaveN * 0.002; // just inside the face, so each pixel's cell is stable
+          vec3 px = floor(bq * 16.0);
+          float n = bhash(px), n2 = bhash(px + 17.0);
+          vec3 f = fract(bq);
           float edge = min(min(min(f.x, 1.0 - f.x), min(f.z, 1.0 - f.z)), min(f.y, 1.0 - f.y));
-          diffuseColor.rgb *= (0.9 + 0.12 * spk) * (0.93 + 0.07 * grain) * (0.8 + 0.2 * smoothstep(0.0, 0.05, edge));
           bool side = abs(vWaveN.y) < 0.5;
-          bool grassy = diffuseColor.g > diffuseColor.r * 1.25 && diffuseColor.g > diffuseColor.b * 1.2;
-          if (side) {
-            if (vWaveP.y < vTop - 0.2) diffuseColor.rgb = grassy ? vec3(0.47, 0.32, 0.21) * (0.88 + 0.16 * spk) * (0.93 + 0.07 * grain) : diffuseColor.rgb * 0.82;
-            diffuseColor.rgb *= 0.72 + 0.28 * smoothstep(0.0, 0.7, f.y); // occlusion toward each block's foot
-          }`)
+          vec3 c = diffuseColor.rgb;
+          #if BLOCK_KIND == 0
+            bool grassy = c.g > c.r * 1.25 && c.g > c.b * 1.2;
+            bool snowy = c.r > 0.85 && c.b > 0.85;
+            float lip = (2.0 + floor(bhash(vec3(px.x + px.z, 0.0, 3.0)) * 4.0)) / 16.0;
+            if (side && bq.y < vTop - lip) c = grassy ? vec3(0.45, 0.3, 0.19) : snowy ? vec3(0.55, 0.57, 0.6) : c * 0.85;
+            c *= 0.84 + 0.26 * n;
+            if (n2 > 0.93) c *= 0.78;
+          #elif BLOCK_KIND == 1
+            c *= 0.78 + 0.34 * n;
+            if (n2 < 0.16) c *= 0.45;
+          #elif BLOCK_KIND == 2
+            c *= side ? 0.72 + 0.34 * bhash(vec3(px.x + px.z, floor(px.y / 3.0), 7.0)) : 0.88 + 0.16 * n;
+          #else
+            c *= 0.93 + 0.1 * n;
+          #endif
+          c *= 0.8 + 0.2 * smoothstep(0.0, 0.04, edge);
+          if (side) c *= 0.74 + 0.26 * smoothstep(0.0, 0.7, f.y);
+          diffuseColor.rgb = c;`)
     }
     return mat
   }
-  const blocksMat = blockDetail(blockStd({ color: '#ffffff', roughness: 0.92 }))
+  const blockMats = [0, 1, 2, 3].map(k => blockDetail(blockStd({ color: '#ffffff', roughness: k === 1 ? 0.8 : 0.92 }), k))
   const cols = [], water = []
   const hgt = (x, z) => {
     const n = Math.sin(x * 0.17) * Math.cos(z * 0.21) + Math.sin(x * 0.05 + z * 0.08) * 1.6
@@ -244,7 +261,7 @@ export function createArcade(renderer, { loader, normalize, mobile = false }) {
       const top = z > 9 ? '#efd795' : h > 12 ? '#f4f7fb' : h > 8 ? '#9aa3ad' : '#5aa84a'
       cols.push([x, z, h, top])
     }
-  const grid = new THREE.InstancedMesh(cube, blocksMat, cols.length)
+  const grid = new THREE.InstancedMesh(cube, blockMats[0], cols.length)
   const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), s = new THREE.Vector3(), p = new THREE.Vector3()
   cols.forEach(([x, z, h, c], i) => {
     m4.compose(p.set(x + 0.5, -3, z + 0.5), q, s.set(1, h + 3, 1))
@@ -254,7 +271,7 @@ export function createArcade(renderer, { loader, normalize, mobile = false }) {
   grid.receiveShadow = grid.castShadow = true
   scene.add(grid)
   // Water: glossy blocks that hold the sky.
-  const sea2 = new THREE.InstancedMesh(cube, blockDetail(blockStd({ color: '#3d97d6', roughness: 0.12, metalness: 0.1 })), water.length)
+  const sea2 = new THREE.InstancedMesh(cube, blockDetail(blockStd({ color: '#3d97d6', roughness: 0.12, metalness: 0.1 }), 3), water.length)
   water.forEach(([x, z], i) => {
     m4.compose(p.set(x + 0.5, -1.2, z + 0.5), q, s.set(1, 1, 1))
     sea2.setMatrixAt(i, m4)
@@ -263,15 +280,19 @@ export function createArcade(renderer, { loader, normalize, mobile = false }) {
   scene.add(sea2)
   // Block trees where the palms stood (a fuller crown), block towers where the hotels stood, clouds.
   const bits = []
-  const addBlock = (x, y, z, sx, sy, sz, c) => bits.push([x, y, z, sx, sy, sz, c])
-  const tree = (x, z, h) => {
-    addBlock(x, 0, z, 1, h, 1, '#8a5a3a')
-    addBlock(x, h - 1, z, 5, 2, 5, '#4f9e3c')
-    addBlock(x, h + 1, z, 3, 1, 3, '#5aad45')
-    addBlock(x + 1, h + 2, z, 1, 1, 1, '#66bb50')
+  const addBlock = (x, y, z, sx, sy, sz, c, kind = 3) => bits.push([x, y, z, sx, sy, sz, c, kind])
+  // Two kinds of tree: a dark-barked one with a deep green crown, and a pale-barked, lighter one. The
+  // crown is a cross of leaf blocks (no square corners), a smaller layer, and a tuft on top.
+  const tree = (x, z, h, pale) => {
+    const [bark, leaf, leaf2] = pale ? ['#e6dfd2', '#7cc35a', '#8fd06a'] : ['#7a5232', '#4f9e3c', '#5aad45']
+    addBlock(x, 0, z, 1, h, 1, bark, 2)
+    addBlock(x, h - 1, z, 5, 2, 3, leaf, 1)
+    addBlock(x, h - 1, z, 3, 2, 5, leaf, 1)
+    addBlock(x, h + 1, z, 3, 1, 3, leaf2, 1)
+    addBlock(x + (pale ? -1 : 1), h + 2, z, 1, 1, 1, leaf2, 1)
   }
-  for (let x = -14; x < 160; x += 6.5) tree(x, 6, 4 + Math.round(Math.abs(Math.sin(x)) * 2))
-  for (const [x, z] of [[-8, -16], [3, -19], [16, -17], [27, -21], [44, -18], [55, -16], [72, -19], [88, -15], [104, -20], [121, -17], [140, -18], [156, -16]]) tree(x, z, 5)
+  for (let x = -14, k = 0; x < 160; x += 6.5, k++) tree(x, 6, 4 + Math.round(Math.abs(Math.sin(x)) * 2), k % 3 === 1)
+  for (const [k, [x, z]] of [[-8, -16], [3, -19], [16, -17], [27, -21], [44, -18], [55, -16], [72, -19], [88, -15], [104, -20], [121, -17], [140, -18], [156, -16]].entries()) tree(x, z, 5 + (k % 2), k % 2 === 0)
   for (const [x, odd] of HOTELS) {
     const floors = odd ? 3 : 5
     const tint = ['#f4b3c9', '#a8e6d3', '#ffd0a8', '#c9b6f2'][Math.abs(Math.round(x)) % 4]
@@ -290,14 +311,48 @@ export function createArcade(renderer, { loader, normalize, mobile = false }) {
   addBlock(AX + 0.1, 1.1, AZ, 0.8, 0.9, 1, '#3b2470') // upper body, set back
   addBlock(AX - 0.31, 1.25, AZ, 0.04, 0.6, 0.76, '#7ff6ff') // screen
   addBlock(AX + 0.05, 2.0, AZ, 0.9, 0.35, 1, '#ff5fb7') // marquee
-  const blocks = new THREE.InstancedMesh(cube, blocksMat, bits.length)
-  bits.forEach(([x, y, z, sx, sy, sz, c], i) => {
-    m4.compose(p.set(x, y, z), q, s.set(sx, sy, sz))
-    blocks.setMatrixAt(i, m4)
-    blocks.setColorAt(i, new THREE.Color(c))
-  })
-  blocks.castShadow = blocks.receiveShadow = true
-  scene.add(blocks)
+  for (const kind of [1, 2, 3]) {
+    const mine = bits.filter(b => b[7] === kind)
+    const blocks = new THREE.InstancedMesh(cube, blockMats[kind], mine.length)
+    mine.forEach(([x, y, z, sx, sy, sz, c], i) => {
+      m4.compose(p.set(x, y, z), q, s.set(sx, sy, sz))
+      blocks.setMatrixAt(i, m4)
+      blocks.setColorAt(i, new THREE.Color(c))
+    })
+    blocks.castShadow = blocks.receiveShadow = true
+    scene.add(blocks)
+  }
+  // Tall grass: crossed pixel tufts on the open grass either side of the path.
+  const tuftTex = (() => {
+    const c = document.createElement('canvas')
+    c.width = c.height = 16
+    const g = c.getContext('2d')
+    for (let k = 0; k < 9; k++) {
+      const bx = 1 + ((k * 7) % 14), top = 3 + ((k * 5) % 9)
+      for (let y = top; y < 16; y++) {
+        g.fillStyle = ['#4f9e3c', '#5fb347', '#3f8a32', '#6cc052'][(k + y) % 4]
+        g.fillRect(bx + (y < top + 3 ? (k % 2 ? 1 : -1) : 0), y, 1, 1)
+      }
+    }
+    const t = new THREE.CanvasTexture(c)
+    t.magFilter = t.minFilter = THREE.NearestFilter
+    t.colorSpace = THREE.SRGBColorSpace
+    return t
+  })()
+  const tuftPlane = () => new THREE.PlaneGeometry(0.9, 0.9).translate(0, 0.45, 0)
+  const tuftGeo = mergeGeometries([tuftPlane().rotateY(Math.PI / 4), tuftPlane().rotateY(-Math.PI / 4)])
+  const TUFTS = 900
+  const tufts = new THREE.InstancedMesh(tuftGeo, blockStd({ map: tuftTex, alphaTest: 0.5, side: THREE.DoubleSide, roughness: 0.9 }), TUFTS)
+  for (let i = 0; i < TUFTS; i++) {
+    const x = X0 + Math.random() * (X1 - X0), z = (Math.random() < 0.5 ? -1 : 1) * (2.2 + Math.random() * 9)
+    const fx = Math.floor(x), fz = Math.floor(z), h = hgt(fx, fz)
+    if (z > 9 || h > 8) { tufts.setMatrixAt(i, m4.makeScale(0, 0, 0)); continue } // none on sand or stone
+    m4.compose(p.set(fx + 0.5, h, fz + 0.5), q.setFromEuler(new THREE.Euler(0, Math.random() * 3, 0)), s.setScalar(0.7 + Math.random() * 0.4))
+    tufts.setMatrixAt(i, m4)
+  }
+  q.identity()
+  tufts.receiveShadow = true
+  scene.add(tufts)
   // Flowers in the grass along the path.
   // Flowers grow in patches, one colour to a patch, small enough to read as flowers and not dice.
   const PATCHES = 90, PER = 7
@@ -407,12 +462,12 @@ export function createArcade(renderer, { loader, normalize, mobile = false }) {
     const dream = ss(0.5, 0.515, P) * (1 - ss(0.552, 0.566, P))
     if (you) {
       you.root.position.set(x, 0.02, 0)
-      const strut = walk1 > 0 && walk1 < 1 // his own walk on the coast
+      const strut = walk1 > 0 && walk1 < 1 // a relaxed, unhurried walk on the coast
       const trek = walk2 > 0 && walk2 < 1
       const atArcade = P > 0.5 && P < 0.56
       const jumping = P >= 0.575 && P < 0.62
       const done = P > 0.95
-      const next = jumping ? 'Regular_Jump' : done ? 'Axe_Breathe_and_Look_Around' : atArcade ? 'Step_Hip_Hop_Dance' : strut ? 'Confident_Strut' : trek ? 'Walk' : 'Idle'
+      const next = jumping ? 'Regular_Jump' : done ? 'Axe_Breathe_and_Look_Around' : atArcade ? 'Step_Hip_Hop_Dance' : strut ? 'Casual_Walk' : trek ? 'Walk' : 'Idle'
       if (next !== cue) {
         cue = next
         you.play(you.actions[next] ? next : 'Idle', { fade: 0.35 })
@@ -465,29 +520,39 @@ export function createArcade(renderer, { loader, normalize, mobile = false }) {
 }
 
 /**
- * Block-world gear in our own pixel palette: a gold helmet, an iron chestplate with shoulder plates, and
- * an axe. Each piece is placed around him in his rest pose (metres; y up, his front +z) and then
- * parented to the bone it rides on, keeping where it sits. Returns the pieces, hidden, for update().
+ * Block-world armour in the blocky game style, drawn in our own pixel palette: a gold helm (a box round
+ * the whole head with a face opening) and an iron chestplate (a box round the torso, sleeves round the
+ * upper arms), plus an axe with a stepped blade. Every face is a 16-pixel plate: a few flat shades, a
+ * dark outline and a highlight row. Each piece is placed around him in his rest pose (metres; y up, his
+ * front +z) and then parented to the bone it rides on. Returns the pieces, hidden, for update().
  */
 function makeGear(you) {
-  const pixels = cols => {
+  const plate = (pal, outline, highlight) => {
     const c = document.createElement('canvas')
-    c.width = c.height = 8
+    c.width = c.height = 16
     const g = c.getContext('2d')
-    for (let i = 0; i < 64; i++) {
-      g.fillStyle = cols[Math.floor(Math.abs(Math.sin(i * 12.9898) * 43758.5453) % 1 * cols.length)]
-      g.fillRect(i % 8, i >> 3, 1, 1)
+    for (let i = 0; i < 256; i++) {
+      g.fillStyle = pal[Math.floor((Math.abs(Math.sin(i * 12.9898 + pal.length) * 43758.5453) % 1) * pal.length)]
+      g.fillRect(i % 16, i >> 4, 1, 1)
     }
+    g.fillStyle = highlight
+    g.fillRect(1, 1, 14, 1)
+    g.fillRect(1, 1, 1, 14)
+    g.strokeStyle = outline
+    g.lineWidth = 1
+    g.strokeRect(0.5, 0.5, 15, 15)
     const t = new THREE.CanvasTexture(c)
     t.magFilter = t.minFilter = THREE.NearestFilter
     t.colorSpace = THREE.SRGBColorSpace
     return t
   }
-  const mat = (cols, metalness, roughness) => new THREE.MeshStandardMaterial({ map: pixels(cols), metalness, roughness, flatShading: true })
-  const gold = mat(['#f5cf4a', '#edc340', '#f8d85e', '#e6b93a'], 0.9, 0.26)
-  const iron = mat(['#d9dde2', '#cfd3d9', '#e2e6ea', '#c7ccd2'], 0.85, 0.32)
-  const ironDark = mat(['#9aa1ab', '#8a919b', '#a9b0b9'], 0.8, 0.42)
-  const wood = mat(['#8a5a32', '#7a4e2a', '#9c6a3e', '#6d4425'], 0, 0.8)
+  const mat = (tex, metalness, roughness) => new THREE.MeshStandardMaterial({ map: tex, metalness, roughness, flatShading: true })
+  const gold = mat(plate(['#f6d63c', '#f6d63c', '#f6d63c', '#f6d63c', '#eec73a', '#fbe270'], '#9a6c15', '#fff6a8'), 0.35, 0.55)
+  const iron = mat(plate(['#d6d6d6', '#d6d6d6', '#d6d6d6', '#d6d6d6', '#cbcbcb', '#e2e2e2'], '#7b7b7b', '#f6f6f6'), 0.3, 0.6)
+  const ironDark = mat(plate(['#9a9a9a', '#8c8c8c', '#a8a8a8'], '#5e5e5e', '#c4c4c4'), 0.3, 0.6)
+  const steel = mat(plate(['#eef2f6', '#e2e6ea'], '#a9b0b8', '#ffffff'), 0.4, 0.45)
+  const wood = mat(plate(['#8a5a32', '#7a4e2a', '#9c6a3e'], '#4f3119', '#ad7c4c'), 0, 0.8)
+  const leather = mat(plate(['#4a2e1c', '#563622'], '#2e1c10', '#6b452c'), 0, 0.7)
   const parts = []
   const piece = (bone, material, [w, h, d], [x, y, z]) => {
     const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), material)
@@ -496,23 +561,28 @@ function makeGear(you) {
     you.root.add(m)
     parts.push([bone, m])
   }
-  // Helmet: a gold box shell over the head (head: x ±0.11, y 1.45..1.72, z ±0.13).
-  piece('Head', gold, [0.28, 0.07, 0.31], [0, 1.735, 0])
-  piece('Head', gold, [0.03, 0.18, 0.31], [-0.14, 1.63, 0])
-  piece('Head', gold, [0.03, 0.18, 0.31], [0.14, 1.63, 0])
-  piece('Head', gold, [0.28, 0.2, 0.03], [0, 1.62, -0.155])
-  piece('Head', gold, [0.28, 0.045, 0.03], [0, 1.69, 0.155])
-  // Chestplate: around a loose shirt (torso: x ±0.2, y 0.98..1.36, z ±0.125), shoulder plates on the arms.
-  piece('Spine01', iron, [0.46, 0.32, 0.3], [0, 1.2, 0])
-  piece('Spine01', ironDark, [0.44, 0.07, 0.29], [0, 1.02, 0])
-  piece('Spine01', ironDark, [0.2, 0.06, 0.02], [0, 1.25, 0.152])
-  piece('LeftArm', iron, [0.17, 0.08, 0.3], [0.25, 1.36, 0])
-  piece('RightArm', iron, [0.17, 0.08, 0.3], [-0.25, 1.36, 0])
-  // Axe in the right fist (fist about x -0.7, y 1.26; its grip runs front to back).
-  piece('RightHand', wood, [0.035, 0.035, 0.6], [-0.7, 1.26, 0.1])
-  piece('RightHand', iron, [0.03, 0.15, 0.1], [-0.7, 1.335, 0.33])
-  piece('RightHand', iron, [0.03, 0.08, 0.06], [-0.7, 1.43, 0.36])
-  piece('RightHand', ironDark, [0.034, 0.05, 0.05], [-0.7, 1.27, 0.37])
+  // Helm: a box round the head (head: x ±0.11, y 1.45..1.72, z ±0.13; the face at +z), open at the face.
+  piece('Head', gold, [0.3, 0.06, 0.33], [0, 1.75, 0]) // top
+  piece('Head', gold, [0.04, 0.26, 0.33], [-0.14, 1.6, 0]) // sides, down to the jaw
+  piece('Head', gold, [0.04, 0.26, 0.33], [0.14, 1.6, 0])
+  piece('Head', gold, [0.3, 0.28, 0.04], [0, 1.6, -0.165]) // back
+  piece('Head', gold, [0.3, 0.06, 0.04], [0, 1.69, 0.165]) // brow, the top of the face opening
+  piece('Head', gold, [0.05, 0.13, 0.04], [-0.115, 1.56, 0.165]) // cheeks, its sides
+  piece('Head', gold, [0.05, 0.13, 0.04], [0.115, 1.56, 0.165])
+  // Chestplate: a box round a loose shirt (torso: x ±0.2, y 0.98..1.36, z ±0.125) and sleeves round the
+  // upper arms (shoulder to elbow along x in the rest pose).
+  piece('Spine01', iron, [0.47, 0.39, 0.31], [0, 1.18, 0])
+  piece('Spine01', ironDark, [0.02, 0.33, 0.01], [0, 1.18, 0.16]) // the seam down the front
+  for (const [bone, sx] of [['LeftArm', 1], ['RightArm', -1]]) piece(bone, iron, [0.21, 0.16, 0.17], [sx * 0.275, 1.3, 0])
+  // Axe in the right fist (fist about x -0.7, y 1.26; its grip runs front to back), blade up.
+  piece('RightHand', wood, [0.035, 0.035, 0.62], [-0.7, 1.26, 0.1])
+  piece('RightHand', leather, [0.045, 0.045, 0.1], [-0.7, 1.26, -0.02]) // grip wrap
+  piece('RightHand', ironDark, [0.05, 0.06, 0.07], [-0.7, 1.26, 0.37]) // socket
+  piece('RightHand', iron, [0.03, 0.06, 0.08], [-0.7, 1.315, 0.37]) // the blade, widening in steps
+  piece('RightHand', iron, [0.03, 0.05, 0.12], [-0.7, 1.37, 0.37])
+  piece('RightHand', iron, [0.03, 0.04, 0.15], [-0.7, 1.415, 0.37])
+  piece('RightHand', steel, [0.032, 0.02, 0.16], [-0.7, 1.445, 0.37]) // the edge
+  piece('RightHand', ironDark, [0.03, 0.04, 0.04], [-0.7, 1.215, 0.37]) // back spike
   you.root.updateMatrixWorld(true)
   for (const [bone, m] of parts) {
     you.bone(bone).attach(m)

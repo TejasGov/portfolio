@@ -426,7 +426,14 @@ export function duskSky(U) {
           float cl = smoothstep(0.52, 0.8, fbm(cp * vec2(0.6, 1.8) + 3.0)) * smoothstep(0.02, 0.12, h) * (1.0 - smoothstep(0.45, 0.7, h));
           vec3 cloudCol = mix(vec3(0.55, 0.3, 0.55), vec3(1.0, 0.62, 0.55), pow(sd, 2.0));
           dusk = mix(dusk, cloudCol, cl * 0.8);
-          vec3 day = mix(vec3(0.78, 0.9, 1.0), vec3(0.3, 0.58, 0.98), smoothstep(0.0, 0.5, h));
+          vec3 day = mix(vec3(0.74, 0.87, 1.0), vec3(0.27, 0.53, 0.96), smoothstep(0.0, 0.35, h));
+          // The block world's sun: a flat square of light low ahead, with a soft halo.
+          vec3 sunD = normalize(vec3(1.0, 0.2, 0.05));
+          vec3 sX = normalize(cross(sunD, vec3(0.0, 1.0, 0.0))), sY = cross(sX, sunD);
+          float toSun = dot(d, sunD);
+          vec2 sp = vec2(dot(d, sX), dot(d, sY)) / max(toSun, 1e-3);
+          day += vec3(1.0, 0.95, 0.75) * pow(max(toSun, 0.0), 20.0) * 0.4;
+          day = mix(day, vec3(1.6, 1.55, 1.35), step(max(abs(sp.x), abs(sp.y)), 0.05) * step(0.0, toSun));
           day = mix(day, vec3(1.0), smoothstep(0.55, 0.78, fbm(cp * 0.8 + 9.0)) * smoothstep(0.03, 0.2, h) * 0.85);
           gl_FragColor = vec4(mix(dusk, day, uDay), 1.0);
         }`,

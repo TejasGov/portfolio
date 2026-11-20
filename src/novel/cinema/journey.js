@@ -84,7 +84,7 @@ export function createJourney(renderer, { loader, normalize }) {
     holder.position.set(i * STOP_GAP, 0, pathZ(i * STOP_GAP) - 3.6)
     scene.add(holder)
     loader.loadAsync(`/cinema/journey/${id}.glb`).then(gltf => {
-      const g = normalize(gltf.scene, id === 'nyc' ? 5.6 : 4.8, -0.35)
+      const g = normalize(gltf.scene, { nyc: 5.6, gym: 6 }[id] ?? 4.8, -0.35) // the wide, low ones a little larger
       const box = new THREE.Box3().setFromObject(g)
       g.position.y = -box.min.y
       g.traverse(o => {
