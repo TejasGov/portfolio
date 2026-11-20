@@ -53,17 +53,33 @@ export default function Stage() {
       ema = 16.7
     }
 
+    // The 3D follows the scroll with a little weight: each chapter's progress glides toward the scroll's
+    // (on top of Lenis's own smoothing), so waves, walks and camera moves never step with the wheel.
+    // A jump (the contents menu) lands at once rather than playing every chapter on the way.
+    const view = Object.create(store)
+    const KEYS = ['prologue', 'workIn', 'work', 'three', 'four', 'epilogue', 'epiIn']
+    let lastFrame = 0
+    const glide = now => {
+      const k = reduced() || !lastFrame ? 1 : 1 - Math.exp(-Math.min(0.1, (now - lastFrame) / 1000) * 4.5)
+      lastFrame = now
+      for (const key of KEYS) {
+        const to = store[key] ?? 0, from = Object.hasOwn(view, key) ? view[key] : to
+        view[key] = Math.abs(to - from) > 0.3 ? to : from + (to - from) * k
+      }
+    }
+
     const loop = now => {
       raf = requestAnimationFrame(loop)
+      glide(now)
       if (!store.night) return
       govern(now)
       const k = reduced() ? 0 : 0.06
       mouse.x += (store.mouse.x - mouse.x) * k
       mouse.y += (store.mouse.y - mouse.y) * k
-      const st = stateAt(store, mouse, innerWidth / innerHeight)
+      const st = stateAt(view, mouse, innerWidth / innerHeight)
       // Make sure the reel being screened is loaded first.
-      const sec = section(store)
-      if (sec === 'work') world.loadFilm(PROJECT_IDS[workSlot(store.work).i])
+      const sec = section(view)
+      if (sec === 'work') world.loadFilm(PROJECT_IDS[workSlot(view.work).i])
       // Build the next chapter's world while the reader is paused, so its seam doesn't stall mid-scroll.
       const next = { work: 'journey', three: 'arcade' }[sec]
       if (next && now - scrolled > 400) world.prepare(next)

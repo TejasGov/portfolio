@@ -511,6 +511,12 @@ export async function createCinema(canvas, { mobile = false, onProgress } = {}) 
       su.uPlane.value = sk.dir ? 1 : 0
       if (sk.dir) su.uDir.value.copy(sk.dir)
       su.uLines.value = sk.ink ?? 1
+      // Each seam's own light: a tint (two-toned along the front), or the hue of the world it reveals.
+      su.uTint.value.set(sk.tint ?? '#ffe2b0')
+      su.uTint2.value.set(sk.tint2 ?? sk.tint ?? '#ffe2b0')
+      su.uAuto.value = sk.tint ? 0 : 1
+      su.uGrid.value = sk.grid ?? 0.4
+      su.uShimmer.value = sk.shimmer ?? 0.8
     }
     su.uTime.value = t
     composer.render()

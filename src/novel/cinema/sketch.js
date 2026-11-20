@@ -9,9 +9,11 @@ import { Pass } from 'postprocessing'
  *                the deepest shade
  *   paper      - the site's paper colour with a little fibre, so the drawing meets the paper chapters
  *                with no cut
- * The wave is in world space: a ragged sphere growing from `origin`. Behind its front the world is in
- * full colour, ahead of it the drawing; at the front the colour bleeds into the paper like watercolour
- * and a band of light runs along it (Monolith's desert-to-oasis wave, in our own materials).
+ * The wave is in world space: a wavy sphere growing from `origin` (or a plane along `dir`). Behind its
+ * front the world is in full colour, ahead of it the drawing; at the front the colour bleeds into the
+ * paper like watercolour, the world refracts and splits into its colours, a crisp line of light with a
+ * soft halo runs along it, and the colour arrives first as a grid of light lines. Each seam sets its
+ * own crest tint, or takes the hue of the world it reveals (Monolith's wave, in our own materials).
  */
 const VERT = /* glsl */ `
 varying vec2 vUv;
@@ -23,6 +25,7 @@ uniform sampler2D inputBuffer; uniform highp sampler2D depthBuffer; uniform high
 uniform mat4 uInvProj; uniform mat4 uCamWorld; uniform vec2 uTexel; uniform float uTime;
 uniform vec3 uOrigin; uniform float uR; uniform float uBand; uniform float uColorBehind;
 uniform float uPlane; uniform vec3 uDir; uniform float uLines;
+uniform vec3 uTint; uniform vec3 uTint2; uniform float uAuto; uniform float uGrid; uniform float uShimmer;
 uniform vec3 uPaper; uniform vec3 uInk; uniform vec3 uKey; uniform float uScale;
 varying vec2 vUv;
 
@@ -83,18 +86,44 @@ void main() {
   float reach = uPlane > 0.5 ? dot(world - uOrigin, uDir) : length(world - uOrigin);
   // The sky: last to bloom from a point; with a travelling front, it takes the colour of where the camera stands.
   float farReach = uPlane > 0.5 ? dot(uCamWorld[3].xyz - uOrigin, uDir) : 250.0;
-  float d = (far ? farReach : reach) - uR + (noise3(world * 0.09 + vec3(0.0, uTime * 0.02, 0.0)) - 0.5) * uBand * 2.2;
-  float behind = 1.0 - smoothstep(-0.25, 0.25, d);
+  // A wavy front: a long swell and a fine ripple of noise, both drifting.
+  float swell = (noise3(world * 0.07 + vec3(0.0, uTime * 0.02, 0.0)) - 0.5) * uBand * 2.2;
+  float ripple = (noise3(world * 0.5 + vec3(uTime * 0.06, 0.0, uTime * 0.04)) - 0.5) * uBand * 0.45;
+  float d = (far ? farReach : reach) - uR + (far ? 0.0 : swell + ripple);
+  // Feathered across the band and never narrower than a pixel and a half, so the front never stair-steps.
+  float fw = clamp(fwidth(d), 1e-4, uBand * 0.25);
+  float feather = max(uBand * 0.3, fw * 1.5);
+  float behind = 1.0 - smoothstep(-feather, feather, d);
   float colourK = uColorBehind > 0.5 ? behind : 1.0 - behind;
+  // Near the front the world refracts, as through a lens of moving water, split into its colours.
+  vec2 grad = vec2(dFdx(d), dFdy(d));
+  float near = exp(-abs(d) / max(uBand * 0.7, 0.01)) * (far ? 0.0 : 1.0) * uShimmer;
+  vec3 world_col = src.rgb;
+  if (near > 0.02) {
+    vec2 off = grad / max(length(grad), 1e-5) * uTexel * (7.0 * uScale) * near * sin(d * 6.0 - uTime * 3.0);
+    world_col = vec3(texture2D(inputBuffer, vUv + off * 1.6).r, texture2D(inputBuffer, vUv + off).g, texture2D(inputBuffer, vUv + off * 0.4).b);
+  }
+  // The crest's colour: the seam's own tint, two-toned along the front, or (uAuto) the hue of the world it reveals.
+  vec3 hue = world_col / max(max(world_col.r, max(world_col.g, world_col.b)), 1e-3);
+  vec3 tint = mix(uTint, uTint2, 0.5 + 0.5 * sin(world.y * 1.3 + world.x * 0.2 + uTime * 0.8));
+  vec3 crestCol = mix(tint, mix(hue, vec3(1.0), 0.35), uAuto);
   // Watercolour bleed just on the drawing side of the front: the paper takes the world's hue.
   float ahead = uColorBehind > 0.5 ? max(d, 0.0) : max(-d, 0.0);
   float bleed = exp(-ahead / max(uBand, 0.01)) * (1.0 - colourK);
-  vec3 hue = src.rgb / max(max(src.r, max(src.g, src.b)), 1e-3);
   drawing = mix(drawing, drawing * mix(vec3(1.0), hue, 0.75) * 1.05, bleed);
-  vec3 col = mix(drawing, src.rgb, colourK);
-  // A band of light on the crest.
-  float crest = exp(-abs(d) / max(uBand * 0.2, 0.01)) * step(uR, 1e4) * (far ? 0.0 : 1.0);
-  col += vec3(1.0, 0.93, 0.8) * crest * mix(0.06, 0.22, uColorBehind); // brighter when colour arrives than when it leaves
+  vec3 col = mix(drawing, world_col, colourK);
+  // Where colour has just arrived, the world is first drawn in lines of light: a grid that fills in.
+  float since = max(-d, 0.0);
+  vec3 gq = world * 1.25 + 0.137;
+  vec3 gw = max(fwidth(gq) * 1.2, vec3(1e-3));
+  vec3 gline = smoothstep(0.5 - gw, vec3(0.5), abs(fract(gq) - 0.5)) * (1.0 - smoothstep(0.12, 0.3, gw)); // none where they would smear
+  float grid = max(gline.x, max(gline.y, gline.z)) * (far ? 0.0 : 1.0);
+  col += crestCol * grid * smoothstep(0.0, uBand * 0.25, since) * exp(-since / max(uBand * 1.6, 0.01)) * colourK * uGrid * 0.55;
+  // The crest: a crisp core, a soft two-scale halo and a few glints, brighter as colour arrives than as it leaves.
+  float core = 1.0 - smoothstep(0.0, max(fw * 1.5, uBand * 0.02), abs(d));
+  float halo = exp(-abs(d) / max(uBand * 0.18, 0.01)) * 0.55 + exp(-abs(d) / max(uBand * 0.8, 0.01)) * 0.25;
+  float glint = step(0.986, fract(sin(dot(floor(px / (6.0 * uScale)) + floor(uTime * 6.0), vec2(12.99, 78.23))) * 43758.5)) * exp(-abs(d) / max(uBand * 0.3, 0.01));
+  col += crestCol * (core * 0.85 + halo * 0.5 + glint * 0.9) * mix(0.35, 1.0, uColorBehind) * (far ? 0.0 : 1.0);
   gl_FragColor = vec4(col, 1.0);
   #include <colorspace_fragment>
 }`
@@ -110,6 +139,7 @@ export class SketchPass extends Pass {
         inputBuffer: { value: null }, depthBuffer: { value: null }, tNoise: { value: noise },
         uInvProj: { value: new THREE.Matrix4() }, uCamWorld: { value: new THREE.Matrix4() }, uTexel: { value: new THREE.Vector2() },
         uTime: { value: 0 }, uOrigin: { value: new THREE.Vector3() }, uR: { value: 1e5 }, uBand: { value: 1.2 }, uColorBehind: { value: 1 }, uPlane: { value: 0 }, uDir: { value: new THREE.Vector3(1, 0, 0) }, uLines: { value: 1 },
+        uTint: { value: new THREE.Color() }, uTint2: { value: new THREE.Color() }, uAuto: { value: 1 }, uGrid: { value: 0.4 }, uShimmer: { value: 0.8 },
         uPaper: { value: lin('#efe8da') }, uInk: { value: lin('#1d1913') }, uKey: { value: new THREE.Vector3(-0.5, 0.8, -0.4) }, uScale: { value: 1 },
       },
       vertexShader: VERT,

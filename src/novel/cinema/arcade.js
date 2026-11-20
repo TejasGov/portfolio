@@ -20,7 +20,8 @@ uniform vec3 uWaveO; uniform float uWaveR; uniform float uWaveSide; uniform floa
 varying vec3 vWaveP;
 float waveD() {
   vec3 p = vWaveP;
-  float r = uWaveR + sin(p.x * 0.8 + uWaveT * 1.3) * sin(p.z * 0.65 - uWaveT) * 0.9 + sin(p.y * 1.7 + uWaveT * 2.0) * 0.35;
+  // The ripple grows in with the wave, so nothing near its origin (the arcade) is touched before it starts.
+  float r = uWaveR + (sin(p.x * 0.8 + uWaveT * 1.3) * sin(p.z * 0.65 - uWaveT) * 0.9 + sin(p.y * 1.7 + uWaveT * 2.0) * 0.35) * min(1.0, uWaveR);
   return distance(p, uWaveO) - r; // < 0 inside the wave
 }`
 
@@ -41,10 +42,21 @@ function onWave(mat, side, U) {
       .replace('#include <common>', '#include <common>\n' + WAVE_GLSL)
       .replace('#include <clipping_planes_fragment>', `#include <clipping_planes_fragment>
         float wd = waveD();
-        if (wd * uWaveSide < 0.0) discard;`)
+        // The coast breaks up into 30 cm cubes just ahead of the front, each cube at its own moment.
+        float cubeAt = fract(sin(dot(floor(vWaveP / 0.3), vec3(12.99, 78.23, 37.71))) * 43758.5) * 1.4 * step(0.0, uWaveSide) * step(0.01, uWaveR);
+        if ((wd - cubeAt) * uWaveSide < 0.0) discard;`)
       .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
-        float crest = exp(-abs(wd) * 1.6) * step(0.01, uWaveR);
-        totalEmissiveRadiance += mix(vec3(1.0, 0.45, 0.85), vec3(0.45, 0.9, 1.0), 0.5 + 0.5 * sin(vWaveP.y * 2.0 + uWaveT)) * crest * 2.2;`)
+        float live = step(0.01, uWaveR) * step(uWaveR, 9000.0);
+        vec3 neon = mix(vec3(1.0, 0.45, 0.85), vec3(0.45, 0.9, 1.0), 0.5 + 0.5 * sin(vWaveP.y * 2.0 + uWaveT));
+        // The crest: a white-hot core inside a wide neon glow.
+        totalEmissiveRadiance += (neon * exp(-abs(wd) * 1.6) * 2.2 + vec3(1.0, 0.96, 1.0) * exp(-abs(wd) * 9.0) * 3.0) * live;
+        // Behind it, the blocks arrive drawn in light: their edges glow cyan, then fade as the front moves on.
+        if (uWaveSide < 0.0) {
+          vec3 g = 1.0 - smoothstep(0.0, 0.045, min(fract(vWaveP), 1.0 - fract(vWaveP)));
+          float edge = max(g.x * g.y, max(g.y * g.z, g.x * g.z));
+          float since = max(-wd, 0.0);
+          totalEmissiveRadiance += vec3(0.35, 0.95, 1.0) * edge * smoothstep(0.0, 0.4, since) * exp(-since / 3.0) * 2.6 * live;
+        }`)
   }
   mat.needsUpdate = true
   return mat
