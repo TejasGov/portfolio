@@ -47,7 +47,7 @@ function Piece({ it }) {
   switch (it.kind) {
     case 'img':
       return (
-        <figure className="piece" data-in="img" data-depth={it.depth ?? 0} style={{ ...style, '--w': it.w }}>
+        <figure className="piece" data-in={it.fly ? 'fly' : 'img'} data-depth={it.depth ?? 0} style={{ ...style, '--w': it.w }}>
           <img src={src(it.src)} alt="" draggable="false" className={`block w-full ${it.duotone ? 'duotone' : ''} ${it.spin ? 'spin-slow' : ''}`} />
           {it.duotone && <span className="duotone-ink" aria-hidden="true" />}
           {it.steam && <Steam />}
@@ -60,8 +60,14 @@ function Piece({ it }) {
       )
     case 'poster':
       return (
-        <p className={`piece poster ${it.outline ? 'poster-outline' : ''}`} data-in="poster" data-depth={it.depth ?? 0} style={{ ...style, color: it.color, '--s': it.size }} aria-hidden="true">
-          {it.text}
+        <p className={`piece poster ${it.outline ? 'poster-outline' : ''}`} data-in="poster" data-fx={it.fx} data-depth={it.depth ?? 0} style={{ ...style, color: it.color, '--s': it.size }} aria-hidden="true">
+          {it.fx
+            ? it.text.split('').map((ch, k) => (
+                <span key={k} className="pl" style={{ '--k': k }}>
+                  <span className="pl-in">{ch}</span>
+                </span>
+              ))
+            : it.text}
         </p>
       )
     case 'note':
@@ -128,6 +134,28 @@ function Piece({ it }) {
   }
 }
 
+/* ------------------------------------------------------------ the sheets */
+
+/** A torn sheet's outline: points along each side, each nudged inward a little, so the edge reads torn. */
+function torn(seed, n = 36, j = 1.4) {
+  const r = k => Math.abs(Math.sin(seed * 91.7 + k * 12.9898) * 43758.5453) % 1
+  const pts = []
+  let k = 0
+  for (let i = 0; i <= n; i++) pts.push([(i / n) * 100, r(k++) * j])
+  for (let i = 1; i <= n; i++) pts.push([100 - r(k++) * j, (i / n) * 100])
+  for (let i = n - 1; i >= 0; i--) pts.push([(i / n) * 100, 100 - r(k++) * j])
+  for (let i = n - 1; i >= 1; i--) pts.push([r(k++) * j, (i / n) * 100])
+  return `polygon(${pts.map(([x, y]) => `${x.toFixed(2)}% ${y.toFixed(2)}%`).join(',')})`
+}
+function Sheet({ sheet, seed }) {
+  const { color, x, y, w, h, r = 0, from = 'left' } = sheet
+  return (
+    <div className="sheet" data-from={from} style={{ left: `${x}%`, top: `${y}%`, width: `${w}%`, height: `${h}%`, rotate: `${r}deg` }} aria-hidden="true">
+      <div className="sheet-paper" style={{ backgroundColor: color, clipPath: torn(seed) }} />
+    </div>
+  )
+}
+
 /* ----------------------------------------------------------- the route */
 
 // A hand-drawn route through all six spreads, in (vw within the strip, % of height).
@@ -148,6 +176,7 @@ function Route() {
         <path className="route-line route-ghost" d={ROUTE} mask="url(#route-reveal)" transform="translate(0.15 0.35)" />
         <path className="route-line" d={ROUTE} mask="url(#route-reveal)" />
       </svg>
+      <span className="route-nib" aria-hidden="true" />
       {STOPS.map(([x, y, label]) => (
         <span key={label} className="route-stop" data-in="stop" style={{ left: `calc(${x} * var(--strip-unit))`, top: `${y}%` }}>
           <span className="route-pin" />
@@ -181,10 +210,23 @@ export default function ChapterOne({ spreads = SPREADS }) {
         // Hold on the title card for the first ~60% of a screen before the scrapbook starts to travel.
         scrollTrigger: { trigger: section, start: () => `top+=${Math.round(innerHeight * 0.6)} top`, end: 'bottom bottom', scrub: 0.7, invalidateOnRefresh: true },
       })
+      // The route draws itself across the strip, a red nib at its tip leading you from spread to spread.
+      const line = el.querySelector('.route-line:not(.route-ghost)')
+      const nib = el.querySelector('.route-nib')
+      const length = line?.getTotalLength() ?? 0
       gsap.fromTo('.route-mask', { strokeDashoffset: 1 }, {
         strokeDashoffset: 0,
+        autoRound: false, // the line is measured 0..1 (pathLength); whole-pixel rounding would snap it on at once
         ease: 'none',
         scrollTrigger: { trigger: section, start: 'top top', end: 'bottom bottom', scrub: 0.7 },
+        onUpdate() {
+          if (!line || !nib) return
+          const k = this.progress()
+          const pt = line.getPointAtLength(k * length)
+          nib.style.left = `calc(${pt.x.toFixed(2)} * var(--strip-unit))`
+          nib.style.top = `${pt.y.toFixed(2)}%`
+          nib.style.opacity = k > 0.002 && k < 0.998 ? 1 : 0
+        },
       })
 
       // Title letters assemble from scattered paper scraps as the page takes over from the light.
@@ -205,11 +247,31 @@ export default function ChapterOne({ spreads = SPREADS }) {
             ? { trigger: section, start: 'top 70%', end: 'top top', scrub: 0.8 }
             : { trigger: spread, containerAnimation: move, start: 'left 88%', end: 'left 20%', scrub: 0.8 },
         })
+        // The sheet is laid down first, from its own edge, like a hand sliding a page into the book.
+        const sheet = spread.querySelector(':scope > .sheet')
+        if (sheet) {
+          const from = sheet.dataset.from
+          const origin = { left: 'left center', right: 'right center', top: 'center top', bottom: 'center bottom' }[from]
+          tl.from(sheet, { [from === 'left' || from === 'right' ? 'scaleX' : 'scaleY']: 0, transformOrigin: origin, rotation: '+=4', duration: 0.55, ease: 'expo.out' }, 0)
+        }
         items.forEach((it, k) => {
           const kind = it.dataset.in
-          const at = k * 0.12
+          const at = k * 0.12 + (sheet ? 0.15 : 0)
           if (kind === 'img') tl.from(it, { y: 160, rotation: gsap.utils.random(-22, 22), scale: 0.86, opacity: 0, duration: 0.6, ease: 'expo.out' }, at)
-          else if (kind === 'poster') tl.from(it, { yPercent: 40, opacity: 0, duration: 0.6, ease: 'expo.out' }, at)
+          else if (kind === 'fly') {
+            // Bowled in: a long arc from the upper left, spinning, landing where it rests.
+            tl.from(it, { xPercent: -900, rotation: -900, duration: 0.7, ease: 'none' }, at)
+            tl.from(it, { yPercent: -420, duration: 0.7, ease: 'power2.in' }, at)
+            tl.from(it, { opacity: 0, duration: 0.1 }, at)
+          } else if (kind === 'poster' && it.dataset.fx) {
+            const letters = it.querySelectorAll('.pl')
+            const fx = it.dataset.fx
+            if (fx === 'stamp') tl.from(letters, { y: -140, scale: 1.7, rotation: () => gsap.utils.random(-24, 24), opacity: 0, duration: 0.35, ease: 'back.out(2.4)', stagger: 0.08 }, at)
+            else if (fx === 'steam') tl.from(letters, { y: 90, x: () => gsap.utils.random(-30, 30), opacity: 0, filter: 'blur(8px)', duration: 0.6, ease: 'sine.out', stagger: 0.1 }, at)
+            else if (fx === 'bounce') tl.from(letters, { y: -260, opacity: 0, duration: 0.6, ease: 'bounce.out', stagger: 0.06 }, at)
+            else tl.from(letters, { opacity: 0, duration: 0.3, ease: 'steps(4)', stagger: { each: 0.07, from: 'random' } }, at) // marquee: bulbs flicking on
+          } else if (kind === 'poster') tl.from(it, { yPercent: 40, opacity: 0, duration: 0.6, ease: 'expo.out' }, at)
+          else if (kind === 'note') tl.fromTo(it, { clipPath: 'inset(-60% 100% -60% -15%)' }, { clipPath: 'inset(-60% -15% -60% -15%)', duration: 0.45, ease: 'none' }, at + 0.25) // written on, left to right
           else if (kind === 'stamp') tl.from(it, { scale: 2.2, opacity: 0, rotation: '+=18', duration: 0.3, ease: 'back.out(3)' }, at + 0.3)
           else if (kind === 'cast') tl.from(it.querySelectorAll('.cast-member'), { y: 140, rotation: () => gsap.utils.random(-25, 25), opacity: 0, duration: 0.5, ease: 'back.out(1.5)', stagger: 0.06 }, at)
           else tl.from(it, { y: 18, opacity: 0, duration: 0.4, ease: 'power3.out' }, at + 0.25)
@@ -219,8 +281,8 @@ export default function ChapterOne({ spreads = SPREADS }) {
         const all = q => spread.querySelectorAll(q)
         if (all('[data-in="tape"]').length) tl.from(all('[data-in="tape"]'), { scale: 1.9, opacity: 0, duration: 0.18, ease: 'back.out(3)', stagger: 0.06 }, '>-0.25')
         if (all('[data-in="mark"]').length) tl.from(all('[data-in="mark"]'), { scaleX: 0, transformOrigin: 'left center', duration: 0.3, ease: 'power2.out' }, '>-0.1')
-        if (all('.circle path').length) tl.fromTo(all('.circle path'), { strokeDashoffset: 1 }, { strokeDashoffset: 0, duration: 0.35, ease: 'power2.inOut' }, '<')
-        if (all('.river').length) tl.fromTo(all('.river'), { strokeDashoffset: 1 }, { strokeDashoffset: 0, duration: 0.5, ease: 'power2.inOut', stagger: 0.12 }, 0.2)
+        if (all('.circle path').length) tl.fromTo(all('.circle path'), { strokeDashoffset: 1 }, { strokeDashoffset: 0, autoRound: false, duration: 0.35, ease: 'power2.inOut' }, '<')
+        if (all('.river').length) tl.fromTo(all('.river'), { strokeDashoffset: 1 }, { strokeDashoffset: 0, autoRound: false, duration: 0.5, ease: 'power2.inOut', stagger: 0.12 }, 0.2)
 
         // Depth: nearer pieces slide a little faster than the page — cheap, convincing parallax.
         items.forEach(it => {
@@ -252,6 +314,7 @@ export default function ChapterOne({ spreads = SPREADS }) {
         <div ref={strip} className={`strip relative flex ${still ? 'flex-col' : 'h-full'}`}>
           {spreads.map((s, i) => (
             <div key={s.id} className={`spread relative shrink-0 ${still ? 'h-svh' : 'h-full'}`} aria-label={s.label}>
+              {s.sheet && <Sheet sheet={s.sheet} seed={i + 1} />}
               {i === 0 && (
                 <div className="absolute top-[18%] left-[7%] max-w-[60%]">
                   <p className="poster text-stamp" style={{ '--s': 4.2 }}>Chapter One</p>
