@@ -126,7 +126,7 @@ export function buildOceanDrive(scene, { wrap = m => m, mobile = false } = {}) {
   }
 
   // ------------------------------------------------------------ ground: sidewalk, road, promenade, lawn, beach
-  const X0 = -24, X1 = 72, L = X1 - X0
+  const X0 = -24, X1 = 170, L = X1 - X0 // past the last hotel (x ~123), so the boulevard runs on into the haze
   const strip = (z0, z1, mat, y = 0) => {
     const m = new THREE.Mesh(new THREE.PlaneGeometry(L, z1 - z0).rotateX(-Math.PI / 2), mat)
     m.position.set((X0 + X1) / 2, y, (z0 + z1) / 2)
@@ -147,11 +147,15 @@ export function buildOceanDrive(scene, { wrap = m => m, mobile = false } = {}) {
     k.position.set((X0 + X1) / 2, 0.08, z)
     scene.add(k)
   }
+  const marks = new THREE.Group()
+  const dash = std({ color: '#f3e6a8', roughness: 0.6 })
   for (let x = X0; x < X1; x += 4) {
-    const d = new THREE.Mesh(new THREE.PlaneGeometry(2, 0.13).rotateX(-Math.PI / 2), std({ color: '#f3e6a8', roughness: 0.6 }))
+    const d = new THREE.Mesh(new THREE.PlaneGeometry(2, 0.13).rotateX(-Math.PI / 2), dash)
     d.position.set(x, 0.012, -4)
-    scene.add(d)
+    marks.add(d)
   }
+  mergeByMaterial(marks)
+  scene.add(marks)
 
   // ------------------------------------------------------------ the hotels
   const FLOOR = 3.1
@@ -315,15 +319,19 @@ export function buildOceanDrive(scene, { wrap = m => m, mobile = false } = {}) {
 
   // ------------------------------------------------------------ the promenade: lamps, palms' places
   const lampMat = std({ color: '#1f3438', roughness: 0.45, metalness: 0.5 }) // dark painted iron: a slim silhouette at dusk, the globe does the glowing
-  for (let x = -20; x < 70; x += 8) {
+  const lamps = new THREE.Group()
+  const globeMat = glow('#ffe2b3', 3)
+  for (let x = -20; x < X1 - 4; x += 8) {
     const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.09, 4.2, 10), lampMat)
     pole.position.set(x, 2.1, -1.55)
-    const globe = new THREE.Mesh(new THREE.SphereGeometry(0.26, 16, 12), glow('#ffe2b3', 3))
+    const globe = new THREE.Mesh(new THREE.SphereGeometry(0.26, 16, 12), globeMat)
     globe.position.set(x, 4.35, -1.55)
     const cap = new THREE.Mesh(new THREE.ConeGeometry(0.3, 0.25, 16), lampMat)
     cap.position.set(x, 4.66, -1.55)
-    add(pole); add(globe); add(cap)
+    lamps.add(pole, globe, cap)
   }
+  mergeByMaterial(lamps) // one draw for every post, one for every globe
+  add(lamps)
   // Lifeguard huts on the sand, in the beach's own pastel stripes.
   for (const [x, c] of [[4, '#ff9fc4'], [30, '#8fe3d0'], [52, '#ffd27f']]) {
     const hut = new THREE.Group()

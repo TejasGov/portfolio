@@ -98,7 +98,8 @@ export function createArcade(renderer, { loader, normalize, mobile = false }) {
   const props = new THREE.Group()
   const shadows = { side: 0 } // which world casts shadows right now (see update)
   scene.add(props)
-  const place = (url, size, at, yaw, { side = 1, tint = null, rough = 0.75, metal = 0 } = {}) => loader.loadAsync(url).then(gltf => {
+  const gltfs = {} // each model loads and decodes once; every palm and coupe is built from that one copy
+  const place = (url, size, at, yaw, { side = 1, tint = null, rough = 0.75, metal = 0 } = {}) => (gltfs[url] ??= loader.loadAsync(url)).then(gltf => {
     const g = normalize(gltf.scene, size, yaw)
     const box = new THREE.Box3().setFromObject(g)
     g.position.set(at[0], at[1] - box.min.y, at[2])
@@ -114,15 +115,15 @@ export function createArcade(renderer, { loader, normalize, mobile = false }) {
     return g
   }).catch(() => null)
   // Palms along the promenade's lawn and on the beach; a few parked coupes; the arcade at the end.
-  for (let x = -20; x < 68; x += 7) place('/cinema/arcade/palm.glb', 7.5 + ((x * 7) % 3), [x, 0, 5.6], x, { rough: 0.85 }) // far enough from the chase camera to frame, not block
-  for (const [x, z] of [[8, 10], [21, 12], [39, 9], [58, 11]]) place('/cinema/arcade/palm.glb', 8, [x, 0, z], x, { rough: 0.85 })
+  for (let x = -20; x < 160; x += 7) place('/cinema/arcade/palm.glb', 7.5 + ((x * 7) % 3), [x, 0, 5.6], x, { rough: 0.85 }) // far enough from the chase camera to frame, not block
+  for (const [x, z] of [[8, 10], [21, 12], [39, 9], [58, 11], [77, 10], [96, 12], [118, 9], [139, 11]]) place('/cinema/arcade/palm.glb', 8, [x, 0, z], x, { rough: 0.85 })
   // Traffic, not parked cars (there is no parking lane): coupes driving both lanes, on the right-hand
   // side, head- and tail-lights on. Each loops the length of the street.
   const traffic = []
   const LANES = [{ z: -3.0, dir: 1 }, { z: -5.0, dir: -1 }] // driving on the right
-  for (const [k, tint] of ['#ffffff', '#bff3ea', '#ffd7e6', '#c9d6ff'].entries()) {
+  for (const [k, tint] of ['#ffffff', '#bff3ea', '#ffd7e6', '#c9d6ff', '#fff1c9', '#e2d3ff'].entries()) {
     const lane = LANES[k % 2]
-    const car = { lane, x0: -20 + k * 23, speed: 6 + k * 0.7, g: null }
+    const car = { lane, x0: -30 + k * 33, speed: 6 + k * 0.7, g: null }
     traffic.push(car)
     // The coupe model's nose points down -x: turn it round for the eastbound lane.
     place('/cinema/arcade/car.glb', 4.3, [0, 0, lane.z], lane.dir > 0 ? Math.PI : 0, { tint, rough: 0.3, metal: 0.45 }).then(g => {
@@ -190,7 +191,7 @@ export function createArcade(renderer, { loader, normalize, mobile = false }) {
   const HOTELS = drive.hotels.map(h => [h.x, h.floors < 4])
 
   // ------------------------------------------------------------ the block world, in the same place
-  const X0 = -18, X1 = 64 // the stretch of coast the blocks rebuild
+  const X0 = -18, X1 = 165 // the stretch of coast the blocks rebuild, past the last hotel
   const cube = new THREE.BoxGeometry(1, 1, 1).translate(0, 0.5, 0)
   // One column per metre: top colour by height (sand, grass, stone), sides banded every metre so a
   // column reads as stacked blocks; a little per-block speckle, our own palette, no borrowed textures.
@@ -268,15 +269,15 @@ export function createArcade(renderer, { loader, normalize, mobile = false }) {
     addBlock(x, h + 1, z, 3, 1, 3, '#5aad45')
     addBlock(x + 1, h + 2, z, 1, 1, 1, '#66bb50')
   }
-  for (let x = -14; x < 60; x += 6.5) tree(x, 6, 4 + Math.round(Math.abs(Math.sin(x)) * 2))
-  for (const [x, z] of [[-8, -16], [3, -19], [16, -17], [27, -21], [44, -18], [55, -16]]) tree(x, z, 5)
+  for (let x = -14; x < 160; x += 6.5) tree(x, 6, 4 + Math.round(Math.abs(Math.sin(x)) * 2))
+  for (const [x, z] of [[-8, -16], [3, -19], [16, -17], [27, -21], [44, -18], [55, -16], [72, -19], [88, -15], [104, -20], [121, -17], [140, -18], [156, -16]]) tree(x, z, 5)
   for (const [x, odd] of HOTELS) {
     const floors = odd ? 3 : 5
     const tint = ['#f4b3c9', '#a8e6d3', '#ffd0a8', '#c9b6f2'][Math.abs(Math.round(x)) % 4]
     for (let f = 0; f < floors; f++) addBlock(x, f * 2, -10.5, odd ? 8 : 6, 2, 6, f % 2 ? tint : '#f6efe4')
     addBlock(x, floors * 2, -10.5, 2, 2.5, 2, tint) // its fin, in blocks
   }
-  for (const [x, y, z, w] of [[0, 24, -34, 11], [18, 28, -28, 9], [36, 23, -38, 13], [52, 27, -24, 10], [8, 30, 34, 12], [30, 26, 40, 9], [-10, 25, -20, 8]]) {
+  for (const [x, y, z, w] of [[0, 24, -34, 11], [18, 28, -28, 9], [36, 23, -38, 13], [52, 27, -24, 10], [8, 30, 34, 12], [30, 26, 40, 9], [-10, 25, -20, 8], [74, 26, -30, 12], [98, 29, -22, 9], [122, 24, -36, 13], [146, 27, -26, 10], [86, 25, 30, 11]]) {
     addBlock(x, y, z, w, 1.5, w * 0.55, '#ffffff')
     addBlock(x + 1, y + 1.5, z, w * 0.55, 1, w * 0.35, '#ffffff')
   }
@@ -290,7 +291,7 @@ export function createArcade(renderer, { loader, normalize, mobile = false }) {
   scene.add(blocks)
   // Flowers in the grass along the path.
   // Flowers grow in patches, one colour to a patch, small enough to read as flowers and not dice.
-  const PATCHES = 46, PER = 7
+  const PATCHES = 90, PER = 7
   const flowers = new THREE.InstancedMesh(new THREE.BoxGeometry(0.11, 0.11, 0.11).translate(0, 0.055, 0), blockStd({ color: '#ffffff', roughness: 0.7 }), PATCHES * PER)
   const petal = ['#ff6f8a', '#ffd84d', '#fffaf0', '#c9a0ff', '#ffa65c'].map(c => new THREE.Color(c))
   let fi = 0
@@ -357,8 +358,9 @@ export function createArcade(renderer, { loader, normalize, mobile = false }) {
     // Traffic loops the street; its lights ride with it.
     for (const car of traffic) {
       if (!car.g) continue
-      const span = 100
-      const cx = -24 + ((((car.x0 + car.lane.dir * car.speed * t) + 24) % span) + span) % span
+      // Loops -40..160: both ends far out of frame (behind the camera, or deep in the haze).
+      const span = 200
+      const cx = -40 + ((((car.x0 + car.lane.dir * car.speed * t) + 40) % span) + span) % span
       car.g.position.x = cx
       const d = car.lane.dir
       car.lights[0].position.set(cx + d * 2.05, 0.62, car.lane.z - 0.62)
