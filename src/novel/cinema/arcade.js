@@ -605,7 +605,7 @@ export function createArcade(renderer, { loader, normalize, mobile = false }) {
     // The third-person chase camera: behind and a little above, looking down the boulevard.
     camera.aspect = aspect
     camera.updateProjectionMatrix()
-    const portrait = aspect < 0.85
+    const portrait = state.portrait ?? aspect < 0.85 // on the cinema's screen, framed for the phone it is seen on
     cam.set(x - (portrait ? 7.5 : 5.2), portrait ? 3.6 : 2.5, portrait ? 2.6 : 1.9)
     cam.lerp(dreamCam.set(x - (portrait ? 3.6 : 2.6), portrait ? 1.9 : 1.6, portrait ? 4.2 : 3.2), dream)
     camera.position.lerp(cam, camera.position.lengthSq() ? 0.12 : 1)

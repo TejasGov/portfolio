@@ -313,10 +313,18 @@ export async function createCinema(canvas, { mobile = false, onProgress } = {}) 
       }
       await frame()
       offscreen(() => renderer.render(w.scene, w.camera)) // then one real draw: geometry and shadow map
+      if (name !== 'arcade') return
+      // The game also leaves through the cinema's screen: make its screen target now, not mid-exit.
+      await frame()
+      const prev = renderer.getRenderTarget()
+      renderer.setRenderTarget(gameTarget())
+      renderer.render(w.scene, w.camera)
+      renderer.setRenderTarget(prev)
     }).finally(() => { compiling = null })
   }
   const scratch = new THREE.WebGLRenderTarget(64, 64)
   let gameRT = null
+  const gameTarget = () => (gameRT ??= new THREE.WebGLRenderTarget(mobile ? 1152 : 2048, Math.round((mobile ? 1152 : 2048) / FILM_ASPECT), { type: THREE.HalfFloatType, samples: mobile ? 0 : 4 }))
   const showOnScreen = tex => {
     if (filmScreen.material.map === tex) return
     filmScreen.material.map = tex
@@ -483,6 +491,7 @@ export async function createCinema(canvas, { mobile = false, onProgress } = {}) 
     const jy = state.journey ? worlds.journey() : state.arcade ? worlds.arcade() : null
     // Chapter Four ends on the cinema's screen: the game plays there, framed for it, while the hall is drawn.
     const onScreen = !!state.arcade?.onScreen
+    if (onScreen) state.arcade.portrait = camera.aspect < 0.85 // so the screen's centre crop matches the full-frame view
     const res = jy ? jy.update(state.journey ?? state.arcade, t, onScreen ? FILM_ASPECT : camera.aspect) : null
     const walker = res?.here ?? null
     // The film: on the screen from the seats, or the whole frame once the camera is inside it.
@@ -498,9 +507,8 @@ export async function createCinema(canvas, { mobile = false, onProgress } = {}) 
       else film.renderToTexture()
     }
     if (onScreen) {
-      gameRT ??= new THREE.WebGLRenderTarget(mobile ? 1152 : 2048, Math.round((mobile ? 1152 : 2048) / FILM_ASPECT), { type: THREE.HalfFloatType, samples: mobile ? 0 : 4 })
       const prev = renderer.getRenderTarget()
-      renderer.setRenderTarget(gameRT)
+      renderer.setRenderTarget(gameTarget())
       renderer.clear()
       renderer.render(jy.scene, jy.camera)
       renderer.setRenderTarget(prev)

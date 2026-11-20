@@ -65,6 +65,10 @@ export default function Book() {
       <p ref={page} className="kicker pointer-events-none fixed right-5 bottom-5 z-50 text-white tabular-nums opacity-70 mix-blend-difference md:right-7 md:bottom-7" aria-hidden="true">
         p. 01 / 96
       </p>
+      {/* The other edition, in the corner opposite the page number: there if you look, never in the way. */}
+      <a href="/os/" aria-label="The OS edition: this portfolio as a desktop, from 2023" className="kicker fixed bottom-5 left-5 z-50 text-white opacity-50 mix-blend-difference transition-opacity hover:opacity-100 focus-visible:opacity-100 md:bottom-7 md:left-7">
+        OS edition →
+      </a>
 
       <dialog
         ref={dialog}
@@ -91,6 +95,9 @@ export default function Book() {
               </li>
             ))}
           </ol>
+          <p className="mt-8 border-t border-ink/15 pt-5 font-serif italic opacity-80">
+            Also available: <a href="/os/" className="underline underline-offset-4 hover:opacity-70">the 2023 edition, as a desktop OS →</a>
+          </p>
         </div>
       </dialog>
     </>
