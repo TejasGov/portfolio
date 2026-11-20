@@ -1,4 +1,5 @@
 import * as THREE from 'three'
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js'
 
 /*
  * The neon coast of Chapter Four, modelled the way 1980s Miami Beach actually looked: an Ocean Drive of
@@ -21,6 +22,22 @@ const PALETTES = [
   { wall: '#c9e8f7', trim: '#ffffff', accent: '#f08ab0', neon: '#ff5fb0' },
 ]
 const NAMES = ['Solara', 'Miramar', 'Coral Bay', 'Paloma', 'Starlite', 'Azura', 'Neptune', 'Estrella', 'Laguna']
+
+/** One mesh per material: a hotel is ~60 pieces but only ~8 materials, and draw calls are the cost here. */
+function mergeByMaterial(group) {
+  const byMat = new Map()
+  for (const m of [...group.children]) {
+    if (!m.isMesh || m.material.transparent) continue // neon signs keep their own draw (blending)
+    m.updateMatrix()
+    if (!byMat.has(m.material)) byMat.set(m.material, [])
+    byMat.get(m.material).push(m.geometry.clone().applyMatrix4(m.matrix))
+    group.remove(m)
+  }
+  for (const [mat, geos] of byMat) {
+    const merged = mergeGeometries(geos, false)
+    if (merged) group.add(new THREE.Mesh(merged, mat))
+  }
+}
 
 /** Box with UVs in metres (one texture tile per `tile` m on every face), so stucco never stretches. */
 function box(w, h, d, tile = 3) {
@@ -237,6 +254,7 @@ export function buildOceanDrive(scene, { wrap = m => m, mobile = false } = {}) {
     script.position.set(0, 3.9, 1.6)
     g.add(script)
     signs.push(vsign, script)
+    mergeByMaterial(g)
     add(g)
     // Neon spill onto the facade and the street.
     neonLights.push({ x, color: P.neon, y: finH * 0.6 })
@@ -251,7 +269,7 @@ export function buildOceanDrive(scene, { wrap = m => m, mobile = false } = {}) {
     hx += w + 1.2
   }
   // A handful of real lights for the neon (the rest is bloom): the nearest few to where you walk.
-  const pool = Array.from({ length: mobile ? 3 : 6 }, () => {
+  const pool = Array.from({ length: mobile ? 2 : 4 }, () => {
     const l = new THREE.PointLight('#ffffff', 0, 14, 1.6)
     scene.add(l)
     return l
@@ -306,7 +324,20 @@ export function buildOceanDrive(scene, { wrap = m => m, mobile = false } = {}) {
     scene.add(s)
   }
 
+  // The two lamps nearest the walker cast real, warm pools of light on the promenade.
+  const lampPool = Array.from({ length: mobile ? 1 : 2 }, () => {
+    const l = new THREE.PointLight('#ffd6a0', 0, 10, 1.5)
+    scene.add(l)
+    return l
+  })
+
   function update(t, walkerX) {
+    const lamp0 = Math.round((walkerX + 20) / 8) * 8 - 20
+    lampPool.forEach((l, k) => {
+      const lx = lamp0 + (k ? (walkerX > lamp0 ? 8 : -8) : 0)
+      l.position.set(lx, 4.1, -1.3)
+      l.intensity = 22
+    })
     // Move the real neon lights to the hotels nearest the walker.
     const near = [...neonLights].sort((a, b) => Math.abs(a.x - walkerX) - Math.abs(b.x - walkerX)).slice(0, pool.length)
     pool.forEach((l, k) => {

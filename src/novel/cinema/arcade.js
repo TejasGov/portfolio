@@ -54,11 +54,17 @@ export function createArcade(renderer, { loader, normalize, mobile = false }) {
   const U = { uWaveO: { value: new THREE.Vector3(ARCADE_X, 1, 0.8) }, uWaveR: { value: 0 }, uWaveT: { value: 0 }, uDay: { value: 0 } }
   const sky = duskSky(U)
   scene.add(sky)
+  let envDusk, envDay
   // The sky also lights the street and shows in every glass, car and puddle: an environment map of it.
   {
     const envScene = new THREE.Scene()
     envScene.add(duskSky({ uDay: { value: 0 } }))
-    scene.environment = new THREE.PMREMGenerator(renderer).fromScene(envScene, 0.02).texture
+    const pm = new THREE.PMREMGenerator(renderer)
+    envDusk = pm.fromScene(envScene, 0.02).texture
+    const dayScene = new THREE.Scene()
+    dayScene.add(duskSky({ uDay: { value: 1 } }))
+    envDay = pm.fromScene(dayScene, 0.02).texture
+    scene.environment = envDusk
     scene.environmentIntensity = 1.2
   }
   const coast = m => onWave(m, 1, U)
@@ -88,6 +94,7 @@ export function createArcade(renderer, { loader, normalize, mobile = false }) {
   scene.add(sea)
 
   const props = new THREE.Group()
+  const shadows = { side: 0 } // which world casts shadows right now (see update)
   scene.add(props)
   const place = (url, size, at, yaw, { side = 1, tint = null, rough = 0.75, metal = 0 } = {}) => loader.loadAsync(url).then(gltf => {
     const g = normalize(gltf.scene, size, yaw)
@@ -98,7 +105,8 @@ export function createArcade(renderer, { loader, normalize, mobile = false }) {
       o.material = side > 0
         ? coast(new THREE.MeshStandardMaterial({ map: o.material.map, color: tint ?? '#ffffff', roughness: rough, metalness: metal }))
         : block({ map: o.material.map })
-      o.castShadow = o.receiveShadow = true
+      o.receiveShadow = true
+      o.castShadow = shadows.side === 0 || shadows.side === side // late arrivals obey the current side
     })
     props.add(g)
     return g
@@ -120,40 +128,52 @@ export function createArcade(renderer, { loader, normalize, mobile = false }) {
   const cube = new THREE.BoxGeometry(1, 1, 1).translate(0, 0.5, 0)
   // One column per metre: top colour by height (sand, grass, stone), sides banded every metre so a
   // column reads as stacked blocks; a little per-block speckle, our own palette, no borrowed textures.
-  const blocksMat = block({ color: '#ffffff' })
-  const prev = blocksMat.onBeforeCompile
-  blocksMat.onBeforeCompile = sh => {
-    prev(sh)
-    sh.fragmentShader = sh.fragmentShader.replace('#include <color_fragment>', `#include <color_fragment>
-      vec3 cell = floor(vWaveP + 0.001);
-      float spk = fract(sin(dot(cell, vec3(12.99, 78.23, 37.71))) * 43758.5);
-      vec3 f = fract(vWaveP);
-      float edge = min(min(min(f.x, 1.0 - f.x), min(f.z, 1.0 - f.z)), min(f.y, 1.0 - f.y));
-      diffuseColor.rgb *= (0.9 + 0.12 * spk) * (0.82 + 0.18 * smoothstep(0.0, 0.06, edge));
-      // Sides below a thin band at the top: grass columns show their earth, the rest just shade.
-      bool side = abs(vWaveN.y) < 0.5;
-      bool grassy = diffuseColor.g > diffuseColor.r * 1.25 && diffuseColor.g > diffuseColor.b * 1.2;
-      if (side && vWaveP.y < vTop - 0.22) diffuseColor.rgb = grassy ? vec3(0.45, 0.3, 0.2) * (0.9 + 0.15 * spk) : diffuseColor.rgb * 0.78;`)
-    sh.vertexShader = sh.vertexShader
-      .replace('#include <common>', `#include <common>
-        varying float vTop; varying vec3 vWaveN;`)
-      .replace('#include <project_vertex>', `#include <project_vertex>
-        vTop = (modelMatrix * instanceMatrix * vec4(0.0, 1.0, 0.0, 1.0)).y;
-        vWaveN = normal;`)
-    sh.fragmentShader = sh.fragmentShader.replace('#include <common>', `#include <common>
-      varying float vTop; varying vec3 vWaveN;`)
+  const blockStd = opts => onWave(new THREE.MeshStandardMaterial(opts), -1, U)
+  // Per-block detail in the shader, our own palette and no borrowed textures: a little speckle per
+  // block, darker seams between blocks, earth under a band of grass on the sides, and a soft occlusion
+  // toward the bottom of every block face so a column reads as stacked cubes.
+  const blockDetail = mat => {
+    const prev = mat.onBeforeCompile
+    mat.onBeforeCompile = sh => {
+      prev(sh)
+      sh.vertexShader = sh.vertexShader
+        .replace('#include <common>', `#include <common>
+          varying float vTop; varying vec3 vWaveN;`)
+        .replace('#include <project_vertex>', `#include <project_vertex>
+          vTop = (modelMatrix * instanceMatrix * vec4(0.0, 1.0, 0.0, 1.0)).y;
+          vWaveN = normal;`)
+      sh.fragmentShader = sh.fragmentShader
+        .replace('#include <common>', `#include <common>
+          varying float vTop; varying vec3 vWaveN;`)
+        .replace('#include <color_fragment>', `#include <color_fragment>
+          vec3 cell = floor(vWaveP + 0.001);
+          float spk = fract(sin(dot(cell, vec3(12.99, 78.23, 37.71))) * 43758.5);
+          vec3 f = fract(vWaveP);
+          float grain = fract(sin(dot(floor(vWaveP * 8.0), vec3(3.1, 7.7, 5.3))) * 9124.7);
+          float edge = min(min(min(f.x, 1.0 - f.x), min(f.z, 1.0 - f.z)), min(f.y, 1.0 - f.y));
+          diffuseColor.rgb *= (0.9 + 0.12 * spk) * (0.93 + 0.07 * grain) * (0.8 + 0.2 * smoothstep(0.0, 0.05, edge));
+          bool side = abs(vWaveN.y) < 0.5;
+          bool grassy = diffuseColor.g > diffuseColor.r * 1.25 && diffuseColor.g > diffuseColor.b * 1.2;
+          if (side) {
+            if (vWaveP.y < vTop - 0.2) diffuseColor.rgb = grassy ? vec3(0.47, 0.32, 0.21) * (0.88 + 0.16 * spk) * (0.93 + 0.07 * grain) : diffuseColor.rgb * 0.82;
+            diffuseColor.rgb *= 0.72 + 0.28 * smoothstep(0.0, 0.7, f.y); // occlusion toward each block's foot
+          }`)
+    }
+    return mat
   }
-  const cols = []
+  const blocksMat = blockDetail(blockStd({ color: '#ffffff', roughness: 0.92 }))
+  const cols = [], water = []
   const hgt = (x, z) => {
     const n = Math.sin(x * 0.17) * Math.cos(z * 0.21) + Math.sin(x * 0.05 + z * 0.08) * 1.6
     const away = Math.min(1, Math.max(0, (Math.abs(z) - 3) / 8)) // flat by the path
-    return Math.round(Math.max(0, n * 2.4 + 1.5) * away)
+    const hills = THREE.MathUtils.smoothstep(-z, 14, 34) * (7 + 5 * Math.sin(x * 0.09) * Math.cos(z * 0.13)) // the ridge behind
+    return Math.round(Math.max(0, n * 2.4 + 1.5) * away + Math.max(0, hills))
   }
   for (let x = X0; x < X1; x++)
-    for (let z = -22; z < 26; z++) {
-      if (z >= 14) { cols.push([x, z, 0, '#4aa3df']); continue } // the sea, as water blocks
+    for (let z = -40; z < 26; z++) {
+      if (z >= 14) { water.push([x, z]); continue } // the sea, as water blocks
       const h = Math.abs(z) < 2 ? 0 : hgt(x, z)
-      const top = z > 9 ? '#f1d98c' : h > 4 ? '#9aa3ad' : '#6fcf5b'
+      const top = z > 9 ? '#efd795' : h > 12 ? '#f4f7fb' : h > 8 ? '#9aa3ad' : '#5aa84a'
       cols.push([x, z, h, top])
     }
   const grid = new THREE.InstancedMesh(cube, blocksMat, cols.length)
@@ -165,21 +185,35 @@ export function createArcade(renderer, { loader, normalize, mobile = false }) {
   })
   grid.receiveShadow = grid.castShadow = true
   scene.add(grid)
-  // Block trees where the palms stood, block towers where the hotels stood, and a few clouds.
+  // Water: glossy blocks that hold the sky.
+  const sea2 = new THREE.InstancedMesh(cube, blockDetail(blockStd({ color: '#3d97d6', roughness: 0.12, metalness: 0.1 })), water.length)
+  water.forEach(([x, z], i) => {
+    m4.compose(p.set(x + 0.5, -1.2, z + 0.5), q, s.set(1, 1, 1))
+    sea2.setMatrixAt(i, m4)
+  })
+  sea2.receiveShadow = true
+  scene.add(sea2)
+  // Block trees where the palms stood (a fuller crown), block towers where the hotels stood, clouds.
   const bits = []
   const addBlock = (x, y, z, sx, sy, sz, c) => bits.push([x, y, z, sx, sy, sz, c])
-  for (let x = -14; x < 60; x += 6.5) {
-    const h = 4 + Math.round(Math.abs(Math.sin(x)) * 2)
-    addBlock(x, 0, 6, 1, h, 1, '#8a5a3a')
-    addBlock(x, h, 6, 3, 2, 3, '#4f9e3c')
-    addBlock(x, h + 2, 6, 1, 1, 1, '#5fb24a')
+  const tree = (x, z, h) => {
+    addBlock(x, 0, z, 1, h, 1, '#8a5a3a')
+    addBlock(x, h - 1, z, 5, 2, 5, '#4f9e3c')
+    addBlock(x, h + 1, z, 3, 1, 3, '#5aad45')
+    addBlock(x + 1, h + 2, z, 1, 1, 1, '#66bb50')
   }
+  for (let x = -14; x < 60; x += 6.5) tree(x, 6, 4 + Math.round(Math.abs(Math.sin(x)) * 2))
+  for (const [x, z] of [[-8, -16], [3, -19], [16, -17], [27, -21], [44, -18], [55, -16]]) tree(x, z, 5)
   for (const [x, odd] of HOTELS) {
     const floors = odd ? 3 : 5
     const tint = ['#f4b3c9', '#a8e6d3', '#ffd0a8', '#c9b6f2'][Math.abs(Math.round(x)) % 4]
     for (let f = 0; f < floors; f++) addBlock(x, f * 2, -10.5, odd ? 8 : 6, 2, 6, f % 2 ? tint : '#f6efe4')
+    addBlock(x, floors * 2, -10.5, 2, 2.5, 2, tint) // its fin, in blocks
   }
-  for (const [x, y, z] of [[0, 22, -30], [18, 26, -24], [36, 21, -34], [52, 25, -20], [8, 28, 30]]) addBlock(x, y, z, 9, 1.5, 5, '#ffffff')
+  for (const [x, y, z, w] of [[0, 24, -34, 11], [18, 28, -28, 9], [36, 23, -38, 13], [52, 27, -24, 10], [8, 30, 34, 12], [30, 26, 40, 9], [-10, 25, -20, 8]]) {
+    addBlock(x, y, z, w, 1.5, w * 0.55, '#ffffff')
+    addBlock(x + 1, y + 1.5, z, w * 0.55, 1, w * 0.35, '#ffffff')
+  }
   const blocks = new THREE.InstancedMesh(cube, blocksMat, bits.length)
   bits.forEach(([x, y, z, sx, sy, sz, c], i) => {
     m4.compose(p.set(x, y, z), q, s.set(sx, sy, sz))
@@ -188,6 +222,22 @@ export function createArcade(renderer, { loader, normalize, mobile = false }) {
   })
   blocks.castShadow = blocks.receiveShadow = true
   scene.add(blocks)
+  // Flowers in the grass along the path.
+  // Flowers grow in patches, one colour to a patch, small enough to read as flowers and not dice.
+  const PATCHES = 46, PER = 7
+  const flowers = new THREE.InstancedMesh(new THREE.BoxGeometry(0.11, 0.11, 0.11).translate(0, 0.055, 0), blockStd({ color: '#ffffff', roughness: 0.7 }), PATCHES * PER)
+  const petal = ['#ff6f8a', '#ffd84d', '#fffaf0', '#c9a0ff', '#ffa65c'].map(c => new THREE.Color(c))
+  let fi = 0
+  for (let k = 0; k < PATCHES; k++) {
+    const cx = X0 + 2 + ((k * 37) % (X1 - X0 - 4)), cz = (k % 2 ? -1 : 1) * (3 + ((k * 13) % 5))
+    for (let j = 0; j < PER; j++) {
+      const x = cx + (Math.random() - 0.5) * 1.6, z = cz + (Math.random() - 0.5) * 1.6
+      m4.compose(p.set(x, hgt(Math.floor(x), Math.floor(z)), z), q, s.setScalar(0.8 + Math.random() * 0.4))
+      flowers.setMatrixAt(fi, m4)
+      flowers.setColorAt(fi++, petal[k % petal.length])
+    }
+  }
+  scene.add(flowers)
 
   // Glowing cubes lifting off the wave front.
   const MOTES = 260
@@ -213,7 +263,7 @@ export function createArcade(renderer, { loader, normalize, mobile = false }) {
 
   const camera = new THREE.PerspectiveCamera(42, 1, 0.1, 700)
   const look = new THREE.Vector3(), cam = new THREE.Vector3()
-  let lastT = null, cue = '', shadowSide = 0
+  let lastT = null, cue = ''
 
   /**
    * state: { p (0..1 through the chapter) }. Walk the coast (to the arcade), the wave, walk the blocks.
@@ -235,13 +285,14 @@ export function createArcade(renderer, { loader, normalize, mobile = false }) {
     hemi.color.set('#b9a3ff').lerp(new THREE.Color('#e6f2ff'), U.uDay.value)
     hemi.groundColor.set('#3a2a40').lerp(new THREE.Color('#6a8a50'), U.uDay.value)
     hemi.intensity = 1.15 + U.uDay.value * 0.4
-    scene.environmentIntensity = 1.2 * (1 - U.uDay.value * 0.5)
+    scene.environment = U.uDay.value > 0.5 ? envDay : envDusk
+    scene.environmentIntensity = U.uDay.value > 0.5 ? 1.0 : 1.2
     drive.update(t, x)
     // Shadows ignore the wave's discard, so only the world in front casts them (the coast until the
     // wave has mostly passed, then the blocks); flipped once each way.
     const castSide = U.uWaveR.value > 40 ? -1 : 1
-    if (castSide !== shadowSide) {
-      shadowSide = castSide
+    if (castSide !== shadows.side) {
+      shadows.side = castSide
       scene.traverse(o => {
         const side = o.isMesh && o.material?.userData?.waveSide
         if (side) o.castShadow = side === castSide
