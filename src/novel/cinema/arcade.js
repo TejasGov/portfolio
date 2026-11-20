@@ -382,6 +382,81 @@ export function createArcade(renderer, { loader, normalize, mobile = false }) {
   }
   scene.add(flowers)
 
+  // ------------------------------------------------------------ the block world's creatures
+  // Our own designs in our own pixel palette, in the spirit of a block game's night: an undead
+  // shambler with its arms out, a skeletal archer with a bow, and a mossy stone golem. They wander
+  // beside the path and, like everything in the block world, appear as the wave reaches them.
+  const tex8 = paint => {
+    const c = document.createElement('canvas')
+    c.width = c.height = 8
+    paint(c.getContext('2d'))
+    const t = new THREE.CanvasTexture(c)
+    t.magFilter = t.minFilter = THREE.NearestFilter
+    t.colorSpace = THREE.SRGBColorSpace
+    return t
+  }
+  const dot = (g, col, pts) => {
+    g.fillStyle = col
+    for (const [x, y, w = 1, h = 1] of pts) g.fillRect(x, y, w, h)
+  }
+  const pixelMat = (cols, paint) => blockStd({
+    map: tex8(g => {
+      for (let i = 0; i < 64; i++) dot(g, cols[Math.floor((Math.abs(Math.sin((i + cols.length * 7) * 12.9898) * 43758.5453) % 1) * cols.length)], [[i % 8, i >> 3]])
+      paint?.(g)
+    }),
+    roughness: 0.85,
+  })
+  // A box placed at [x, y, z]; a limb (hang) has its origin at its top, so it swings from its joint.
+  const part = (w, h, d, mat, [x, y, z], hang = false) => {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d).translate(0, hang ? -h / 2 : 0, 0), mat)
+    m.position.set(x, y, z)
+    m.castShadow = true
+    return m
+  }
+  const withFace = (side, front) => [side, side, side, side, front, side] // +x -x +y -y +z(front) -z
+  const ASH = ['#7d8a6e', '#73805f', '#86937a', '#6a7658']
+  const RUST = ['#a2552f', '#93492a', '#b05f36']
+  const CLOTH = ['#4e3b2c', '#45342a', '#58443a']
+  const BONE = ['#e4dfd0', '#d8d2c0', '#ece8dc']
+  const STONE = ['#7f8683', '#737a77', '#8b928e', '#6a706d']
+  const MOSS = ['#4f7f3a', '#5c8f44', '#456f33']
+  const shambler = () => {
+    const skin = pixelMat(ASH), shirt = pixelMat(RUST), cloth = pixelMat(CLOTH)
+    const face = pixelMat(ASH, g => { dot(g, '#1c1410', [[1, 3, 2, 2], [5, 3, 2, 2], [2, 6, 4, 1]]); dot(g, '#ffb547', [[1, 3], [6, 3]]) })
+    const arms = [0.33, -0.33].map(x => part(0.2, 0.66, 0.2, shirt, [x, 1.36, 0], true))
+    const legs = [0.12, -0.12].map(x => part(0.22, 0.7, 0.22, cloth, [x, 0.7, 0], true))
+    const g = new THREE.Group().add(part(0.46, 0.46, 0.46, withFace(skin, face), [0, 1.62, 0]), part(0.46, 0.68, 0.26, shirt, [0, 1.05, 0]), ...arms, ...legs)
+    return { g, legs, arms, armRest: -Math.PI / 2 + 0.12, speed: 0.6 } // arms held out ahead
+  }
+  const archer = () => {
+    const bone = pixelMat(BONE), wood = pixelMat(['#7a5232', '#6b4628'])
+    const ribs = pixelMat(BONE, g => dot(g, '#5a5448', [[1, 1, 6, 1], [1, 3, 6, 1], [1, 5, 6, 1], [3, 0, 2, 8]]))
+    const skull = pixelMat(BONE, g => dot(g, '#2a2620', [[1, 3, 2, 2], [5, 3, 2, 2], [3, 5, 2, 1], [2, 7, 4, 1]]))
+    const arms = [0.25, -0.25].map(x => part(0.11, 0.62, 0.11, bone, [x, 1.36, 0], true))
+    const legs = [0.1, -0.1].map(x => part(0.12, 0.7, 0.12, bone, [x, 0.7, 0], true))
+    const bow = [[0.3, 0.5], [0.15, 0.58], [0, 0.6], [-0.15, 0.58], [-0.3, 0.5]].map(([y, z]) => part(0.05, 0.16, 0.05, wood, [-0.25, 1.36 + y, z]))
+    const g = new THREE.Group().add(part(0.44, 0.44, 0.44, withFace(bone, skull), [0, 1.6, 0]), part(0.4, 0.64, 0.18, ribs, [0, 1.06, 0]), ...arms, ...legs, ...bow, part(0.01, 0.62, 0.01, bone, [-0.25, 1.36, 0.47]))
+    return { g, legs, arms, armRest: -Math.PI / 2, speed: 0.75 }
+  }
+  const golem = () => {
+    const stone = pixelMat(STONE, g => dot(g, MOSS[0], [[0, 0, 3, 1], [5, 0, 3, 2], [0, 1, 1, 2]]))
+    const face = pixelMat(STONE, g => { dot(g, '#0e3b3f', [[1, 3, 2, 2], [5, 3, 2, 2]]); dot(g, '#5ff3ff', [[1, 3], [5, 3]]); dot(g, MOSS[1], [[0, 0, 8, 1], [2, 1, 2, 1]]) })
+    const legs = [[0.3, 0.28], [-0.3, -0.28], [-0.3, 0.28], [0.3, -0.28]].map(([x, z]) => part(0.24, 0.32, 0.24, stone, [x, 0.32, z], true))
+    const g = new THREE.Group().add(part(0.9, 0.62, 0.8, [stone, stone, pixelMat(MOSS), stone, face, stone], [0, 0.62, 0]), ...legs)
+    return { g, legs, arms: [], armRest: 0, speed: 0.4 }
+  }
+  // Beside the path ahead of where the walk through the blocks begins, a few metres off it either side.
+  const mobs = [shambler, archer, golem, shambler, archer, shambler, golem].map((make, i) => {
+    const m = make()
+    m.home = new THREE.Vector2(ARCADE_X + 7 + i * 4.2, i % 2 ? -3.6 - (i % 3) * 0.8 : 4.6 + (i % 3) * 0.8) // the camera rides at z ~2 on the + side
+    m.pos = m.home.clone()
+    m.to = m.home.clone()
+    m.phase = i * 1.7
+    scene.add(m.g)
+    return m
+  })
+  const step2 = new THREE.Vector2()
+
   // Glowing cubes lifting off the wave front.
   const MOTES = 260
   const motes = new THREE.InstancedMesh(new THREE.BoxGeometry(0.22, 0.22, 0.22), new THREE.MeshBasicMaterial({ color: new THREE.Color('#ffd6f4').multiplyScalar(3), transparent: true, opacity: 0.9, depthWrite: false }), MOTES)
@@ -465,7 +540,7 @@ export function createArcade(renderer, { loader, normalize, mobile = false }) {
     if (castSide !== shadows.side) {
       shadows.side = castSide
       scene.traverse(o => {
-        const side = o.isMesh && o.material?.userData?.waveSide
+        const side = o.isMesh && [o.material].flat()[0]?.userData?.waveSide
         if (side) o.castShadow = side === castSide
       })
     }
@@ -498,6 +573,20 @@ export function createArcade(renderer, { loader, normalize, mobile = false }) {
     }
     danceLight.intensity = dream * 16
     danceLight.position.set(x + Math.sin(t * 1.3) * 1.3, 1.7, Math.cos(t * 1.3) * 1.3)
+    // The creatures wander about their spots, legs swinging, turning the way they walk.
+    if (U.uWaveR.value > 0)
+      for (const m of mobs) {
+        if (m.pos.distanceTo(m.to) < 0.3) m.to.set(m.home.x + (Math.random() - 0.5) * 6, m.home.y + (Math.random() - 0.5) * 1.6)
+        step2.copy(m.to).sub(m.pos)
+        const len = step2.length()
+        m.pos.addScaledVector(step2.divideScalar(len || 1), Math.min(len, m.speed * dt))
+        const turn = Math.atan2(step2.x, step2.y) - m.g.rotation.y
+        m.g.rotation.y += Math.atan2(Math.sin(turn), Math.cos(turn)) * 0.08
+        m.g.position.set(m.pos.x, hgt(Math.floor(m.pos.x), Math.floor(m.pos.y)), m.pos.y)
+        const swing = Math.sin(t * 7 * m.speed + m.phase) * 0.6
+        m.legs.forEach((l, k) => { l.rotation.x = k % 2 ? -swing : swing })
+        m.arms.forEach((a, k) => { a.rotation.x = m.armRest + (k % 2 ? swing : -swing) * 0.12 })
+      }
     // Motes: on the wave's front, drifting up and out.
     if (wave > 0 && wave < 1) {
       const R = U.uWaveR.value
