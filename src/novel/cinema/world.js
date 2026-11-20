@@ -10,7 +10,7 @@ import {
 } from 'postprocessing'
 import { noiseVolume, beamFrame, VolumetricPass, makeDust, glowTexture } from './core'
 import { createFilm } from './film'
-import { WavePass } from './wave'
+import { SketchPass } from './sketch'
 
 /*
  * The one 3D world of the site: a cinema. A projection booth (with the Meshy projector) behind a window
@@ -133,8 +133,7 @@ function dissolvable(mat, u) {
 }
 
 export async function createCinema(canvas, { mobile = false, onProgress } = {}) {
-  // alpha: the seams to the paper chapters let the page show through the frame (see wave.js).
-  const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: false, stencil: false, powerPreference: 'high-performance' })
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, stencil: false, powerPreference: 'high-performance' })
   const dpr = Math.min(devicePixelRatio, mobile ? 1.5 : 1.75)
   renderer.setPixelRatio(dpr)
   renderer.outputColorSpace = THREE.SRGBColorSpace
@@ -292,11 +291,12 @@ export async function createCinema(canvas, { mobile = false, onProgress } = {}) 
   vol.uniforms.uMaxDist.value = 46
   composer.addPass(vol)
   const bloom = new BloomEffect({ mipmapBlur: true, intensity: 1.0, luminanceThreshold: 0.32, luminanceSmoothing: 0.3, radius: 0.74 })
+  const vignette = new VignetteEffect({ offset: 0.28, darkness: 0.72 })
   const grain = new NoiseEffect({ blendFunction: BlendFunction.SOFT_LIGHT })
   grain.blendMode.opacity.value = 0.16
-  composer.addPass(new EffectPass(camera, new ChromaticAberrationEffect({ offset: new THREE.Vector2(0.0008, 0.0005), radialModulation: true, modulationOffset: 0.25 }), bloom, new ToneMappingEffect({ mode: ToneMappingMode.AGX }), new VignetteEffect({ offset: 0.28, darkness: 0.72 }), grain))
-  const wave = new WavePass(noise)
-  composer.addPass(wave)
+  composer.addPass(new EffectPass(camera, new ChromaticAberrationEffect({ offset: new THREE.Vector2(0.0008, 0.0005), radialModulation: true, modulationOffset: 0.25 }), bloom, new ToneMappingEffect({ mode: ToneMappingMode.AGX }), vignette, grain))
+  const sketch = new SketchPass(camera, noise)
+  composer.addPass(sketch)
 
   // ------------------------------------------------------------ film frames on the screen
   // The spot's projective map is square; the screen fills its full width and a centred band of its height.
@@ -462,6 +462,7 @@ export async function createCinema(canvas, { mobile = false, onProgress } = {}) 
 
   /**
    * state: { pos, target, fov, lamp (0..∞), pull, swirl, bloom, house (0..1), card: {key, ...},
+   *          sketch: { r, origin, band, colourBehind } (the ink-drawing wave; omit for the plain world),
    *          project: { id, morph, fade, dissolve, spin } | null, flare }
    */
   function render(state) {
@@ -541,11 +542,18 @@ export async function createCinema(canvas, { mobile = false, onProgress } = {}) 
     renderPass.mainScene = inFilm ? film.scene : scene // inFilm implies the film exists
     renderPass.mainCamera = inFilm ? film.camera : camera
     vol.enabled = !inFilm
-    const w = state.wave
-    wave.uniforms.uMode.value = w?.mode === 'burn' ? 0 : 1
-    wave.uniforms.uP.value = w ? w.p : 0
-    if (w?.origin) wave.uniforms.uOrigin.value.set(...w.origin)
-    wave.uniforms.uTime.value = t
+    vignette.darkness = inFilm ? 0.42 : 0.72 // a film is graded on its own; the hall's heavy vignette would muddy it
+    // The seams: the world as an ink drawing on the book's paper, and the wave between the two.
+    const sk = state.sketch
+    const su = sketch.uniforms
+    sketch.cam = inFilm ? film.camera : camera
+    su.uR.value = sk ? sk.r : 1e5
+    if (sk) {
+      su.uOrigin.value.copy(sk.origin)
+      su.uBand.value = sk.band ?? 1.2
+      su.uColorBehind.value = sk.colourBehind === false ? 0 : 1
+    }
+    su.uTime.value = t
     composer.render()
   }
 
