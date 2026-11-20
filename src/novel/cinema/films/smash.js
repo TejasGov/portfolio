@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import { toon, sky, paintTexture, textSprite, inkBox, inkMesh, frameLeft } from './kit'
+import { toon, sky, paintTexture, textSprite, inkBox, inkMesh, frameLeft, FRAME } from './kit'
 
 /*
  * Smash Cricket, the film: a floodlit ground at night. You show your hand to a giant webcam; its beam
@@ -193,7 +193,7 @@ export async function smash({ traveller }) {
     // Camera: low, three-quarter, drifting.
     const a = 0.08 + Math.sin(time * 0.1) * 0.06
     camera.position.set(Math.sin(a) * 7.8 - 0.3, 1.5, Math.cos(a) * 7.8)
-    frameLeft(camera, subject.set(-0.3, 1.4, 0), 0.95)
+    frameLeft(camera, subject.set(FRAME.portrait ? -1.1 : -0.3, 1.4, 0), 0.95) // on a phone, centre on you rather than the set
   }
 
   return { scene, camera, update, tick(dt) { you.mixer.update(dt) } }

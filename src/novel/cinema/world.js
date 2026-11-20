@@ -435,6 +435,7 @@ export async function createCinema(canvas, { mobile = false, onProgress } = {}) 
     const inFilm = !!f && f.inside >= 1
     filmScreen.visible = !!f && !inFilm && (f.show ?? 1) > 0.001
     if (f) {
+      f.portrait = camera.aspect < 0.85
       getFilm().update(f, t)
       filmScreen.material.color.setScalar(f.show ?? 1)
       if (inFilm) film.cropFor(camera.aspect, renderer.getDrawingBufferSize(drawSize).y)

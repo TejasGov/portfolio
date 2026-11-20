@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import { loadTraveller } from './films/kit'
+import { loadTraveller, FRAME } from './films/kit'
 import { yudhveer } from './films/yudhveer'
 import { smash } from './films/smash'
 import { cogniflow } from './films/cogniflow'
@@ -51,6 +51,7 @@ export function createFilm(renderer, { mobile = false, loader }) {
     const dt = lastT === null ? 0 : Math.min(0.1, Math.max(0, t - lastT))
     lastT = t
     clock += dt
+    FRAME.portrait = !!state.portrait
     active.tick(dt)
     active.update(state.time ?? clock)
     out.scene = active.scene

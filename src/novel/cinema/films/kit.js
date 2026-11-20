@@ -204,8 +204,11 @@ export function inkMesh(geo, color, { width = 0.012, ...opts } = {}) {
 }
 
 const _right = new THREE.Vector3()
+/** Set by the film each frame: a tall phone screen sees only the middle of the frame, so centre the subject. */
+export const FRAME = { portrait: false }
 /** Aim the camera so `subject` sits left of centre, leaving the right third for the title card. */
 export function frameLeft(camera, subject, shift = 0.9) {
+  if (FRAME.portrait) shift = 0
   camera.lookAt(subject)
   _right.set(1, 0, 0).applyQuaternion(camera.quaternion)
   camera.lookAt(_right.multiplyScalar(shift).add(subject))

@@ -68,8 +68,10 @@ export default function Epilogue() {
         <div className="mx-auto max-w-5xl border-t border-night-ink/15 pt-10">
           <h2 className="font-display text-4xl italic">Colophon</h2>
           <p className="mt-4 max-w-[62ch] font-serif text-base leading-relaxed text-night-ink/65">
-            Set in Instrument Serif, Newsreader, Geist Mono, Anton and Caveat. The cinema was modelled and light-baked in Blender; the projector,
-            the recliners and the five project models were generated with Meshy; the beam, the haze and the dust are drawn live in WebGL, and the projector you can hear is synthesized in the browser.
+            Set in Instrument Serif, Newsreader, Geist Mono, Anton and Caveat. The cinema was modelled and light-baked in Blender, with
+            surface textures from Poly Haven (CC0) and a carpet drawn for it; the projector, the recliners, the traveller (a stylised me) and
+            the six little worlds of Chapter Three were generated with Meshy. The five films, the ink drawings and the waves between them, the
+            beam, the haze and the dust are all drawn live in WebGL, and the projector you can hear is synthesized in the browser.
             Photographs in Chapter One come from Wikimedia Commons under the licences below; they were cut out, torn and taped for this book.
           </p>
           <ul className="mt-8 grid gap-x-10 gap-y-2 font-mono text-[11px] leading-relaxed text-night-ink/50 md:grid-cols-2">

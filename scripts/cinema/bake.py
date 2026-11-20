@@ -108,7 +108,7 @@ def state(name):
     emission('cove', 7.0 if house else 3.0)
     for n, o in light_objs.items():
         if n.startswith('scallop_'):
-            o.data.energy = 70 if house else 26
+            o.data.energy = 170 if house else 75
         if n.startswith('foot_'):
             o.data.energy = 90 if house else 140
 

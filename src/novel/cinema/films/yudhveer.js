@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import { toon, outline, sky, paintTexture, holdIn } from './kit'
+import { toon, outline, sky, paintTexture, holdIn, FRAME } from './kit'
 
 /*
  * Yudhveer, the film: a duel at dusk on a stone ring. You hold sword and shield against your own
@@ -122,9 +122,9 @@ export async function yudhveer({ traveller }) {
     spark.position.set(0.05, 1.35, 0.15)
     // Camera: low, from the side, drifting in; a small kick on each hit.
     const a = -0.25 + Math.sin(time * 0.11) * 0.12
-    const d = 8.6 - Math.min(t, 6) * 0.12
+    const d = (8.6 - Math.min(t, 6) * 0.12) * (FRAME.portrait ? 1.45 : 1) // a phone sees a narrow slice: step back to fit both
     camera.position.set(Math.sin(a) * d, 1.15 + hit * 0.03, Math.cos(a) * d)
-    camera.lookAt(0.85, 1.05, 0) // the duel sits left of centre; the title takes the right
+    camera.lookAt(FRAME.portrait ? 0 : 0.85, 1.05, 0) // the duel sits left of centre; the title takes the right
   }
 
   return {

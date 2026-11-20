@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import { toon, sky, paintTexture, textSprite, inkBox, inkMesh } from './kit'
+import { toon, sky, paintTexture, textSprite, inkBox, inkMesh, FRAME } from './kit'
 
 /*
  * Revere, the film: seen through the glasses. A sunlit garden in the late afternoon; you walk up the
@@ -123,7 +123,7 @@ export async function revere({ traveller }) {
 
     // The wearer looks at whoever is coming, with a little head sway.
     camera.position.set(0.15 + Math.sin(time * 0.4) * 0.02, 1.32 + Math.sin(time * 0.7) * 0.01, 1.4)
-    look.copy(head).add(new THREE.Vector3(0.75, -0.15, 0))
+    look.copy(head).add(new THREE.Vector3(FRAME.portrait ? 0 : 0.75, -0.15, 0))
     camera.lookAt(look)
   }
 
