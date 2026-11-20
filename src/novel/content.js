@@ -29,7 +29,7 @@ export const PROJECTS = [
 export const ALL_ROLES = workData.map(w => ({ org: w.org, role: w.role, period: w.period, year: w.year, place: w.location, type: w.type, impact: w.impact, bullets: w.bullets, current: w.current, future: w.future }))
 
 /** A shorter list of headline roles. */
-export const ROLES = ['Daiwa Capitals Market America', 'COA', 'UB College of Arts & Sciences', 'MedTourEasy', 'Sunflower Association'].map(org => {
+export const ROLES = ['Daiwa Capital Markets America', 'COA', 'UB College of Arts & Sciences', 'MedTourEasy', 'Sunflower Association'].map(org => {
   const w = role(org)
   return { org: w.org, role: w.role, period: w.period, place: w.location, impact: w.impact }
 })
@@ -54,6 +54,6 @@ const STOPS = [
   { id: 'gym', when: '2025', place: 'UB Athletics', orgs: ['UB Athletics'] },
   { id: 'library', when: '2025', place: 'Libraries & labs', orgs: ['UB Libraries', 'UB College of Arts & Sciences'] },
   { id: 'garage', when: '2025–26', place: 'Remote & Buffalo', orgs: ['MedTourEasy', 'COA', 'University at Buffalo', 'Society of Computing at UB'] },
-  { id: 'nyc', when: '2026', place: 'New York', orgs: ['Daiwa Capitals Market America'] },
+  { id: 'nyc', when: '2026', place: 'New York', orgs: ['Daiwa Capital Markets America'] },
 ]
 export const JOURNEY = STOPS.map(s => ({ ...s, roles: ALL_ROLES.filter(r => s.orgs.includes(r.org)).reverse() }))

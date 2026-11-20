@@ -46,7 +46,7 @@ const Whoosh = () => (
 
 // What a visitor should know first. Every line comes from Tejas's own data: his summary (the 2023
 // site's), his current main roles, his links.
-const NOW = ['Daiwa Capitals Market America', 'COA']
+const NOW = ['Daiwa Capital Markets America', 'COA']
 const HIS_LINE = SUMMARY.slice(SUMMARY.indexOf('The kind of person'))
 const link = label => CONTACT.links.find(l => l.label === label)?.href
 
