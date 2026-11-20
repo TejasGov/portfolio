@@ -1,12 +1,14 @@
 import { useEffect, useRef, useState } from 'react'
 import { store } from './lib/store'
+import { sound } from './lib/sound'
 
 export const CONTENTS = [
-  { id: 'prologue', n: '—', title: 'Prologue', sub: 'Signal' },
-  { id: 'one', n: 'I', title: 'Chai, Cricket & Cinema', sub: 'Prayagraj, the early years' },
-  { id: 'two', n: 'II', title: 'Things I Built', sub: 'Five holograms' },
-  { id: 'three', n: 'III', title: 'Places I Worked', sub: 'An index' },
-  { id: 'epilogue', n: '—', title: 'Epilogue', sub: 'Write to me' },
+  { id: 'prologue', n: '—', title: 'Prologue', sub: 'Lights down' },
+  { id: 'one', n: 'I', title: 'About me', sub: 'Who I am, where I’m from' },
+  { id: 'two', n: 'II', title: 'Now Showing', sub: 'Five projects' },
+  { id: 'three', n: 'III', title: 'Places I Worked', sub: 'Prayagraj to New York' },
+  { id: 'four', n: 'IV', title: 'Press Start', sub: 'An ode to games' },
+  { id: 'epilogue', n: '—', title: 'Epilogue', sub: 'House lights' },
 ]
 
 /**
@@ -14,7 +16,9 @@ export const CONTENTS = [
  * mix-blend-mode: difference keeps it legible on both night and paper without swapping colours.
  */
 export default function Book() {
-  const [label, setLabel] = useState('Prologue · Signal')
+  const [label, setLabel] = useState('Prologue · Lights down')
+  const [audible, setAudible] = useState(sound.on)
+  useEffect(() => sound.subscribe(setAudible), [])
   const page = useRef(null)
   const dialog = useRef(null)
 
@@ -48,13 +52,23 @@ export default function Book() {
       <header className="pointer-events-none fixed inset-x-0 top-0 z-50 flex items-start justify-between p-5 text-white mix-blend-difference md:p-7">
         <a href="#prologue" className="kicker pointer-events-auto">Tejas Govind</a>
         <p className="kicker hidden opacity-70 md:block">{label}</p>
-        <button type="button" onClick={() => dialog.current?.showModal()} className="kicker pointer-events-auto underline-offset-4 hover:underline">
-          Contents
-        </button>
+        <div className="flex items-start gap-6">
+          <button type="button" aria-pressed={audible} onClick={() => sound.toggle()} className="kicker pointer-events-auto flex items-center gap-2 underline-offset-4 hover:underline">
+            <span className={`sound-bars${audible ? ' is-on' : ''}`} aria-hidden="true"><i /><i /><i /></span>
+            Sound<span aria-hidden="true">{audible ? ' on' : ' off'}</span>
+          </button>
+          <button type="button" onClick={() => dialog.current?.showModal()} className="kicker pointer-events-auto underline-offset-4 hover:underline">
+            Contents
+          </button>
+        </div>
       </header>
       <p ref={page} className="kicker pointer-events-none fixed right-5 bottom-5 z-50 text-white tabular-nums opacity-70 mix-blend-difference md:right-7 md:bottom-7" aria-hidden="true">
         p. 01 / 96
       </p>
+      {/* The other edition, in the corner opposite the page number: there if you look, never in the way. */}
+      <a href="/os/" aria-label="The OS edition: this portfolio as a desktop, from 2023" className="kicker fixed bottom-5 left-5 z-50 text-white opacity-50 mix-blend-difference transition-opacity hover:opacity-100 focus-visible:opacity-100 md:bottom-7 md:left-7">
+        OS edition →
+      </a>
 
       <dialog
         ref={dialog}
@@ -81,6 +95,9 @@ export default function Book() {
               </li>
             ))}
           </ol>
+          <p className="mt-8 border-t border-ink/15 pt-5 font-serif italic opacity-80">
+            Also available: <a href="/os/" className="underline underline-offset-4 hover:opacity-70">the 2023 edition, as a desktop OS →</a>
+          </p>
         </div>
       </dialog>
     </>

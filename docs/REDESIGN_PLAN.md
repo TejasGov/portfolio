@@ -1,78 +1,97 @@
-# A Design Novel: Portfolio Plan
+# Now Showing: Portfolio Plan
 
-The portfolio reads as **a design novel in four chapters**. Two worlds alternate:
+The portfolio is **a night at the movies**. It runs in one 3D world, a cinema built in Blender with its lighting baked in. That world is interrupted by one paper flashback, the India scrapbook, and one paper index, the credits. The 2023 macOS site lives at `/os/`.
 
-- **Night:** live WebGL, a cloud of about 90,000 pixels and a glowing scientific orb.
-- **Paper:** an editorial collage and a typeset index.
-
-Pixel-dithered fringes stitch the two together as you scroll. The 2023 macOS site lives at `/os/`.
-
-## 1. Why this, after Contours
-
-Contours, a procedural 3D landscape, read as "PS3", not premium, and invented details: a hilltop cricket field in the middle of nowhere, when Tejas grew up in Prayagraj. This version is built from three things he asked for:
-
-1. **The orb image he brought,** rebuilt at its own level of detail: near-black sphere, glowing multi-strand contour ribbons, a hot rim, bracketed live-coordinate labels and survey lines.
-2. **A morphing pixel vortex** that condenses into that orb, and later into each project.
-3. **India as a Vox-style paper collage** with real photographs: chai in a kulhad, cricket and MS Dhoni, Bollywood. The design references are human-md for editorial pacing, Monolith for scene-to-scene motion, and bricelab for restraint. None of their signature elements is copied.
-
-Every claim in the copy comes from Tejas's own words or `src/data`.
-
-## 2. The book
+## 1. The film
 
 | Chapter | World | What happens |
 |---|---|---|
-| Prologue · Signal | Night | Your name assembles over a two-armed pixel vortex with depth of field. The pixels spiral in and settle onto the orb's contour lines. The drawn orb takes over, with instrument rings, survey markers and lines, then turns so Prayagraj (25.4358° N, 81.8463° E) faces you: "Mine started here." |
-| I · Chai, Cricket & Cinema | Paper | A horizontal scrapbook pinned to the scroll: title card with a hand-drawn Sangam map → Prayagraj (Sangam, Naini Bridge, Kumbh) → chai (kulhad, chaiwala) → cricket (gully cricket, MS Dhoni, bat, ball) → cinema (Elgin Talkies, SRK, Deepika, Amitabh, ticket) → 2022 Sunflower Association → "Somewhere in there, I started building things." A double-pass ink route draws itself across the spreads. |
-| II · Things I Built | Night | The pixel cloud forms each project as a tinted, annotated hologram. Each shape is a signed distance function sliced into contour rings and given a three-quarter turn: Smash Cricket (hand), CogniFlow (brain), Revere (glasses), Yudhveer (sword and shield), Commit City (towers). An editorial spread with links sits beside each. |
-| III · Places I Worked | Paper | Every role in `workData`, typeset as a book index. Each entry is a `<details>` that opens to its impact line and bullets. |
-| Epilogue · Write to me | Night | The last hologram folds back into the orb. Contact details, then a colophon that credits every photograph. |
+| **Prologue · Lights down** | Cinema | It opens in the projection booth with a vintage projector, film cans and a warm bulb. The camera passes the lens, flies out through the window and down the beam to the screen, which shows your name. It turns back over the seats and rises into the lamp. The light floods the frame and breaks into paper pixels. |
+| **I · Chai, Cricket & Cinema** | Paper | The horizontal scrapbook with parallax: Prayagraj, chai, cricket and cinema. |
+| **II · Now Showing** | Cinema, then films | The hall arrives as an ink drawing on the scrapbook's paper, and colour blooms out from the screen. The camera walks into the screen. Five animated films star the traveller, a stylised Tejas: Smash Cricket, CogniFlow, Revere, Yudhveer and Commit City. Each blooms out of ink and washes back to ink before the next cut. The camera walks back out, and the hall washes to ink and lifts off the page. |
+| **III · Places I Worked** | The journey | The traveller walks a path from Prayagraj (2022) to New York (2026), past six little worlds, one per stop. Each world blooms from ink into colour as he reaches it, and the day turns to night along the way. Paper slips carry every role. |
+| **IV · Press Start** | The neon coast, then blocks | An ode to the games Tejas grew up on, in two original worlds that share one place. You walk an 80s neon beach boulevard at dusk under a third-person chase camera: pastel hotels, palms, a parked coupe, a striped sunset over the sea. At the arcade cabinet at the end of the boardwalk, a wave rolls out and the coast dissolves into a voxel world under a bright sky. Glowing cubes lift off the wave's front, and you walk on and jump. |
+| **Epilogue · House lights** | Cinema | The hall is drawn back onto the page and blooms into colour with the house lights up. The screen reads "The End". Contact details follow, then the colophon. |
 
-## 3. Code map (`src/novel`)
+**The seams** are one language: the 3D world as an ink drawing on the book's paper (`cinema/sketch.js`), with a wave between the drawing and the lit world. The wave is a growing sphere for the hall and the films, and a front that travels with the traveller on the journey.
+
+## 2. How the world is built
+
+- **The hall:** `scripts/cinema/hall_build.py` builds it in Blender 5.2:
+  - stadium rake, acoustic wall panels with uplights, ceiling baffles;
+  - the booth with its projection window, the screen, curtains and exit signs;
+  - designed light: sconces throwing scallops up the fabric walls, a warm proscenium cove around the screen, and footlights on the curtains.
+
+  Every material carries a `detail` id.
+- **The bake:** `scripts/cinema/bake.py` bakes the hall twice with Cycles on the GPU (HIP):
+  - `hall_show` is lit by the screen and projector;
+  - `hall_house` adds warm downlights.
+
+  Both are 4K and stored as **log-encoded radiance**, so the dark room and the bright fittings both keep detail in 8 bits. The bake also writes two UV sets: world-scale detail coordinates and each face's material id. The web multiplies the matching texture from `hall_detail.webp` over the bake:
+  - R: an art-deco carpet, drawn for the hall;
+  - G: wool herringbone;
+  - B: board-formed concrete;
+  - A: velvet.
+
+  The last three are CC0 from Poly Haven. A star ceiling is drawn live on top.
+- **Models:** generated with **Meshy**:
+  - the projector and the recliner (smart topology, instanced 330 times), compressed with glTF-Transform (meshopt);
+  - the traveller (smart topology, auto-rig, ten library clips and a walk);
+  - the six journey dioramas.
+
+  The traveller and the dioramas are compressed by `scripts/cinema/compress.py` (Blender: Draco and 1K WebP, the walk merged in): the traveller is 0.77 MB and the dioramas 0.4–0.7 MB each.
+- **Films and journey:** live scenes in an ink-and-paint style (`cinema/films/kit.js`), with cel shading on the Meshy textures, ink outlines, painted skies and procedural props. A film renders into a target shown on the screen from the seats, or straight to the frame once the camera is inside (a view offset matches the screen's crop).
+- **Live layer:** the projector is a three.js `SpotLight` whose `map` is the film frame (a canvas). The screen is lit by it, so objects in the beam cast shadows on it. The beam itself is ray-marched through 3D noise haze at half resolution (`cinema/core.js`), with dust motes that light up only inside it. Post-processing adds mipmap bloom, AgX tone mapping, grain, chromatic aberration and a vignette.
+- **Transitions:** the bloom flood and the paper pixel sweep (`stage/Takeover.jsx`, `cinema/sweep.js`) are scroll-driven, so they run backwards too.
+- **Sound (opt-in, header toggle):** synthesized live with WebAudio in `lib/sound.js`, with no audio files: the projector's 24 fps clatter, motor hum and fan (louder the closer the camera is to the lens), the hall's air, and a rush of air as the light floods the frame. Silent under paper chapters.
+
+## 3. Code map
 
 | Path | Role |
 |---|---|
-| `main.jsx`, `App.jsx`, `index.css` | Entry, the chapter order, design tokens (night/paper, five typefaces), HUD and collage styles. |
-| `Book.jsx` | Running head (difference blend, so it reads on both worlds), Contents dialog, page counter. |
-| `lib/scroll.js` | Lenis on GSAP's ticker, with ScrollTrigger. |
-| `lib/store.js` | Per-chapter progress plus mouse, read every frame by the stage. |
-| `lib/chapters.js` | `useProgress` (progress into the store), `usePaper` (pauses WebGL while paper covers the screen), `useRunningHead`. |
-| `lib/Beats.jsx`, `lib/Assemble.jsx` | Text that surfaces at scroll windows; titles whose letters fly in. |
-| `lib/PixelFringe.jsx` | The dithered night↔paper edge. |
-| `stage/Stage.jsx` | Canvas, camera rig, HUD projector, post-processing (bloom, chromatic aberration, grain, vignette). |
-| `stage/timeline.js` | Scroll → state for pixels, orb, camera and HUD. **Tune timing here.** |
-| `stage/Field.jsx` + `targets.js` + `targets.worker.js` | The pixel cloud. Targets (galaxy, orb lines, dust, five shapes) are built in a Web Worker. |
-| `stage/noise.js` | The orb's domain-warped field, written in both JS and GLSL so the pixels land on the drawn lines. |
-| `stage/Orb.jsx`, `stage/Instrument.jsx` | The orb shader (ribbons, emboss, rim, graticule, scan) and its tick-ring rig. |
-| `stage/Hud.jsx`, `stage/anchors.js` | Bracketed readouts, survey lines, home marker, project annotations. |
-| `stage/sculptures.js` | Project shape functions, the slicer, and per-shape yaw. |
-| `chapters/*` | One file per chapter. `collage.js` holds the scrapbook layout as data. |
-| `content.js`, `credits.json` | Projects and roles (from `src/data`); photo licences and attribution. |
-| `public/novel/collage/` | Processed photos: `*-s` stickers (cut out with rembg, white rim baked in) and `*-t` torn prints. |
+| `src/novel/cinema/world.js` | The hall: loading, hall material (bake × detail textures), seats, projector, star ceiling, lights, beam, dust, title cards, and `render(state)`, which also draws the films and the journey. |
+| `src/novel/cinema/timeline.js` | Scroll progress to world state: camera paths, lamp, flood and sweep, which film is playing, the ink waves. **Tune timing here.** |
+| `src/novel/cinema/sketch.js` | The ink-drawing pass and its waves. |
+| `src/novel/cinema/film.js`, `films/*.js` | The films. `kit.js` holds the shared ink-and-paint kit and the traveller; there is one scene file per project. |
+| `src/novel/cinema/journey.js` | Chapter Three's world: path, dioramas, scenery and sky. |
+| `src/novel/cinema/arcade.js`, `oceandrive.js` | Chapter Four. `oceandrive.js` models the Art Deco street procedurally: stucco hotels with eyebrow ledges, neon fins, corner towers and café awnings, plus the road, the promenade, lamps and lifeguard huts. It uses CC0 PBR textures in `public/cinema/arcade/tex/` and is lit by its dusk sky (PMREM) and the neon. `arcade.js` adds the sea, the Meshy palms, coupes and cabinet, the block world, and the wave between the two. Every coast material discards inside the wave and every block material outside it. |
+| `src/novel/cinema/core.js` | Beam frame, volumetric pass, dust and noise volume. |
+| `src/novel/stage/Stage.jsx`, `Takeover.jsx` | The canvas and render loop (paused under paper chapters, with adaptive resolution); the prologue's flood and pixel sweep. |
+| `src/novel/content.js` | Project copy (`PROJECTS`) and the journey's stops and roles (`JOURNEY`). |
+| `public/cinema/` | The hall bake, `hall_detail.webp`, the projector and seat, `traveller.glb` (eleven clips), and `journey/*.glb`. |
+| `scripts/cinema/` | The Blender build and bake (`hall_build.py`, `bake.py`), `compress.py` (Draco and WebP for Meshy models), and the collage photo processor. |
+| `lab/` (dev only) | `film.html?film=<id>` plays one film, `seam.html` shows the ink seam, and `hall.html` is the free-camera inspector. |
 
 ### Common edits
 
-- **Copy:** `BEATS` in `chapters/Prologue.jsx` and `chapters/Epilogue.jsx`; `chapters/collage.js` for the scrapbook; `content.js` for project one-liners.
-- **A different featured project:** edit `PROJECTS` in `content.js`. For a new shape, add it to `SHAPES` and `YAW` in `sculptures.js`, its key to `SHAPE_KEYS` in `Field.jsx` and to `WORK_KEYS` in `timeline.js`, and its labels to `WORK_NOTES` in `anchors.js`.
-- **Pacing:** section heights in each chapter file, and windows in `timeline.js`.
+- **Copy:** `BEATS` in `chapters/Prologue.jsx` and `chapters/Epilogue.jsx`; `collage.js`; `content.js` for project one-liners.
+- **A film:** its scene file in `cinema/films/`. Every film keeps its subject left of centre (`frameLeft`), because the card sits in the right third.
+- **A journey stop or role:** `STOPS` in `content.js`. The dioramas are Meshy models; compress new ones with `scripts/cinema/compress.py`.
+- **Share card:** `public/og.jpg` (1200×630) is a frame of the opening shot with the header and page counter hidden. Re-render it if the prologue's look changes.
+- **Relight the hall:** edit the lights in `scripts/cinema/bake.py`, then rebake:
+
+  ```sh
+  blender -b hall.blend --python bake.py -- out 2048 256
+  ```
+
+  Copy `hall.glb`, the two bakes (as WebP) and `hall_gains.json` into `public/cinema/`.
 
 ## 4. Quality bar
 
 - **Performance:**
-  - The page's own JS is about 55 KB.
-  - The stage chunk is about 90 KB plus three.js, lazy-loaded; target generation runs in a 5 KB worker.
-  - Phones get 42k pixels instead of 90k and a wider lens.
-  - WebGL rendering stops while a paper chapter covers the screen.
-  - DPR is capped at 1.75.
-- **Accessibility:**
-  - All text and links are real DOM, with one `h1`.
-  - Hidden beats are `inert`.
-  - Reduced motion removes drift, inertia and the sideways scrapbook travel; spreads stack instead.
-  - The 3D sits behind an error boundary, with a WebGL2 check.
-- **Licensing:** Chapter One's photographs are from Wikimedia Commons (CC BY, CC BY-SA, CC0, public domain), credited in the colophon. They are photos of public figures, used as a personal collage, not as an endorsement.
+  - The page's own JS is about 60 KB. The 3D stage is lazy-loaded, with the films and the journey loading after the first frame.
+  - Phones get fewer ray-march steps, fewer dust motes and smaller shadow and film-frame maps.
+  - On a desktop RX 9060 XT a frame takes 6–10 ms at 2520×1575 in the hall, and 3–4 ms in the films and the journey. Slower GPUs are handled by adaptive resolution: when frames run long for about a second, the stage drops the pixel ratio by 20%, down to 0.7 (`govern` in `stage/Stage.jsx`).
+  - Rendering stops while paper covers the screen.
+- **Accessibility:** all text and links are real DOM. Hidden beats are `inert`. Reduced motion stacks the scrapbook. The 3D sits behind an error boundary with a WebGL2 check.
+- **Licensing:**
+  - Photographs: Wikimedia Commons, credited in the colophon.
+  - 3D models: generated with Meshy on your account.
+  - Textures: Poly Haven, CC0.
 
 ## 5. Open items
 
-1. **Real-device check:** so far the site has only been rendered in headless Chromium, which renders WebGL in software. Profile on a laptop GPU and a phone. The levers are pixel count `N` and bloom.
-2. **The Smash Cricket live link** (`smash-cricket.vercel.app`) returned 404 in QA. Fix it or drop it in `src/data/projectsData.js`.
-3. **Copy pass by Tejas,** especially the prologue lines and the collage notes.
-4. **Optional:** hover previews in the Chapter Three index, sound, and an updated OG image and `llms.txt`.
+1. **Real hardware:** check on a phone and a laptop GPU. Adaptive resolution covers the worst of it. The remaining levers are `steps` in the volumetric pass, dust count, the recliner instance count and the shadow map size.
+2. **Four portraits:** Salman Khan, Akshay Kumar, Priyanka Chopra and a new Deepika Padukone photo were picked (see `scripts/cinema/collage_jobs.json`). Wikimedia still answers 429 to scripted downloads from this machine (retried on 19 Nov). Run `python scripts/cinema/collage_photos.py scripts/cinema/collage_jobs.json salman akshay priyanka deepika2`, then add them to the cast lineups in `collage.js`.
+3. **Smash Cricket link:** `smash-cricket.vercel.app` returns 404 and there is no public repo, so the link is hidden (`link: "#"` in `src/data/projectsData.js`). Put the URL back when it is redeployed.
+4. **Copy pass by Tejas,** especially the prologue lines.

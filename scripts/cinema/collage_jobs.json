@@ -1,0 +1,76 @@
+[
+ {
+  "key": "srk2",
+  "title": "File:Shah Rukh Khan (Berlin Film Festival 2008) 4.1.jpg",
+  "mode": "head",
+  "max": 640
+ },
+ {
+  "key": "ranbir",
+  "title": "File:Ranbir Kapoor promoting Bombay Velvet.jpg",
+  "mode": "head",
+  "max": 640
+ },
+ {
+  "key": "amitabh2",
+  "title": "File:Indian actor Amitabh Bachchan.jpg",
+  "mode": "head",
+  "max": 640
+ },
+ {
+  "key": "salman",
+  "title": "File:Salman Khan 2.jpg",
+  "mode": "head",
+  "max": 640,
+  "ratio": 0.95
+ },
+ {
+  "key": "akshay",
+  "title": "File:Akshay-Kumar-snapped-at-Pitch-To-Get-Rich-press-conference-in-Bandra.jpg",
+  "mode": "head",
+  "max": 640
+ },
+ {
+  "key": "kareena",
+  "title": "File:Kareena Kapoor at TOIFA16.jpg",
+  "mode": "head",
+  "max": 640,
+  "model": "isnet"
+ },
+ {
+  "key": "priyanka",
+  "title": "File:Priyanka Chopra at 2019 Cannes (cropped).jpg",
+  "mode": "head",
+  "max": 640
+ },
+ {
+  "key": "deepika2",
+  "title": "File:Deepika Padukone promoting Chhapaak 2.jpg",
+  "mode": "head",
+  "max": 640
+ },
+ {
+  "key": "dhoni2",
+  "title": "File:MS Dhoni 2.jpg",
+  "mode": "full",
+  "max": 900
+ },
+ {
+  "key": "wc2011",
+  "title": "File:People in Pune celebate after India wins the CWC11 (5591768796).jpg",
+  "mode": "torn",
+  "max": 1100
+ },
+ {
+  "key": "csk",
+  "title": "File:IPL T20 Chennai vs Kolkata.JPG",
+  "mode": "torn",
+  "max": 1000
+ },
+ {
+  "key": "pvr",
+  "title": "File:PVR Cinemas.jpg",
+  "mode": "torn",
+  "max": 1000
+ }
+]

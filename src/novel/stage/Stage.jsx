@@ -1,168 +1,107 @@
-import { useEffect, useMemo, useRef } from 'react'
-import { Canvas, useFrame, useThree } from '@react-three/fiber'
-import { Bloom, ChromaticAberration, EffectComposer, Noise, Vignette } from '@react-three/postprocessing'
-import { BlendFunction } from 'postprocessing'
+import { useEffect, useRef } from 'react'
 import * as THREE from 'three'
-import Field from './Field'
-import Orb from './Orb'
-import { HOME, ORB_LINKS, ORB_MARKS, WORK_NOTES } from './anchors'
-import { cameraState, chapter, hudState, pixelState, workPosition } from './timeline'
 import { store } from '../lib/store'
+import { createCinema, LENS } from '../cinema/world'
+import { stateAt, PROJECT_IDS, section, workSlot } from '../cinema/timeline'
 
 const reduced = () => matchMedia('(prefers-reduced-motion: reduce)').matches
-const v = new THREE.Vector3()
-const n = new THREE.Vector3()
-const toCam = new THREE.Vector3()
 
-/** Shortest-path angle blend. */
-function blendAngle(a, b, t) {
-  const d = Math.atan2(Math.sin(b - a), Math.cos(b - a))
-  return a + d * t
-}
-
-function Rig({ orb, field }) {
-  const camera = useThree(s => s.camera)
-  const look = useMemo(() => new THREE.Vector3(), [])
-  const target = useMemo(() => new THREE.Vector3(), [])
-  const spin = useRef(0)
-  const nodes = useRef(null)
-  const frame = useRef(0)
-
-  useFrame((state, delta) => {
-    const cam = cameraState(store)
-    const k = reduced() ? 1 : 1 - Math.exp(-delta * 3.2)
-    camera.position.lerp(target.set(...cam.pos), k)
-    look.lerp(target.set(...cam.look), k)
-    if (!reduced()) {
-      camera.position.x += store.mouse.x * 0.12
-      camera.position.y += store.mouse.y * 0.08
-    }
-    camera.lookAt(look)
-    // Portrait screens get a wider lens so the orb and holograms fit the narrow frame.
-    const fov = camera.aspect < 0.75 ? 64 : camera.aspect < 1.05 ? 50 : 38
-    if (camera.fov !== fov) {
-      camera.fov = fov
-      camera.updateProjectionMatrix()
-    }
-
-    // The orb turns slowly; near the end of the prologue it swings home so Prayagraj faces you.
-    const hud = hudState(store)
-    if (!reduced()) spin.current += delta * 0.05
-    const homeY = (HOME.lon * Math.PI) / 180 - Math.PI / 2
-    const homeX = (HOME.lat * Math.PI) / 180
-    const o = orb.current
-    o.rotation.y = blendAngle(spin.current, homeY, hud.home)
-    o.rotation.x = homeX * hud.home
-    o.position.set(...pixelState(store).offset)
-
-    const f = field.current
-    if (f) f.position.set(...pixelState(store).offset)
-    if (f) f.rotation.y = chapter(store) === 'work' && !reduced() ? Math.sin(state.clock.elapsedTime * 0.25) * 0.28 : 0
-
-    project(state, o, f, hud)
-  })
-
-  function project(state, o, f, hud) {
-    if (!nodes.current) {
-      nodes.current = {
-        orb: [...document.querySelectorAll('[data-hud="orb"]')],
-        home: document.querySelector('[data-hud="home"]'),
-        work: [...document.querySelectorAll('[data-hud="work"]')],
-        links: [...document.querySelectorAll('[data-hud-link]')],
-      }
-    }
-    const { width, height } = state.size
-    const refresh = frame.current++ % 5 === 0 // numbers tick like a readout, not every frame
-    const screen = []
-    const place = (el, local, obj, alpha, normalCheck) => {
-      v.set(...local)
-      obj.localToWorld(v)
-      let a = alpha
-      if (normalCheck) {
-        n.set(...local).normalize().transformDirection(obj.matrixWorld)
-        toCam.copy(camera.position).sub(v).normalize()
-        // Fade out just past the limb, so markers can ride the edge as on the reference plate.
-        a *= THREE.MathUtils.smoothstep(n.dot(toCam), -0.12, 0.12)
-      }
-      v.project(camera)
-      const x = (v.x * 0.5 + 0.5) * width
-      const y = (-v.y * 0.5 + 0.5) * height
-      // Readouts extend ~190px to the right of their point; fade them before they hit the edge.
-      a *= THREE.MathUtils.smoothstep(width - x, 120, 220) * THREE.MathUtils.smoothstep(y, 40, 90)
-      el.style.transform = `translate3d(${x.toFixed(1)}px, ${y.toFixed(1)}px, 0)`
-      el.style.opacity = a.toFixed(3)
-      return { x, y, a }
-    }
-    nodes.current.orb.forEach((el, i) => {
-      const s = place(el, ORB_MARKS[i].at, o, hud.orb, true)
-      screen.push(s)
-      if (refresh && s.a > 0.01) el.querySelector('.hud-label').textContent = `${ORB_MARKS[i].id}  ${Math.round(s.x)}, ${Math.round(s.y)}`
-    })
-    nodes.current.links.forEach((el, i) => {
-      const [a, b] = ORB_LINKS[i]
-      el.setAttribute('x1', screen[a].x)
-      el.setAttribute('y1', screen[a].y)
-      el.setAttribute('x2', screen[b].x)
-      el.setAttribute('y2', screen[b].y)
-      el.style.opacity = (Math.min(screen[a].a, screen[b].a) * 0.6).toFixed(3)
-    })
-    place(nodes.current.home, HOME.at, o, hud.home, true)
-
-    const { i, local } = workPosition(store.work)
-    nodes.current.work.forEach(el => {
-      const s = +el.dataset.shape
-      const k = +el.dataset.note
-      const on = hud.work && s === i && store.work > 0.06 ? THREE.MathUtils.smoothstep(local, 0.08, 0.2) * (1 - THREE.MathUtils.smoothstep(local, 0.62, 0.72)) : 0
-      if (f && on > 0) place(el, WORK_NOTES[s][k].at, f, on, false)
-      else el.style.opacity = '0'
-    })
-  }
-  return null
-}
-
-function Scene() {
-  const orb = useRef()
-  const field = useRef()
-  const setFrameloop = useThree(s => s.setFrameloop)
-  useEffect(() => {
-    // Only render while a night chapter is on screen; paper chapters cover the canvas.
-    const apply = () => setFrameloop(store.night ? 'always' : 'never')
-    const fn = key => key === 'night' && apply()
-    store.listeners.add(fn)
-    apply()
-    return () => store.listeners.delete(fn)
-  }, [setFrameloop])
-
-  return (
-    <>
-      <color attach="background" args={['#03050b']} />
-      <group ref={orb}>
-        <Orb group={orb} />
-      </group>
-      <group ref={field}>
-        <Field />
-      </group>
-      <Rig orb={orb} field={field} />
-      <EffectComposer multisampling={0}>
-        <Bloom mipmapBlur intensity={0.55} luminanceThreshold={0.72} luminanceSmoothing={0.22} radius={0.7} />
-        <ChromaticAberration offset={new THREE.Vector2(0.0012, 0.0012)} radialModulation modulationOffset={0.35} />
-        <Noise opacity={0.055} premultiply blendFunction={BlendFunction.SCREEN} />
-        <Vignette offset={0.22} darkness={0.72} />
-      </EffectComposer>
-    </>
-  )
-}
-
+/**
+ * The cinema behind every night chapter. One canvas, one render loop; it stops drawing while a paper
+ * chapter covers the screen. It also tells the takeover overlay where the lens is on screen.
+ */
 export default function Stage() {
-  return (
-    <Canvas
-      className="stage"
-      style={{ position: 'fixed', inset: 0 }}
-      dpr={[1, 1.75]}
-      camera={{ fov: 38, near: 0.05, far: 100, position: [0, 3.6, 8.2] }}
-      gl={{ antialias: false, powerPreference: 'high-performance' }}
-    >
-      <Scene />
-    </Canvas>
-  )
+  const canvas = useRef(null)
+
+  useEffect(() => {
+    let world
+    let raf
+    let alive = true
+    const mobile = matchMedia('(max-width: 760px)').matches
+    const mouse = new THREE.Vector2()
+    const lens = new THREE.Vector3()
+    const resize = () => world?.resize(innerWidth, innerHeight)
+
+    createCinema(canvas.current, { mobile }).then(async w => {
+      if (!alive) return
+      world = w
+      if (import.meta.env.DEV) window.__world = w
+      since = performance.now()
+      resize()
+      canvas.current.style.opacity = '1'
+      raf = requestAnimationFrame(loop)
+      // The films arrive after the first frame, in screening order.
+      for (const id of PROJECT_IDS) {
+        if (!alive) return
+        await world.loadFilm(id).catch(() => {})
+      }
+    })
+
+    // Adaptive resolution: if frames run long for about a second, render at 80% of the pixel ratio
+    // (never below 0.7). Long gaps (a tab switch, a paper chapter) don't count.
+    // shortcut: it only steps down, so a display capped at 30 fps (battery saver) also lands at 0.7; add a step back up if that matters.
+    let last = 0, ema = 16.7, slow = 0, since = performance.now()
+    const govern = now => {
+      const dt = now - last
+      last = now
+      if (dt > 100 || now - since < 2500) return
+      ema += (dt - ema) * 0.05
+      slow = ema > 24 ? slow + 1 : 0
+      if (slow < 45 || world.dpr <= 0.7) return
+      world.setDpr(Math.max(0.7, world.dpr * 0.8))
+      slow = 0
+      ema = 16.7
+    }
+
+    // The 3D follows the scroll with a little weight: each chapter's progress glides toward the scroll's
+    // (on top of Lenis's own smoothing), so waves, walks and camera moves never step with the wheel.
+    // A jump (the contents menu) lands at once rather than playing every chapter on the way.
+    const view = Object.create(store)
+    const KEYS = ['prologue', 'workIn', 'work', 'three', 'four', 'epilogue', 'epiIn']
+    let lastFrame = 0
+    const glide = now => {
+      const k = reduced() || !lastFrame ? 1 : 1 - Math.exp(-Math.min(0.1, (now - lastFrame) / 1000) * 4.5)
+      lastFrame = now
+      for (const key of KEYS) {
+        const to = store[key] ?? 0, from = Object.hasOwn(view, key) ? view[key] : to
+        view[key] = Math.abs(to - from) > 0.3 ? to : from + (to - from) * k
+      }
+    }
+
+    const loop = now => {
+      raf = requestAnimationFrame(loop)
+      glide(now)
+      if (!store.night) return
+      govern(now)
+      const k = reduced() ? 0 : 0.06
+      mouse.x += (store.mouse.x - mouse.x) * k
+      mouse.y += (store.mouse.y - mouse.y) * k
+      const st = stateAt(view, mouse, innerWidth / innerHeight)
+      // Make sure the reel being screened is loaded first.
+      const sec = section(view)
+      if (sec === 'work') world.loadFilm(PROJECT_IDS[workSlot(view.work).i])
+      // Build the next chapter's world while the reader is paused, so its seam doesn't stall mid-scroll.
+      const next = { work: 'journey', three: 'arcade' }[sec]
+      if (next && now - scrolled > 400) world.prepare(next)
+      world.render(st)
+      lens.copy(LENS).project(world.camera)
+      store.lens = [(lens.x * 0.5 + 0.5) * 100, (0.5 - lens.y * 0.5) * 100]
+      store.takeover = { flood: st.flood, sweep: st.sweep }
+      store.camDist = world.camera.position.distanceTo(LENS)
+    }
+
+    let scrolled = 0
+    const onScroll = () => { scrolled = performance.now() }
+    addEventListener('scroll', onScroll, { passive: true })
+    addEventListener('resize', resize)
+    return () => {
+      alive = false
+      cancelAnimationFrame(raf)
+      removeEventListener('scroll', onScroll)
+      removeEventListener('resize', resize)
+      world?.renderer.dispose()
+    }
+  }, [])
+
+  return <canvas ref={canvas} className="fixed inset-0 h-svh w-screen opacity-0 transition-opacity duration-[1500ms]" aria-hidden="true" />
 }

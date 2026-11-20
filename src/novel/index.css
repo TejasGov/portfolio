@@ -29,6 +29,13 @@
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
+/* Assembling letters and parallax pieces may poke past the edge; never let that become a sideways
+   scroll. clip (not hidden) so sticky chapters keep working. */
+html,
+body {
+  overflow-x: clip;
+}
+
 @theme inline {
   --color-night: var(--night);
   --color-night-ink: var(--night-ink);
@@ -202,13 +209,13 @@
 /* ================================================== Chapter One: the scrapbook */
 :root {
   --strip-unit: 1vw;
-  --one-height: 660svh;
+  --one-height: 770svh; /* seven spreads */
 }
 /* Portrait screens: each spread gets wider than the screen so the compositions keep their shape. */
 @media (max-aspect-ratio: 1/1) {
   :root {
     --strip-unit: 1.75vw;
-    --one-height: 820svh;
+    --one-height: 957svh;
   }
 }
 .spread {
@@ -387,6 +394,46 @@ figure.piece {
   border-left: 2px dashed rgb(58 26 12 / 0.45);
   box-shadow: 0 10px 14px rgb(48 30 12 / 0.22);
 }
+.ticket.pvr {
+  background: #1d1a2e;
+  color: #f4e9c8;
+  border-left-color: rgb(244 233 200 / 0.4);
+}
+/* The billing block: small cut-outs shoulder to shoulder, each a little crooked. */
+.cast {
+  display: flex;
+  align-items: flex-end;
+  width: calc(var(--w) * var(--strip-unit));
+}
+.cast-member {
+  position: relative;
+  z-index: calc(20 - var(--i));
+  flex: 1 1 0;
+  min-width: 0;
+  margin: 0 calc(-0.9 * var(--strip-unit));
+  rotate: var(--r);
+  filter: drop-shadow(0 10px 10px rgb(48 30 12 / 0.24)) drop-shadow(0 1px 1px rgb(48 30 12 / 0.2));
+  transition: translate 0.45s var(--ease-out), scale 0.45s var(--ease-out);
+}
+.cast-member:hover {
+  z-index: 30;
+  translate: 0 -7%;
+  scale: 1.06;
+}
+.cast-member img {
+  display: block;
+  width: 100%;
+}
+.cast-member figcaption {
+  margin-top: -0.2em;
+  font-family: var(--font-hand);
+  font-size: max(14px, calc(1.25 * var(--strip-unit)));
+  line-height: 1;
+  text-align: center;
+  white-space: nowrap;
+  color: var(--ink);
+  rotate: calc(var(--r) * -1.5);
+}
 .ticket-kicker,
 .ticket-meta {
   font-family: var(--font-mono);
@@ -456,7 +503,7 @@ figure.piece {
   position: absolute;
   top: 0;
   left: 0;
-  width: calc(600 * var(--strip-unit));
+  width: calc(700 * var(--strip-unit));
   height: 100%;
   pointer-events: none;
   overflow: visible;
@@ -505,6 +552,170 @@ figure.piece {
     animation: none;
   }
 }
+/* A spread's stage: a torn sheet of coloured paper laid under its pieces, with the page's own grain. */
+.sheet {
+  position: absolute;
+  filter: drop-shadow(0 12px 14px rgb(48 30 12 / 0.2)) drop-shadow(0 1px 1px rgb(48 30 12 / 0.22));
+  will-change: transform;
+}
+.sheet-paper {
+  position: absolute;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='320' height='320'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .36 0 0 0 0 .3 0 0 0 0 .22 0 0 0 .32 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-blend-mode: multiply;
+}
+/* A drawing sheet's rules, over the colour and under the grain. */
+.sheet-grid {
+  background-image:
+    linear-gradient(rgb(255 255 255 / 0.3) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(255 255 255 / 0.3) 1px, transparent 1px);
+  background-size: calc(2.4 * var(--strip-unit)) calc(2.4 * var(--strip-unit));
+}
+/* About me: the first thing in the book, an index card with his photo, facts and links. */
+.about {
+  display: flex;
+  gap: calc(2 * var(--strip-unit));
+  align-items: flex-start;
+  width: calc(46 * var(--strip-unit));
+  padding: calc(2 * var(--strip-unit));
+  background: #fbf8f0;
+  border-radius: 2px;
+  box-shadow: 0 14px 30px rgb(48 30 12 / 0.22), 0 2px 3px rgb(48 30 12 / 0.16);
+  color: var(--ink);
+}
+.about-photo {
+  position: relative;
+  flex: none;
+  width: calc(13 * var(--strip-unit));
+  margin: 0;
+  rotate: -3deg;
+  filter: drop-shadow(0 6px 8px rgb(48 30 12 / 0.25));
+}
+.about-photo img {
+  display: block;
+  width: 100%;
+}
+.about-photo .tape {
+  translate: -50% 0;
+}
+.about-body {
+  min-width: 0;
+}
+.about-name {
+  font-family: var(--font-display);
+  font-size: max(22px, calc(2.4 * var(--strip-unit)));
+  line-height: 1;
+}
+.about-facts {
+  margin-top: calc(1.1 * var(--strip-unit));
+  display: grid;
+  gap: 0.45em;
+  font-family: var(--font-serif);
+  font-size: max(14px, calc(1.1 * var(--strip-unit)));
+  line-height: 1.3;
+}
+.about-facts li {
+  display: grid;
+  grid-template-columns: 5.4em 1fr; /* the label, then the fact; wrapped lines stay with the fact */
+  column-gap: 0.6em;
+  align-items: baseline;
+}
+.about-facts .kicker {
+  color: var(--stamp);
+}
+.about-line {
+  margin-top: calc(1.1 * var(--strip-unit));
+  font-family: var(--font-hand);
+  font-weight: 600;
+  font-size: max(17px, calc(1.5 * var(--strip-unit)));
+  line-height: 1.15;
+  color: #2a2116;
+}
+.about-links {
+  margin-top: calc(1 * var(--strip-unit));
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4em 1.4em;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: max(12px, calc(0.85 * var(--strip-unit)));
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.about-links a {
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+.about-links a:hover,
+.about-links a:focus-visible {
+  color: var(--stamp);
+}
+/* On a phone: photo and name side by side as the card's header, the facts at full width below. */
+@media (max-aspect-ratio: 1/1) {
+  .about {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    align-items: center;
+    width: calc(48 * var(--strip-unit));
+  }
+  .about-body {
+    display: contents;
+  }
+  .about-photo {
+    width: calc(11 * var(--strip-unit));
+  }
+  .about-facts,
+  .about-line,
+  .about-links {
+    grid-column: 1 / -1;
+  }
+  .about-facts li {
+    grid-template-columns: 6.4em 1fr;
+  }
+}
+/* Poster words, a letter at a time: the outer span is moved by the scroll, the inner one idles. */
+.pl,
+.pl-in {
+  display: inline-block;
+}
+[data-fx="steam"] .pl-in {
+  transform-origin: 50% 100%;
+  animation: steam-sway 3.4s ease-in-out infinite;
+  animation-delay: calc(var(--k) * -0.5s);
+}
+@keyframes steam-sway {
+  0%, 100% { transform: translateY(0) rotate(-2deg); }
+  50% { transform: translateY(-0.06em) rotate(2deg); }
+}
+[data-fx="marquee"] .pl-in {
+  text-shadow: 0 0 0.25em rgb(255 110 70 / 0.45);
+  animation: bulb 3.1s steps(1) infinite;
+  animation-delay: calc(var(--k) * 0.37s);
+}
+@keyframes bulb {
+  0%, 90% { opacity: 1; }
+  92% { opacity: 0.5; }
+  95% { opacity: 1; }
+  97% { opacity: 0.7; }
+}
+/* The route's pen: a red nib at the tip of the line as it draws. */
+.route-nib {
+  position: absolute;
+  z-index: 2;
+  width: 14px;
+  height: 14px;
+  margin: -7px 0 0 -7px;
+  border-radius: 50%;
+  background: var(--stamp);
+  box-shadow: 0 0 0 5px rgb(200 54 30 / 0.16), 0 2px 6px rgb(120 30 10 / 0.35);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s;
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-fx] .pl-in {
+    animation: none;
+  }
+}
 
 /* ---------------------------------------------- assembling titles (Assemble.jsx) */
 .assemble-letter {
@@ -531,3 +742,33 @@ figure.piece {
     transition: none;
   }
 }
+
+/* Sound toggle: three bars that dance while the cinema is audible. */
+.sound-bars {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 0.8em;
+}
+.sound-bars i {
+  width: 2px;
+  height: 30%;
+  background: currentColor;
+  transition: height 0.3s;
+}
+.sound-bars.is-on i {
+  animation: sound-bar 0.9s ease-in-out infinite alternate;
+}
+.sound-bars.is-on i:nth-child(2) { animation-delay: -0.3s; }
+.sound-bars.is-on i:nth-child(3) { animation-delay: -0.6s; }
+@keyframes sound-bar {
+  from { height: 25%; }
+  to { height: 100%; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sound-bars.is-on i { animation: none; height: 70%; }
+}
+
+/* Chapter Four's "Press start" prompt blinks like an attract screen. */
+@keyframes blink { 50% { opacity: 0.25; } }
+@media (prefers-reduced-motion: reduce) { [class*='animation:blink'] { animation: none !important; } }

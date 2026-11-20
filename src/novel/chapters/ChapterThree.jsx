@@ -1,81 +1,60 @@
-import { useLayoutEffect, useRef } from 'react'
-import PixelFringe from '../lib/PixelFringe'
-import { usePaper, useRunningHead } from '../lib/chapters'
-import { gsap, reducedMotion } from '../lib/scroll'
-import { ALL_ROLES } from '../content'
+import { useMemo, useRef } from 'react'
+import { useBeats } from '../lib/Beats'
+import { useProgress, useRunningHead } from '../lib/chapters'
+import { JOURNEY } from '../content'
+import Assemble from '../lib/Assemble'
+
+const TITLE = [['Places I ', false], ['worked', true]]
 
 /*
- * Chapter Three: every place I've worked, typeset like the index at the back of a book.
- * Each entry opens (native <details>) to the line I'd want remembered from it.
+ * Chapter Three: the journey. In the 3D world (cinema/journey.js) the traveller walks a path from
+ * Prayagraj to New York, pausing at a little world for each stop, which blooms from ink into colour as
+ * he reaches it. The words live here: a paper slip, top-left, for each stop while he stands at it.
+ * Progress starts as soon as the chapter rises into view, so it picks up exactly where Chapter Two ends.
  */
+const N = JOURNEY.length
+const slip = k => [(k + 0.4) / N, (k + 0.98) / N] // = the stand at stop k in journey.js placeAt()
+
 export default function ChapterThree() {
   const ref = useRef(null)
-  usePaper(ref)
+  useProgress(ref, 'three', { start: 'top bottom', end: 'bottom bottom' })
   useRunningHead(ref, 'Chapter Three · Places I Worked')
-
-  useLayoutEffect(() => {
-    if (reducedMotion()) return undefined
-    const ctx = gsap.context(() => {
-      gsap.from('.index-row', {
-        y: 28,
-        opacity: 0,
-        duration: 1,
-        ease: 'expo.out',
-        stagger: 0.06,
-        scrollTrigger: { trigger: '.index-list', start: 'top 80%' },
-      })
-      gsap.from('.three-head > *', { y: 40, opacity: 0, duration: 1.1, ease: 'expo.out', stagger: 0.08, scrollTrigger: { trigger: '.three-head', start: 'top 80%' } })
-    }, ref)
-    return () => ctx.revert()
-  }, [])
+  const beats = useMemo(() => [{ at: [0.012, 0.06], kind: 'title' }, ...JOURNEY.map((s, k) => ({ at: slip(k), s }))], [])
+  const bind = useBeats('three', beats)
 
   return (
-    <section ref={ref} id="three" aria-labelledby="three-title" className="paper relative z-20 px-6 pt-[22svh] pb-[30svh] md:px-[8vw]">
-      <PixelFringe edge="top" />
-      <PixelFringe edge="bottom" />
-      <header className="three-head mx-auto max-w-5xl">
-        <p className="poster text-stamp" style={{ '--s': 3.2, '--strip-unit': '1vw' }}>
-          Chapter Three
-        </p>
-        <h2 id="three-title" className="mt-4 font-display text-[clamp(3.4rem,8vw,7.4rem)] leading-[0.88] tracking-[-0.02em]">
-          Places I <em>worked</em>
-        </h2>
-        <p className="mt-5 font-serif text-lg text-ink/65 italic">An index, newest first. Open any entry.</p>
-      </header>
-
-      <ol className="index-list mx-auto mt-[10svh] max-w-5xl border-t border-ink/25">
-        {ALL_ROLES.map((r, i) => (
-          <li key={`${r.org}-${r.role}`} className="index-row border-b border-ink/15">
-            <details className="group">
-              <summary className="grid cursor-pointer list-none grid-cols-[3.2rem_1fr] items-baseline gap-x-4 py-5 md:grid-cols-[4.5rem_1fr_auto] md:py-6 [&::-webkit-details-marker]:hidden">
-                <span className="font-poster text-xl text-stamp md:text-2xl">{r.year}</span>
-                <span className="min-w-0">
-                  <span className="font-display text-[clamp(1.5rem,2.6vw,2.3rem)] leading-tight group-open:italic">{r.role}</span>
-                  <span className="ml-3 font-serif text-base text-ink/60 italic md:text-lg">{r.org}</span>
-                  {r.current && <span className="ml-2 inline-block size-1.5 -translate-y-1 rounded-full bg-stamp" title="Current" aria-label="current" />}
-                </span>
-                <span className="kicker col-start-2 mt-1 text-ink/55 md:col-start-auto md:mt-0">{r.period}</span>
-              </summary>
-              <div className="grid grid-cols-[3.2rem_1fr] gap-x-4 pb-7 md:grid-cols-[4.5rem_1fr]">
-                <span className="kicker pt-1 text-ink/40">{String(i + 1).padStart(2, '0')}</span>
-                <div className="max-w-[60ch]">
-                  <p className="font-hand text-[1.7rem] leading-tight text-[#2a2116]">“{r.impact}”</p>
-                  <ul className="mt-4 space-y-2 font-serif text-[1.02rem] leading-relaxed text-ink/80">
-                    {r.bullets.map(b => (
-                      <li key={b} className="pl-5 -indent-5">
-                        — {b}
-                      </li>
-                    ))}
-                  </ul>
-                  <p className="kicker mt-4 text-ink/45">
-                    {r.type} · {r.place}
-                  </p>
-                </div>
+    <section ref={ref} id="three" aria-labelledby="three-title" className="relative" style={{ height: '820svh' }}>
+      <div className="sticky top-0 h-svh">
+        <div className="absolute inset-0 grid px-6 pt-[13svh] md:px-[6vw]">
+          {beats.map((b, k) =>
+            b.kind === 'title' ? (
+              // The chapter opens on the page itself (the world is still ink), so it is set in ink.
+              <div key="title" ref={bind(k)} className="pointer-events-none col-start-1 row-start-1 self-center text-ink opacity-0">
+                <p className="kicker text-stamp">Chapter Three</p>
+                <Assemble as="h2" id="three-title" parts={TITLE} className="mt-4 block font-display text-[clamp(3.4rem,8vw,7.4rem)] leading-[0.88] tracking-[-0.02em]" />
+                <p className="mt-5 max-w-[34ch] font-serif text-lg text-ink/70 italic">Prayagraj, 2022 to New York, 2026.</p>
               </div>
-            </details>
-          </li>
-        ))}
-      </ol>
+            ) : (
+              <article key={b.s.id} ref={bind(k)} className="paper col-start-1 row-start-1 max-w-[25rem] self-start p-6 text-ink opacity-0 shadow-[0_18px_40px_rgb(20_14_8/0.28)] md:p-7" style={{ rotate: `${k % 2 ? 0.8 : -0.9}deg` }} aria-label={`${b.s.when}, ${b.s.place}`}>
+                <p className="kicker text-stamp">
+                  {b.s.when} · {b.s.place}
+                </p>
+                <ul className="mt-4 space-y-4">
+                  {b.s.roles.map(r => (
+                    <li key={`${r.org}-${r.role}`}>
+                      <p className="font-display text-[1.65rem] leading-[1.05]">{r.role}</p>
+                      <p className="mt-1 font-serif text-[0.98rem] text-ink/70 italic">
+                        {r.org} · {r.period}
+                      </p>
+                    </li>
+                  ))}
+                </ul>
+                <p className="mt-5 border-t border-ink/15 pt-4 font-hand text-[1.45rem] leading-tight text-[#2a2116]">“{b.s.roles.at(-1)?.impact}”</p>
+              </article>
+            ),
+          )}
+        </div>
+      </div>
     </section>
   )
 }

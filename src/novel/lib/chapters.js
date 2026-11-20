@@ -2,18 +2,21 @@ import { useEffect } from 'react'
 import { ScrollTrigger } from './scroll'
 import { store } from './store'
 
-/** Feed a tall chapter's scroll progress (0 at its top, 1 at its bottom) into the store. */
-export function useProgress(ref, key) {
+/**
+ * Feed a tall chapter's scroll progress (0 at its top, 1 at its bottom) into the store. Other ranges
+ * (e.g. 'top bottom' → 'top top', the chapter arriving from below) go through start/end.
+ */
+export function useProgress(ref, key, { start = 'top top', end = 'bottom bottom' } = {}) {
   useEffect(() => {
     const st = ScrollTrigger.create({
       trigger: ref.current,
-      start: 'top top',
-      end: 'bottom bottom',
+      start,
+      end,
       onUpdate: self => store.set(key, self.progress),
       onRefresh: self => store.set(key, self.progress),
     })
     return () => st.kill()
-  }, [ref, key])
+  }, [ref, key, start, end])
 }
 
 const covering = new Set()
