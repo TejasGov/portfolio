@@ -2,7 +2,7 @@ import '../novel/index.css'
 import './lab.css'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
-import { createCinema, STAGE } from '../novel/cinema/world'
+import { createCinema } from '../novel/cinema/world'
 
 // Free-camera inspector for the cinema world. window.cin exposes everything for live tuning.
 const VIEWS = {
@@ -22,13 +22,9 @@ const go = k => {
 }
 go(3)
 const state = { pos: cam.position, target: controls.target, lamp: 1, pull: 0, swirl: 1, bloom: 1, house: 0, focus: 9, project: null }
-addEventListener('keydown', async e => {
+addEventListener('keydown', e => {
   if (VIEWS[e.key]) go(e.key)
   if (e.key === 'h') state.house = state.house ? 0 : 1
-  if (e.key === 'p') {
-    await world.loadProject('revere')
-    state.project = state.project ? null : { id: 'revere', morph: 1, fade: 0, dissolve: 1 }
-  }
 })
 const resize = () => world.resize(innerWidth, innerHeight)
 resize()
@@ -39,4 +35,4 @@ const loop = () => {
   requestAnimationFrame(loop)
 }
 loop()
-window.cin = { world, state, go, STAGE, THREE }
+window.cin = { world, state, go, THREE }

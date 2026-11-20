@@ -17,14 +17,15 @@ const world = await createCinema(document.getElementById('gl'), { mobile: matchM
 const resize = () => world.resize(innerWidth, innerHeight)
 resize()
 addEventListener('resize', resize)
-await world.loadFilm('yudhveer')
+const FILM = new URLSearchParams(location.search).get('film') ?? 'yudhveer'
+await world.loadFilm(FILM)
 
 const lenis = new Lenis({ lerp: 0.08 })
 const ROW10 = { pos: new THREE.Vector3(0, 4.0, -4.8), look: new THREE.Vector3(0.5, 3.2, 15) }
 const pos = new THREE.Vector3(), look = new THREE.Vector3(), inPos = new THREE.Vector3()
 const $ = id => document.getElementById(id)
-const p = PROJECTS.find(x => x.id === 'yudhveer')
-$('kick').textContent = 'Now showing · 04 / 05'
+const p = PROJECTS.find(x => x.id === FILM)
+$('kick').textContent = `Now showing · ${String(PROJECTS.indexOf(p) + 1).padStart(2, '0')} / 05`
 $('cat').textContent = p.category ?? ''
 $('ptitle').textContent = p.title
 $('pline').textContent = p.line
@@ -42,7 +43,7 @@ function stateAt(P) {
   return {
     pos, target: look, fov, lamp: 1.6, pull: 0, swirl: 1, bloom: 1, house: 0, exposure: 3, focus: 15, flare: 1,
     density: 0.08 * (1 - push), dust: 0.05 * (1 - push), project: null, card: null,
-    film: { id: 'yudhveer', inside: push > 0.9995 ? 1 : push },
+    film: { id: FILM, inside: push > 0.9995 ? 1 : push },
   }
 }
 

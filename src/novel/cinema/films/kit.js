@@ -17,9 +17,22 @@ export function toon(opts = {}) {
   return new THREE.MeshToonMaterial({ gradientMap: ramp, ...opts })
 }
 
-/** Ink outline for a mesh (skinned or not): a back-face shell pushed out along the normal. */
+/**
+ * Ink outline: a back-face shell around the mesh. Skinned meshes push their shell out along the
+ * (smooth) normals; rigid props, whose hard edges have split normals, use a scaled shell instead.
+ */
 export function outline(mesh, { ink = '#120d0a', width = 0.012 } = {}) {
   const mat = new THREE.MeshBasicMaterial({ color: ink, side: THREE.BackSide })
+  if (!mesh.isSkinnedMesh) {
+    mesh.geometry.computeBoundingBox()
+    const size = mesh.geometry.boundingBox.getSize(new THREE.Vector3())
+    const c = mesh.geometry.boundingBox.getCenter(new THREE.Vector3())
+    const shell = new THREE.Mesh(mesh.geometry, mat)
+    shell.scale.set(...size.toArray().map(v => (v + 2 * width) / Math.max(v, 1e-4)))
+    shell.position.copy(c).multiply(new THREE.Vector3(1, 1, 1).sub(shell.scale)) // scale about the centre
+    mesh.add(shell)
+    return shell
+  }
   mat.onBeforeCompile = sh => {
     sh.uniforms.uWidth = { value: width }
     sh.vertexShader = sh.vertexShader
@@ -86,7 +99,11 @@ export function paintTexture(base, spots, { size = 512, count = 220, seed = 1 } 
  * texture; 'shadow' makes him a dark double with a glowing outline.
  */
 export async function loadTraveller(loader) {
-  const gltf = await loader.loadAsync('/cinema/traveller.glb')
+  const [gltf, walk] = await Promise.all([loader.loadAsync('/cinema/traveller.glb'), loader.loadAsync('/cinema/traveller-walk.glb')])
+  // The walk comes from the same rig, so its tracks drive the same bones.
+  const walkClip = walk.animations[0].clone()
+  walkClip.name = 'Walk'
+  gltf.animations.push(walkClip)
   const box = new THREE.Box3().setFromObject(gltf.scene)
   const height = box.max.y - box.min.y
   return {
@@ -141,4 +158,58 @@ export function holdIn(bone, obj) {
   obj.scale.set(1 / s.x, 1 / s.y, 1 / s.z)
   bone.add(obj)
   return obj
+}
+
+/** A sprite of text drawn on a canvas (numerals, labels, HUD lines). */
+export function textSprite(text, { font = '400 180px "Instrument Serif", serif', color = '#fff', size = 1, glow = null, width = 512, height = 256, bg = null } = {}) {
+  const c = document.createElement('canvas')
+  c.width = width
+  c.height = height
+  const g = c.getContext('2d')
+  g.font = font
+  if (bg) {
+    // A HUD plate behind the words, so they read over anything.
+    const tw = Math.min(width - 8, g.measureText(text).width + height * 0.7)
+    g.fillStyle = bg
+    g.beginPath()
+    g.roundRect((width - tw) / 2, 4, tw, height - 8, (height - 8) / 2)
+    g.fill()
+  }
+  g.textAlign = 'center'
+  g.textBaseline = 'middle'
+  if (glow) {
+    g.shadowColor = glow
+    g.shadowBlur = 24
+  }
+  g.fillStyle = color
+  g.fillText(text, width / 2, height / 2)
+  const t = new THREE.CanvasTexture(c)
+  t.colorSpace = THREE.SRGBColorSpace
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: t, transparent: true, depthWrite: false }))
+  sp.scale.set(size * (width / height), size, 1)
+  return sp
+}
+
+/** A box with toon shading and an ink outline: the building block of every set. */
+export function inkBox(w, h, d, color, { width = 0.012, ...opts } = {}) {
+  const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), toon({ color, ...opts }))
+  m.castShadow = m.receiveShadow = true
+  outline(m, { width })
+  return m
+}
+
+/** Same, for any geometry. */
+export function inkMesh(geo, color, { width = 0.012, ...opts } = {}) {
+  const m = new THREE.Mesh(geo, toon({ color, ...opts }))
+  m.castShadow = m.receiveShadow = true
+  outline(m, { width })
+  return m
+}
+
+const _right = new THREE.Vector3()
+/** Aim the camera so `subject` sits left of centre, leaving the right third for the title card. */
+export function frameLeft(camera, subject, shift = 0.9) {
+  camera.lookAt(subject)
+  _right.set(1, 0, 0).applyQuaternion(camera.quaternion)
+  camera.lookAt(_right.multiplyScalar(shift).add(subject))
 }

@@ -30,10 +30,10 @@ export default function Stage() {
       resize()
       canvas.current.style.opacity = '1'
       raf = requestAnimationFrame(loop)
-      // Projects arrive after the first frame, nearest-first.
+      // The films arrive after the first frame, in screening order.
       for (const id of PROJECT_IDS) {
         if (!alive) return
-        await world.loadProject(id).catch(() => {})
+        await world.loadFilm(id).catch(() => {})
       }
     })
 
@@ -62,7 +62,7 @@ export default function Stage() {
       mouse.y += (store.mouse.y - mouse.y) * k
       const st = stateAt(store, mouse, innerWidth / innerHeight)
       // Make sure the reel being screened is loaded first.
-      if (section(store) === 'work') world.loadProject(PROJECT_IDS[workSlot(store.work).i])
+      if (section(store) === 'work') world.loadFilm(PROJECT_IDS[workSlot(store.work).i])
       world.render(st)
       lens.copy(LENS).project(world.camera)
       store.lens = [(lens.x * 0.5 + 0.5) * 100, (0.5 - lens.y * 0.5) * 100]

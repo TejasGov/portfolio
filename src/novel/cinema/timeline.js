@@ -1,6 +1,6 @@
 import * as THREE from 'three'
 import { PROJECTS } from '../content'
-import { PROJECT_MODELS, LENS } from './world'
+import { LENS, SCREEN, insideDistance } from './world'
 
 /*
  * Scroll → the cinema. One function maps the store (prologue / work / epilogue progress) to what the
@@ -36,23 +36,35 @@ const EPI_POS = new THREE.CatmullRomCurve3([V(0, 4.0, -4.8), V(-1.4, 5.2, -7.4),
 const EPI_LOOK = new THREE.CatmullRomCurve3([V(0.5, 3.2, 15), V(0.2, 3.7, 15), V(0, 4.1, 15)], false, 'centripetal')
 
 export const PROJECT_IDS = PROJECTS.map(p => p.id)
-const tints = Object.fromEntries(PROJECT_IDS.map(id => [id, new THREE.Color(PROJECT_MODELS[id].tint).lerp(new THREE.Color('#9ec2ff'), 0.45)]))
 const BEAM_WHITE = new THREE.Color(0.6, 0.76, 1.0)
 
 /** Which world section is driving: the one whose progress is mid-way. */
 export function section(s) {
   if (s.epilogue > 0) return 'epilogue'
-  if (s.work > 0) return 'work'
+  if (s.work > 0 || s.workIn > 0) return 'work'
   return 'prologue'
 }
 
-/** Progress through one project within Chapter Two (0..1 each), plus its index. */
+/*
+ * Chapter Two, in work progress w:
+ *   0    – .045 the hall arrives as an ink drawing on the India chapter's paper; colour blooms from the screen
+ *   .07  – .15  the camera walks into the screen
+ *   .15  – .85  five films, one slot each; each blooms from ink and washes back to ink before the cut
+ *   .85  – .93  back out into the hall
+ *   .93  – 1    the hall washes back into ink, as Chapter Three's paper arrives
+ */
+export const FILMS = [0.15, 0.85]
 export function workSlot(w) {
-  const f = Math.min(0.9999, Math.max(0, (w - 0.07) / 0.93)) * PROJECT_IDS.length
+  const f = Math.min(0.9999, Math.max(0, (w - FILMS[0]) / (FILMS[1] - FILMS[0]))) * PROJECT_IDS.length
   return { i: Math.floor(f), t: f - Math.floor(f) }
 }
+const HALL_REACH = 40 // from the screen to past the booth
+const FILM_ORIGIN = V(0, 1.1, 0) // where each film's subject stands
+/** A film's own wave: near things first, the painted sky last. */
+const filmReach = k => (k < 0.7 ? -2 + (k / 0.7) * 16 : 14 + ((k - 0.7) / 0.3) * 250)
 
 const out = { pos: V(0, 0, 0), target: V(0, 0, 0) }
+const inPos = V(0, 0, 0)
 
 export function stateAt(s, mouse, aspect) {
   const portrait = aspect < 0.85
@@ -81,34 +93,31 @@ export function stateAt(s, mouse, aspect) {
     st.exposure = 3
   } else if (sec === 'work') {
     const w = s.work
-    out.pos.copy(portrait ? WORK_POS_PORTRAIT : WORK_POS)
-    out.target.copy(portrait ? WORK_LOOK_PORTRAIT : WORK_LOOK)
+    const seat = portrait ? WORK_POS_PORTRAIT : WORK_POS
+    const seatLook = portrait ? WORK_LOOK_PORTRAIT : WORK_LOOK
+    inPos.copy(SCREEN).setZ(SCREEN.z - insideDistance(portrait ? 62 : 40, aspect))
+    const push = ss(0.07, 0.15, w) * (1 - ss(0.85, 0.93, w))
+    const k = push * push * (3 - 2 * push)
+    out.pos.copy(seat).lerp(inPos, k)
+    out.target.copy(seatLook).lerp(SCREEN, k)
     const { i, t } = workSlot(w)
-    const id = PROJECT_IDS[i]
-    if (w < 0.07) {
-      st.card = { key: 'work-title', kicker: 'Chapter Two', title: 'Things I built' }
-    } else {
-      const p = PROJECTS[i]
-      const m = PROJECT_MODELS[id]
-      st.card = { key: id, kicker: `${String(i + 1).padStart(2, '0')} / ${String(PROJECT_IDS.length).padStart(2, '0')} · ${p.category}`, title: p.title, field: m.field, image: m.still }
-      // Dust streams down the beam and condenses (0–.35), the shell glows (.3–.5), the solid dissolves in
-      // (.42–.7), holds, then breaks back into dust for the next reel (.9–1).
-      const out1 = ss(0.9, 1, t)
-      st.project = {
-        id,
-        morph: ss(0.02, 0.38, t) * (1 - out1),
-        fade: ss(0.0, 0.08, t) * (1 - ss(0.6, 0.74, t)) + out1 * 0.6,
-        dissolve: ss(0.42, 0.72, t) * (1 - out1),
-        spin: -0.3 + t * 0.6 + mouse.x * 0.3,
-      }
-      st.beamColor = tints[id]
-    }
+    st.card = { key: 'work-title', kicker: 'Chapter Two', title: 'Things I built' }
+    st.film = { id: PROJECT_IDS[i], inside: push > 0.9995 ? 1 : push }
     st.focus = 15
     st.exposure = 3
-    // A bright picture and clean air: you are watching the screen now, not the beam.
     st.lamp = 1.6
-    st.density = 0.08
-    st.dust = 0.05
+    st.density = 0.08 * (1 - push)
+    st.dust = 0.05 * (1 - push)
+    if (w <= 0) st.sketch = { r: -4, origin: SCREEN, band: 1.6 } // still on the India chapter's paper
+    else if (w < 0.05) st.sketch = { r: -4 + ss(0, 0.045, w) * (HALL_REACH + 4), origin: SCREEN, band: 1.6 }
+    else if (w > 0.93) st.sketch = { r: -4 + ss(0.93, 0.995, w) * (HALL_REACH + 4), origin: SCREEN, band: 1.6, colourBehind: false }
+    else if (st.film.inside >= 1) {
+      // Inside: each film blooms out of ink, plays, and washes back to ink before the cut to the next.
+      const bloom = ss(0, 0.16, t), wash = ss(0.84, 1, t)
+      st.sketch = wash > 0
+        ? { r: filmReach(wash), origin: FILM_ORIGIN, band: 0.8, colourBehind: false }
+        : { r: bloom >= 1 ? 1e5 : filmReach(bloom), origin: FILM_ORIGIN, band: 0.8 }
+    }
   } else {
     const e = s.epilogue
     const u = ss(0.05, 0.85, e)
@@ -120,6 +129,9 @@ export function stateAt(s, mouse, aspect) {
     st.dust = 0.3
     st.density = 0.2 // a thinner beam than the prologue's, so "The End" reads through it
     st.card = { key: 'end', kicker: 'Thank you for watching', title: 'The End' }
+    // Arriving from Chapter Three's paper: the hall in ink, then colour from the screen.
+    const bloom = ss(0, 0.1, e)
+    if (bloom < 1) st.sketch = { r: -4 + bloom * (HALL_REACH + 4), origin: SCREEN, band: 1.6 }
   }
 
   // A hand on the camera: gentle parallax from the pointer.

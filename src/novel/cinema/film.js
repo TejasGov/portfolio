@@ -1,6 +1,10 @@
 import * as THREE from 'three'
 import { loadTraveller } from './films/kit'
 import { yudhveer } from './films/yudhveer'
+import { smash } from './films/smash'
+import { cogniflow } from './films/cogniflow'
+import { revere } from './films/revere'
+import { commitCity } from './films/commitcity'
 
 /*
  * The film that plays on the cinema screen in Chapter Two, and the world you enter when the camera
@@ -12,7 +16,7 @@ import { yudhveer } from './films/yudhveer'
  * offset that matches the crop of the screen) once the camera is inside.
  */
 export const FILM_ASPECT = 2.4
-const SCENES = { yudhveer }
+const SCENES = { 'smash-cricket': smash, cognifight: cogniflow, revere, yudhveer, 'commit-city': commitCity } // keyed by project id
 
 export function createFilm(renderer, { mobile = false, loader }) {
   const W = mobile ? 1152 : 2048

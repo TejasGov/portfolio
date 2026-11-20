@@ -2,8 +2,6 @@ import * as THREE from 'three'
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js'
 import { RectAreaLightUniformsLib } from 'three/addons/lights/RectAreaLightUniformsLib.js'
-import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js'
-import { MeshSurfaceSampler } from 'three/addons/math/MeshSurfaceSampler.js'
 import {
   EffectComposer, RenderPass, EffectPass, BloomEffect, ChromaticAberrationEffect, NoiseEffect,
   VignetteEffect, ToneMappingEffect, ToneMappingMode, BlendFunction,
@@ -15,35 +13,25 @@ import { SketchPass } from './sketch'
 /*
  * The one 3D world of the site: a cinema. A projection booth (with the Meshy projector) behind a window
  * in the back wall, a stadium hall baked in Blender (two lighting states: show and house lights),
- * Meshy recliners, the projector beam through haze, and the projects that get "screened" in it.
+ * Meshy recliners, the projector beam through haze, and the films that play on the screen (film.js).
  * The projector is a real three.js SpotLight with a texture map, so the film frame lands on the screen
  * and anything standing in the beam casts its shadow there.
  */
 export const LENS = new THREE.Vector3(0.9, 7.58, -12.15)
 export const WINDOW = new THREE.Vector3(0.9, 7.6, -11.5)
 export const SCREEN = new THREE.Vector3(0, 4.15, 15.44)
-export const STAGE = new THREE.Vector3(0, 3.5, 11.2) // where the projects materialize
 const SCREEN_W = 18, SCREEN_H = 7.5
 /** Where the camera stands, on the screen's axis, when the screen exactly fills (covers) the frame. */
 export function insideDistance(fovDeg, aspect) {
   const t = Math.tan(THREE.MathUtils.degToRad(fovDeg / 2))
   return aspect <= SCREEN_W / SCREEN_H ? SCREEN_H / 2 / t : SCREEN_W / 2 / (t * aspect)
 }
-const PROJ_SCALE = 1.8 // projects are seen from row ten, in front of an 18 m screen
 
 // Recliner layout: identical to the Blender bake's seat proxies (hall_build.py).
 const ROWS = 15, COLS = 22, ROW_D = 1.02, ROW_H = 0.346, Z0 = 4.4
 const seatAt = (r, c) => {
   const x = (c - 10.5) * 0.78 + (c >= 11 ? 0.45 : -0.45)
   return [x, r * ROW_H, Z0 - r * ROW_D + x * x * 0.004]
-}
-
-export const PROJECT_MODELS = {
-  'smash-cricket': { url: '/cinema/cricket.glb', still: '/smash.png', size: 2.3, yaw: -0.25, tint: '#ffb46b', field: ['#2a1606', '#7a4512'] },
-  cognifight: { url: '/cinema/brain.glb', still: '/cognitive.png', size: 2.2, yaw: -0.6, tint: '#c9b4ff', field: ['#160f2c', '#4d3a8c'] },
-  revere: { url: '/cinema/glasses.glb', still: '/revere.png', size: 2.4, yaw: 0.35, tint: '#9fd2ff', field: ['#06142a', '#1f4f86'] },
-  yudhveer: { url: '/cinema/sword.glb', still: '/projects/yudhveer.webp', size: 2.4, yaw: 0.55 + Math.PI, tint: '#ffb08c', field: ['#260a06', '#8a2a16'] },
-  'commit-city': { url: '/cinema/city.glb', still: '/projects/commit-city.webp', size: 2.5, yaw: 0.6, tint: '#9ef2d2', shade: '#a8d9c8', field: ['#04201a', '#1a6b55'] },
 }
 
 const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder)
@@ -111,25 +99,6 @@ function normalize(root, size, yaw = 0) {
     out.add(new THREE.Mesh(g, o.material))
   })
   return out
-}
-
-/** Dissolve-in for any lit material: noise + a sweep up the object, with a hot edge. */
-function dissolvable(mat, u) {
-  mat.onBeforeCompile = sh => {
-    Object.assign(sh.uniforms, u)
-    sh.vertexShader = sh.vertexShader
-      .replace('#include <common>', '#include <common>\nvarying vec3 vLocal;')
-      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvLocal = position;')
-    sh.fragmentShader = sh.fragmentShader
-      .replace('#include <common>', '#include <common>\nvarying vec3 vLocal; uniform float uDissolve; uniform vec3 uEdgeColor; uniform highp sampler3D tNoise; uniform float uHalf;')
-      .replace('#include <clipping_planes_fragment>', `#include <clipping_planes_fragment>
-        float dn = texture(tNoise, vLocal * 0.9).r * 0.4 + clamp((vLocal.y + uHalf) / (2.0 * uHalf), 0.0, 1.0) * 0.6;
-        float dh = mix(-0.12, 1.1, uDissolve);
-        if (dn > dh) discard;
-        float dEdge = 1.0 - smoothstep(0.0, 0.045, dh - dn);`)
-      .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\ntotalEmissiveRadiance += uEdgeColor * dEdge;')
-  }
-  mat.needsUpdate = true
 }
 
 export async function createCinema(canvas, { mobile = false, onProgress } = {}) {
@@ -213,18 +182,6 @@ export async function createCinema(canvas, { mobile = false, onProgress } = {}) 
   scene.add(bulb)
   const houseLight = new THREE.HemisphereLight('#ffd7a8', '#3a2418', 0)
   scene.add(houseLight)
-  // Studio light for whatever is being screened: a warm key from the front-left, a tinted rim from the
-  // screen side, and a soft room reflection so metal, glass and lacquer read as real.
-  const env = new THREE.PMREMGenerator(renderer).fromScene(new RoomEnvironment(), 0.04).texture
-  // Steep from above, so what passes the object lands on the stage floor, not on the screen.
-  const stageKey = new THREE.SpotLight('#fff1de', 0, 0, 0.3, 0.6, 2)
-  stageKey.position.set(-1.6, 11.5, 8.6)
-  stageKey.target.position.copy(STAGE)
-  const stageRim = new THREE.SpotLight('#9ec2ff', 0, 0, 0.5, 0.6, 2)
-  stageRim.position.set(2.8, 6.5, 14.6)
-  stageRim.target.position.copy(STAGE)
-  scene.add(stageKey, stageKey.target, stageRim, stageRim.target)
-
   // The projector itself: a spotlight that projects the film frame (a canvas) and casts shadows.
   const frame = document.createElement('canvas')
   frame.width = frame.height = mobile ? 1024 : 2048
@@ -250,7 +207,7 @@ export async function createCinema(canvas, { mobile = false, onProgress } = {}) 
   let film = null
   const getFilm = () => {
     if (!film) {
-      film = createFilm(renderer, { mobile, loader, normalize, models: PROJECT_MODELS, noise })
+      film = createFilm(renderer, { mobile, loader })
       filmScreen.material.map = film.rt.texture
       filmScreen.material.needsUpdate = true
     }
@@ -302,16 +259,7 @@ export async function createCinema(canvas, { mobile = false, onProgress } = {}) 
   // The spot's projective map is square; the screen fills its full width and a centred band of its height.
   const band = SCREEN_H / SCREEN_W
   let lastCard = ''
-  const stills = {}
-  const still = url => {
-    if (!stills[url]) {
-      stills[url] = new Image()
-      stills[url].onload = () => { lastCard = '' } // redraw the frame once the footage arrives
-      stills[url].src = url
-    }
-    return stills[url]
-  }
-  function card(key, { kicker = '', title = '', field = ['#03060c', '#1a2a46'], ink = '#ffffff', image } = {}) {
+  function card(key, { kicker = '', title = '', field = ['#03060c', '#1a2a46'], ink = '#ffffff' } = {}) {
     if (key === lastCard) return
     lastCard = key
     const g = frame.getContext('2d')
@@ -319,21 +267,6 @@ export async function createCinema(canvas, { mobile = false, onProgress } = {}) 
     const h = S * band, y0 = (S - h) / 2
     g.fillStyle = '#000'
     g.fillRect(0, 0, S, S)
-    const img = image && still(image)
-    if (img?.complete && img.naturalWidth) {
-      // A flat (16:9) print on a scope screen: masked at the sides, cropped to its middle.
-      const w = h * 16 / 9, x0 = (S - w) / 2
-      const sh = Math.min(img.naturalHeight, img.naturalWidth * 9 / 16)
-      g.drawImage(img, 0, (img.naturalHeight - sh) / 2, img.naturalWidth, sh, x0, y0, w, h)
-      const vg = g.createRadialGradient(S / 2, S / 2, h * 0.3, S / 2, S / 2, w * 0.62)
-      vg.addColorStop(0, 'rgba(0,0,0,0)')
-      vg.addColorStop(1, 'rgba(0,0,0,0.55)')
-      g.fillStyle = vg
-      g.fillRect(x0, y0, w, h)
-      frameTex.needsUpdate = true
-      return
-    }
-    if (img) lastCard = '' // still loading: show the colour field meanwhile, then redraw
     const grad = g.createRadialGradient(S / 2, S / 2, h * 0.1, S / 2, S / 2, S * 0.62)
     grad.addColorStop(0, field[1])
     grad.addColorStop(1, field[0])
@@ -362,84 +295,6 @@ export async function createCinema(canvas, { mobile = false, onProgress } = {}) 
     frameTex.needsUpdate = true
   }
 
-  // ------------------------------------------------------------ projects (loaded after first paint)
-  const projects = {}
-  const dissolveU = () => ({ uDissolve: { value: 0 }, uEdgeColor: { value: new THREE.Color(0.5, 0.75, 1).multiplyScalar(7) }, tNoise: { value: noise }, uHalf: { value: 1.2 } })
-  const loading = {}
-  // One load per project, however many callers ask at once.
-  const loadProject = id => (loading[id] ??= buildProject(id))
-  async function buildProject(id) {
-    const spec = PROJECT_MODELS[id]
-    const gltf = await loader.loadAsync(spec.url)
-    const group = normalize(gltf.scene, spec.size, spec.yaw)
-    const u = dissolveU()
-    u.uEdgeColor.value.set(spec.tint).multiplyScalar(7)
-    group.traverse(o => {
-      if (!o.isMesh) return
-      o.material = o.material.clone()
-      if (spec.shade) o.material.color.multiply(new THREE.Color(spec.shade)) // a white maquette reads pale under the beam
-      o.material.envMap = env
-      o.material.envMapIntensity = 0.9
-      dissolvable(o.material, u)
-      o.castShadow = true
-    })
-    // Surface points: the dust condenses onto these before the solid appears.
-    const meshes = []
-    group.traverse(o => o.isMesh && meshes.push(o))
-    const NP = mobile ? 9000 : 22000
-    const to = new Float32Array(NP * 3), from = new Float32Array(NP * 3), seed = new Float32Array(NP * 3)
-    const samplers = meshes.map(m => new MeshSurfaceSampler(m).build())
-    const v = new THREE.Vector3(), b = new THREE.Vector3()
-    for (let i = 0; i < NP; i++) {
-      samplers[i % samplers.length].sample(v)
-      v.toArray(to, i * 3)
-      // Start back up the beam, toward the booth, as if the light carries the object in.
-      const t = 0.15 + Math.random() * 0.85
-      b.copy(LENS).lerp(STAGE, 1 - t).sub(STAGE)
-      b.x += (Math.random() - 0.5) * 3.5 * t
-      b.y += (Math.random() - 0.5) * 2.0 * t
-      b.divideScalar(PROJ_SCALE) // these live inside the scaled root
-      ;(v.clone().add(b)).toArray(from, i * 3)
-      seed.set([Math.random(), Math.random(), Math.random()], i * 3)
-    }
-    const geo = new THREE.BufferGeometry()
-    geo.setAttribute('position', new THREE.BufferAttribute(from, 3))
-    geo.setAttribute('aTo', new THREE.BufferAttribute(to, 3))
-    geo.setAttribute('aSeed', new THREE.BufferAttribute(seed, 3))
-    const pmat = new THREE.ShaderMaterial({
-      uniforms: { uMorph: { value: 0 }, uTime: { value: 0 }, uFade: { value: 0 }, uDpr: { value: renderer.getPixelRatio() }, uColor: { value: new THREE.Color(spec.tint).multiplyScalar(2.4) } },
-      vertexShader: /* glsl */ `
-        attribute vec3 aTo; attribute vec3 aSeed;
-        uniform float uMorph; uniform float uTime; uniform float uFade; uniform float uDpr;
-        varying float vA;
-        void main() {
-          float k = smoothstep(0.0, 1.0, clamp(uMorph * 1.6 - aSeed.x * 0.6, 0.0, 1.0));
-          vec3 drift = vec3(sin(uTime * 0.5 + aSeed.y * 30.0), cos(uTime * 0.4 + aSeed.z * 30.0), sin(uTime * 0.45 + aSeed.x * 30.0)) * 0.06 * (1.0 - k);
-          vec3 p = mix(position + drift, aTo, k);
-          vec4 mv = modelViewMatrix * vec4(p, 1.0);
-          gl_PointSize = clamp(uDpr * (1.6 + (1.0 - k) * 1.5) * 9.0 / -mv.z, 1.0, 5.0);
-          vA = (0.08 + 0.92 * k) * uFade * (0.65 + 0.35 * sin(uTime * 3.0 + aSeed.y * 50.0));
-          gl_Position = projectionMatrix * mv;
-        }`,
-      fragmentShader: /* glsl */ `
-        uniform vec3 uColor; varying float vA;
-        void main() { gl_FragColor = vec4(uColor * vA, 1.0); }`,
-      transparent: true,
-      depthWrite: false,
-      blending: THREE.AdditiveBlending,
-    })
-    const points = new THREE.Points(geo, pmat)
-    points.frustumCulled = false
-    const root = new THREE.Group()
-    root.add(group, points)
-    root.position.copy(STAGE)
-    root.scale.setScalar(PROJ_SCALE)
-    root.visible = false
-    scene.add(root)
-    projects[id] = { root, group, points, pmat, u, spec }
-    return projects[id]
-  }
-
   // ------------------------------------------------------------ per-frame state
   const look = new THREE.Vector3()
   const drawSize = new THREE.Vector2()
@@ -455,7 +310,6 @@ export async function createCinema(canvas, { mobile = false, onProgress } = {}) 
   function setDpr(d) {
     renderer.setPixelRatio(d)
     dust.material.uniforms.uDpr.value = d
-    for (const p of Object.values(projects)) p.pmat.uniforms.uDpr.value = d
     const s = renderer.getSize(new THREE.Vector2())
     resize(s.x, s.y)
   }
@@ -512,23 +366,6 @@ export async function createCinema(canvas, { mobile = false, onProgress } = {}) 
     screenLight.intensity = 0.9 * (1 - hs)
     scene.fog.density = THREE.MathUtils.lerp(0.022, 0.012, hs)
 
-    const lit = state.project ? Math.max(state.project.dissolve, state.project.morph * 0.3) : 0
-    stageKey.intensity = 260 * lit
-    stageRim.intensity = 420 * lit
-    if (state.beamColor) stageRim.color.copy(state.beamColor)
-    for (const [id, p] of Object.entries(projects)) {
-      const on = state.project?.id === id
-      p.root.visible = on
-      if (!on) continue
-      const s = state.project
-      p.pmat.uniforms.uMorph.value = s.morph
-      p.pmat.uniforms.uFade.value = s.fade
-      p.pmat.uniforms.uTime.value = t
-      p.u.uDissolve.value = s.dissolve
-      p.group.visible = s.dissolve > 0.001
-      p.root.rotation.y = s.spin ?? 0
-      p.root.position.y = STAGE.y + Math.sin(t * 0.7) * 0.04
-    }
     // The film: on the screen from the seats, or the whole frame once the camera is inside it.
     const f = state.film
     const inFilm = !!f && f.inside >= 1
@@ -557,12 +394,11 @@ export async function createCinema(canvas, { mobile = false, onProgress } = {}) 
     composer.render()
   }
 
-  for (const m of Object.values(PROJECT_MODELS)) still(m.still)
   card('prologue', { kicker: 'Now showing', title: 'Tejas Govind' })
   onProgress?.(1)
   return {
-    renderer, scene, camera, render, resize, loadProject, loadFilm: id => getFilm().load(id), setDpr, get dpr() { return renderer.getPixelRatio() },
+    renderer, scene, camera, render, resize, loadFilm: id => getFilm().load(id), setDpr, get dpr() { return renderer.getPixelRatio() },
     setActive: v => { active = v },
-    debug: { vol, bloom, dust, lamp, hallMat, seats, projector, screenLight, hemi, bulb, flare, streak, projects },
+    debug: { vol, bloom, dust, lamp, hallMat, seats, projector, screenLight, hemi, bulb, flare, streak },
   }
 }

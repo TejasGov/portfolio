@@ -5,6 +5,7 @@
 export const store = {
   prologue: 0, // booth → beam → hall → the takeover
   work: 0, // through the five screenings
+  workIn: 0, // Chapter Two arriving from below (the seam out of the India chapter)
   epilogue: 0,
   night: true, // is a night (WebGL) chapter on screen?
   mouse: { x: 0, y: 0, active: 0 },

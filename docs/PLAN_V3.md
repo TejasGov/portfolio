@@ -63,3 +63,22 @@ The first film sandbox (point clouds) and the burn/ring seams were rejected. Tej
 4. The work journey: Meshy dioramas for each role, the path, and the colour waves.
 5. The hall rebuild with Poly Haven materials and a 4K rebake.
 6. Wire everything in, verify, and push to PR #4.
+
+## Progress
+
+- [x] Ink-sketch pass and world wave (`cinema/sketch.js`), on every seam:
+  - India → Chapter Two: the hall in ink on the page's paper, then colour blooms from the screen.
+  - Chapter Two → Three: the hall washes back to ink as the paper arrives.
+  - Three → Epilogue: blooms from ink with the house lights.
+- [x] The traveller: Meshy concept, model, rig, ten clips plus a walk (`public/cinema/traveller*.glb`; still uncompressed).
+- [x] Five films in `cinema/films/`, wired into Chapter Two (`timeline.js` FILMS, `ChapterTwo.jsx` cards in the right third):
+  - `smash.js`: floodlit ground, webcam scan, numerals, scoreboard.
+  - `cogniflow.js`: desk at night, focus ring, distractions, nudge.
+  - `revere.js`: POV through the glasses, face brackets, name tag.
+  - `yudhveer.js`: duel with your shadow.
+  - `commitcity.js`: the contribution graph rising into a city.
+- [x] The old solid models, screenshot stills and point clouds are removed from the world.
+- [ ] Chapter Three: the traveller's journey.
+- [ ] Hall rebuild with Poly Haven materials, then rebake.
+- [ ] Compress the GLBs through Blender (Draco + WebP); `npx gltf-transform` is blocked here.
+- [ ] Final verification on desktop and phone.
