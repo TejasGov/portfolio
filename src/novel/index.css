@@ -604,3 +604,7 @@ figure.piece {
 @media (prefers-reduced-motion: reduce) {
   .sound-bars.is-on i { animation: none; height: 70%; }
 }
+
+/* Chapter Four's "Press start" prompt blinks like an attract screen. */
+@keyframes blink { 50% { opacity: 0.25; } }
+@media (prefers-reduced-motion: reduce) { [class*='animation:blink'] { animation: none !important; } }

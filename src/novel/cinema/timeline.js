@@ -41,6 +41,7 @@ const BEAM_WHITE = new THREE.Color(0.6, 0.76, 1.0)
 /** Which world section is driving: the one whose progress is mid-way. */
 export function section(s) {
   if (s.epilogue > 0 || s.epiIn > 0) return 'epilogue'
+  if (s.four > 0) return 'four'
   if (s.three > 0) return 'three'
   if (s.work > 0 || s.workIn > 0) return 'work'
   return 'prologue'
@@ -128,6 +129,14 @@ export function stateAt(s, mouse, aspect) {
     st.journey = { p }
     const r = THREE.MathUtils.lerp(-6, 3.2, ss(0.025, 0.06, p)) - ss(0.955, 0.985, p) * 60
     st.sketch = { follow: true, dir: ALONG, r, band: 1.0, ink: ss(0, 0.02, p) * (1 - ss(0.985, 0.999, p)) }
+  } else if (sec === 'four') {
+    // Press Start: drawn onto the page around you and blooming into the neon coast; the wave to the
+    // block world is the chapter's own (arcade.js); at the end the drawing lifts off for the epilogue.
+    const p = s.four
+    st.arcade = { p }
+    const bloom = ss(0.012, 0.07, p)
+    if (bloom < 1) st.sketch = { follow: true, r: -4 + bloom * 70, origin: SCREEN, band: 1.4, ink: ss(0, 0.012, p) }
+    else if (p > 0.955) st.sketch = { follow: true, r: 70 - ss(0.955, 0.985, p) * 74, origin: SCREEN, band: 1.4, ink: 1 - ss(0.985, 0.999, p) }
   } else {
     const e = s.epilogue
     const u = ss(0.05, 0.85, e)

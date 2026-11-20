@@ -1,8 +1,8 @@
 """Compress Meshy GLBs for the web with Blender's own glTF exporter (Draco geometry, WebP textures).
 blender -b --factory-startup --python compress.py -- <out.glb> <max_texture_px> <in.glb> [<extra_anim.glb>=<ActionName> ...]
 
-Extra GLBs given as path=Name contribute only their animation (same rig, same bone names), renamed, so a
-character and all its clips ship as one file.
+Extra GLBs given as path=Name contribute only their animation (same rig, same bone names), renamed (or
+path=* to keep their names), so a character and all its clips ship as one file.
 """
 import bpy, sys
 
@@ -20,7 +20,8 @@ for spec in EXTRA:
     before = set(bpy.data.actions)
     bpy.ops.import_scene.gltf(filepath=path)
     for act in set(bpy.data.actions) - before:
-        act.name = name
+        if name != '*':  # path=* keeps the file's own clip names (a multi-clip file)
+            act.name = name
         act.use_fake_user = True
     # Drop the extra file's own armature and mesh: only its clip is wanted.
     for o in list(bpy.data.objects):

@@ -10,6 +10,7 @@ import {
 import { noiseVolume, beamFrame, VolumetricPass, makeDust, glowTexture } from './core'
 import { createFilm } from './film'
 import { createJourney } from './journey'
+import { createArcade } from './arcade'
 import { SketchPass } from './sketch'
 
 /*
@@ -263,6 +264,7 @@ export async function createCinema(canvas, { mobile = false, onProgress } = {}) 
   // Built on first use: its render target and 150k-point cloud cost nothing until Chapter Two needs them.
   let film = null
   let journey = null
+  let arcade = null
   const getFilm = () => {
     if (!film) {
       film = createFilm(renderer, { mobile, loader })
@@ -306,10 +308,11 @@ export async function createCinema(canvas, { mobile = false, onProgress } = {}) 
   vol.uniforms.uMaxDist.value = 46
   composer.addPass(vol)
   const bloom = new BloomEffect({ mipmapBlur: true, intensity: 1.0, luminanceThreshold: 0.32, luminanceSmoothing: 0.3, radius: 0.74 })
+  const toneMap = new ToneMappingEffect({ mode: ToneMappingMode.AGX })
   const vignette = new VignetteEffect({ offset: 0.28, darkness: 0.72 })
   const grain = new NoiseEffect({ blendFunction: BlendFunction.SOFT_LIGHT })
   grain.blendMode.opacity.value = 0.16
-  composer.addPass(new EffectPass(camera, new ChromaticAberrationEffect({ offset: new THREE.Vector2(0.0008, 0.0005), radialModulation: true, modulationOffset: 0.25 }), bloom, new ToneMappingEffect({ mode: ToneMappingMode.AGX }), vignette, grain))
+  composer.addPass(new EffectPass(camera, new ChromaticAberrationEffect({ offset: new THREE.Vector2(0.0008, 0.0005), radialModulation: true, modulationOffset: 0.25 }), bloom, toneMap, vignette, grain))
   const sketch = new SketchPass(camera, noise)
   composer.addPass(sketch)
 
@@ -428,8 +431,8 @@ export async function createCinema(canvas, { mobile = false, onProgress } = {}) 
     scene.fog.density = THREE.MathUtils.lerp(0.022, 0.012, hs)
 
     // Chapter Three's journey is its own world, drawn instead of the hall.
-    const jy = state.journey ? (journey ??= createJourney(renderer, { loader, normalize })) : null
-    const walker = jy ? jy.update(state.journey, t, camera.aspect).here : null
+    const jy = state.journey ? (journey ??= createJourney(renderer, { loader, normalize })) : state.arcade ? (arcade ??= createArcade(renderer, { loader, normalize })) : null
+    const walker = jy ? jy.update(state.journey ?? state.arcade, t, camera.aspect).here : null
     // The film: on the screen from the seats, or the whole frame once the camera is inside it.
     const f = jy ? null : state.film
     const inFilm = !!f && f.inside >= 1
@@ -446,6 +449,12 @@ export async function createCinema(canvas, { mobile = false, onProgress } = {}) 
     renderPass.mainCamera = away ? away.camera : camera
     vol.enabled = !away
     vignette.darkness = away ? 0.42 : 0.72 // a film is graded on its own; the hall's heavy vignette would muddy it
+    // The films and the journey are bright, painted daylight: bloom only their true highlights and keep
+    // their colour (Neutral); the dark hall keeps AgX, which holds the lamp's flood gracefully.
+    const mode = away ? ToneMappingMode.NEUTRAL : ToneMappingMode.AGX
+    if (toneMap.mode !== mode) toneMap.mode = mode
+    bloom.luminanceMaterial.threshold = away ? 0.95 : 0.32
+    if (away) bloom.intensity = 0.55
     // The seams: the world as an ink drawing on the book's paper, and the wave between the two.
     const sk = state.sketch
     const su = sketch.uniforms
@@ -464,10 +473,14 @@ export async function createCinema(canvas, { mobile = false, onProgress } = {}) 
   }
 
   card('prologue', { kicker: 'Now showing', title: 'Tejas Govind' })
+  // Compile both grades now, so crossing into a film doesn't stall on a shader compile.
+  toneMap.mode = ToneMappingMode.NEUTRAL
+  composer.render()
+  toneMap.mode = ToneMappingMode.AGX
   onProgress?.(1)
   return {
     renderer, scene, camera, render, resize, loadFilm: id => getFilm().load(id), setDpr, get dpr() { return renderer.getPixelRatio() },
     setActive: v => { active = v },
-    debug: { vol, bloom, dust, lamp, hallMat, seats, projector, screenLight, hemi, bulb, flare, streak },
+    debug: { vol, bloom, toneMap, dust, lamp, hallMat, seats, projector, screenLight, hemi, bulb, flare, streak },
   }
 }

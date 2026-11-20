@@ -10,6 +10,7 @@ The portfolio is **a night at the movies**. It runs in one 3D world, a cinema bu
 | **I · Chai, Cricket & Cinema** | Paper | The horizontal scrapbook with parallax: Prayagraj, chai, cricket and cinema. |
 | **II · Now Showing** | Cinema, then films | The hall arrives as an ink drawing on the scrapbook's paper, and colour blooms out from the screen. The camera walks into the screen. Five animated films star the traveller, a stylised Tejas: Smash Cricket, CogniFlow, Revere, Yudhveer and Commit City. Each blooms out of ink and washes back to ink before the next cut. The camera walks back out, and the hall washes to ink and lifts off the page. |
 | **III · Places I Worked** | The journey | The traveller walks a path from Prayagraj (2022) to New York (2026), past six little worlds, one per stop. Each world blooms from ink into colour as he reaches it, and the day turns to night along the way. Paper slips carry every role. |
+| **IV · Press Start** | The neon coast, then blocks | An ode to the games Tejas grew up on, in two original worlds that share one place. You walk an 80s neon beach boulevard at dusk under a third-person chase camera: pastel hotels, palms, a parked coupe, a striped sunset over the sea. At the arcade cabinet at the end of the boardwalk, a wave rolls out and the coast dissolves into a voxel world under a bright sky. Glowing cubes lift off the wave's front, and you walk on and jump. |
 | **Epilogue · House lights** | Cinema | The hall is drawn back onto the page and blooms into colour with the house lights up. The screen reads "The End". Contact details follow, then the colophon. |
 
 **The seams** are one language: the 3D world as an ink drawing on the book's paper (`cinema/sketch.js`), with a wave between the drawing and the lit world. The wave is a growing sphere for the hall and the films, and a front that travels with the traveller on the journey.
@@ -53,6 +54,7 @@ The portfolio is **a night at the movies**. It runs in one 3D world, a cinema bu
 | `src/novel/cinema/sketch.js` | The ink-drawing pass and its waves. |
 | `src/novel/cinema/film.js`, `films/*.js` | The films. `kit.js` holds the shared ink-and-paint kit and the traveller; there is one scene file per project. |
 | `src/novel/cinema/journey.js` | Chapter Three's world: path, dioramas, scenery and sky. |
+| `src/novel/cinema/arcade.js` | Chapter Four's two worlds and the wave between them. Every coast material discards inside the wave and every block material outside it. The props are Meshy models in `public/cinema/arcade/`. |
 | `src/novel/cinema/core.js` | Beam frame, volumetric pass, dust and noise volume. |
 | `src/novel/stage/Stage.jsx`, `Takeover.jsx` | The canvas and render loop (paused under paper chapters, with adaptive resolution); the prologue's flood and pixel sweep. |
 | `src/novel/content.js` | Project copy (`PROJECTS`) and the journey's stops and roles (`JOURNEY`). |

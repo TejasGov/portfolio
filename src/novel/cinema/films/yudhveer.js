@@ -88,9 +88,11 @@ export async function yudhveer({ traveller }) {
   them.root.position.set(1.05, 0.25, 0)
   them.root.rotation.y = -Math.PI / 2
   scene.add(you.root, them.root)
-  holdIn(you.bone('RightHand'), sword()).rotation.set(0, 0, 0)
+  // A wrist tilt raises the blade into a guard instead of letting it hang by the leg.
+  const GRIP = [1.0, 0, -0.2]
+  holdIn(you.bone('RightHand'), sword()).rotation.set(...GRIP)
   holdIn(you.bone('LeftForeArm'), shield()).position.set(0, 0.6, 0)
-  holdIn(them.bone('RightHand'), sword())
+  holdIn(them.bone('RightHand'), sword()).rotation.set(...GRIP)
 
   // Sparks where the blades meet.
   const spark = new THREE.Sprite(new THREE.SpriteMaterial({ color: new THREE.Color('#fff1c4').multiplyScalar(4), blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, map: sparkTexture() }))

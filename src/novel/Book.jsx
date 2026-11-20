@@ -6,7 +6,8 @@ export const CONTENTS = [
   { id: 'prologue', n: '—', title: 'Prologue', sub: 'Lights down' },
   { id: 'one', n: 'I', title: 'Chai, Cricket & Cinema', sub: 'A flashback to Prayagraj' },
   { id: 'two', n: 'II', title: 'Now Showing', sub: 'Five projects' },
-  { id: 'three', n: 'III', title: 'Places I Worked', sub: 'The credits' },
+  { id: 'three', n: 'III', title: 'Places I Worked', sub: 'Prayagraj to New York' },
+  { id: 'four', n: 'IV', title: 'Press Start', sub: 'An ode to games' },
   { id: 'epilogue', n: '—', title: 'Epilogue', sub: 'House lights' },
 ]
 
