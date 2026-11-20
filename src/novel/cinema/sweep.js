@@ -18,6 +18,7 @@ export function createPixelSweep(canvas, { origin = [0.5, 0.42] } = {}) {
   }
 
   function resize() {
+    last = -1 // resizing clears the canvas, so the flat paper fill must be redrawn
     W = canvas.width = Math.ceil(innerWidth / 8) * 8
     H = canvas.height = Math.ceil(innerHeight / 8) * 8
     canvas.style.width = `${W}px`
@@ -33,7 +34,7 @@ export function createPixelSweep(canvas, { origin = [0.5, 0.42] } = {}) {
         const blob = hash(Math.floor(x / 6), Math.floor(y / 6))
         th0[y * cols0 + x] = d * 0.72 + blob * 0.16 + hash(x, y) * 0.12
       }
-    levels = [{ cols: cols0, rows: rows0, th: th0, tone: tones(cols0 * rows0) }]
+    levels = [{ cols: cols0, rows: rows0, th: th0 }]
     // Each coarser block opens only once every fine cell inside it has (its max threshold).
     for (let l = 1; l < SIZES.length; l++) {
       const prev = levels[l - 1]
@@ -49,19 +50,10 @@ export function createPixelSweep(canvas, { origin = [0.5, 0.42] } = {}) {
             }
           th[y * cols + x] = m
         }
-      levels.push({ cols, rows, th, tone: tones(cols * rows) })
+      levels.push({ cols, rows, th })
     }
   }
 
-  // Paper isn't flat: every block gets its own faint tone.
-  function tones(n) {
-    const t = new Array(n)
-    for (let i = 0; i < n; i++) {
-      const k = (Math.random() - 0.5) * 6
-      t[i] = `rgb(${PAPER[0] + k},${PAPER[1] + k},${PAPER[2] + k * 0.8})`
-    }
-    return t
-  }
 
   function visit(l, x, y, p, time) {
     const L = levels[l]
@@ -69,7 +61,8 @@ export function createPixelSweep(canvas, { origin = [0.5, 0.42] } = {}) {
     const i = y * L.cols + x
     const s = SIZES[l]
     if (L.th[i] + LAG[l] <= p) {
-      ctx.fillStyle = L.tone[i]
+      // Flat: per-block tones read as a tiled grid; the .paper-grain overlay supplies the texture.
+      ctx.fillStyle = `rgb(${PAPER})`
       ctx.fillRect(x * s, y * s, s, s)
       return
     }

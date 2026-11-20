@@ -35,6 +35,10 @@ export default function Stage() {
         if (!alive) return
         await world.loadFilm(id).catch(() => {})
       }
+      // Then start fetching the journey's models, so they're in hand long before Three; it compiles while the reader pauses.
+      const build = () => alive && world.prepare('journey')
+      if (window.requestIdleCallback) requestIdleCallback(build, { timeout: 3000 })
+      else setTimeout(build, 1000)
     })
 
     // Adaptive resolution: if frames run long for about a second, render at 80% of the pixel ratio
@@ -64,25 +68,38 @@ export default function Stage() {
       lastFrame = now
       for (const key of KEYS) {
         const to = store[key] ?? 0, from = Object.hasOwn(view, key) ? view[key] : to
-        view[key] = Math.abs(to - from) > 0.3 ? to : from + (to - from) * k
+        // A tiny gap snaps, so a chapter heading back to 0 really reaches 0 and hands the stage back.
+        const d = to - from
+        view[key] = Math.abs(d) > 0.3 || Math.abs(d) < 1e-4 ? to : from + d * k
       }
     }
 
     const loop = now => {
       raf = requestAnimationFrame(loop)
       glide(now)
-      if (!store.night) return
+      if (!store.night) {
+        // Chapter One's paper covers the canvas: once the reader pauses, draw Two's first frame unseen,
+        // so the seam back to the hall doesn't stall ~60 ms on its first draw.
+        if (!warmed && world && now - scrolled > 400) {
+          warmed = true
+          world.render(stateAt(Object.assign(Object.create(view), { workIn: 0.15, work: 0.004 }), mouse, innerWidth / innerHeight))
+        }
+        return
+      }
+      warmed = false
       govern(now)
       const k = reduced() ? 0 : 0.06
       mouse.x += (store.mouse.x - mouse.x) * k
       mouse.y += (store.mouse.y - mouse.y) * k
+      view.still = reduced()
       const st = stateAt(view, mouse, innerWidth / innerHeight)
       // Make sure the reel being screened is loaded first.
       const sec = section(view)
       if (sec === 'work') world.loadFilm(PROJECT_IDS[workSlot(view.work).i])
       // Build the next chapter's world while the reader is paused, so its seam doesn't stall mid-scroll.
-      const next = { work: 'journey', three: 'arcade' }[sec]
-      if (next && now - scrolled > 400) world.prepare(next)
+      // In Three, keep the journey's late-loading dioramas warm before the arcade (prepare skips while compiling).
+      const todo = { work: ['journey'], three: ['journey', 'arcade'], four: ['arcade'] }[sec]
+      if (todo && now - scrolled > 400) for (const name of todo) world.prepare(name)
       world.render(st)
       lens.copy(LENS).project(world.camera)
       store.lens = [(lens.x * 0.5 + 0.5) * 100, (0.5 - lens.y * 0.5) * 100]
@@ -90,7 +107,7 @@ export default function Stage() {
       store.camDist = world.camera.position.distanceTo(LENS)
     }
 
-    let scrolled = 0
+    let scrolled = 0, warmed = false
     const onScroll = () => { scrolled = performance.now() }
     addEventListener('scroll', onScroll, { passive: true })
     addEventListener('resize', resize)

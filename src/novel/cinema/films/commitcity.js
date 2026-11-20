@@ -23,11 +23,11 @@ const GREENS = ['#0e4429', '#006d32', '#26a641', '#39d353'].map(c => new THREE.C
 
 export async function commitCity({ traveller }) {
   const scene = new THREE.Scene()
-  scene.fog = new THREE.Fog('#2a2350', 18, 70)
+  scene.fog = new THREE.Fog('#4a3a70', 18, 70)
   const skyMesh = sky({ top: '#0d0b26', mid: '#3a2d6b', low: '#d86f6a', sun: '#ffb38a', sunDir: new THREE.Vector3(-0.2, 0.03, -1) })
   scene.add(skyMesh)
 
-  const ground = new THREE.Mesh(new THREE.PlaneGeometry(200, 200).rotateX(-Math.PI / 2), toon({ color: '#1b1830' }))
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(200, 200).rotateX(-Math.PI / 2), toon({ color: '#6a5a9a' })) // a dusk violet, not black: the city stands on something
   ground.receiveShadow = true
   scene.add(ground)
 
@@ -49,8 +49,8 @@ export async function commitCity({ traveller }) {
           vec2 cell = vec2(dot(vW.xz, vec2(1.0)) * 14.0, vW.y * 9.0);
           vec2 f = fract(cell);
           float lit = step(0.55, fract(sin(dot(floor(cell), vec2(12.9898, 78.233))) * 43758.5));
-          float win = step(0.25, f.x) * step(f.x, 0.75) * step(0.3, f.y) * step(f.y, 0.75);
-          totalEmissiveRadiance += vec3(1.0, 0.82, 0.5) * win * lit * uNight * 1.6 * step(0.12, vW.y);
+          float win = step(0.08, f.x) * step(f.x, 0.92) * step(0.35, f.y) * step(f.y, 0.7); // wide panes: lit floors read as strips
+          totalEmissiveRadiance += vec3(1.0, 0.82, 0.5) * win * lit * (0.35 + uNight) * 2.4 * step(0.12, vW.y);
         }`)
   }
   const towers = new THREE.InstancedMesh(geo, mat, N)
@@ -61,7 +61,7 @@ export async function commitCity({ traveller }) {
       const c = commits(w, d)
       const i = w * DAYS + d
       data.push({ x: (w - WEEKS / 2) * CELL, z: (d - 3) * CELL - 2.2, h: c ? 0.25 + c * 0.32 : 0.04, w })
-      towers.setColorAt(i, c ? GREENS[Math.min(3, Math.floor(c / 3.5))] : new THREE.Color('#2b2d3a'))
+      towers.setColorAt(i, c ? GREENS[Math.min(3, Math.floor(c / 3.5))] : new THREE.Color('#4a4d66'))
     }
   scene.add(towers)
 
@@ -70,9 +70,12 @@ export async function commitCity({ traveller }) {
   sun.castShadow = true
   sun.shadow.mapSize.set(2048, 2048)
   Object.assign(sun.shadow.camera, { left: -14, right: 14, top: 8, bottom: -8, near: 1, far: 50 })
-  const fill = new THREE.DirectionalLight('#8f9cff', 1.2)
+  const fill = new THREE.DirectionalLight('#8f9cff', 1.8)
   fill.position.set(6, 5, 8)
-  scene.add(sun, fill, new THREE.HemisphereLight('#a99cff', '#2a2040', 1.2))
+  // A warm rim from the sunset behind the city, so the towers and you are edged in light, not mud.
+  const rim = new THREE.DirectionalLight('#ffb27a', 1.8)
+  rim.position.set(-3, 9, -16)
+  scene.add(sun, fill, rim, new THREE.HemisphereLight('#c7b8ff', '#4a3a2c', 1.9))
 
   const you = traveller.make()
   you.root.rotation.y = Math.PI / 2

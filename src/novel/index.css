@@ -154,10 +154,14 @@ body {
 .paper {
   background-color: var(--paper);
   color: var(--ink);
-  /* Paper fibre: two static noise layers, multiplied in. Rasterised once by the browser. */
+}
+/* Paper fibre: two static noise layers, multiplied in. Rasterised once by the browser. The grain alone
+   also lies over the prologue's pixel sweep, so the swept paper matches the page that rises under it. */
+.paper,
+.paper-grain {
   background-image:
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='320' height='320'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .36 0 0 0 0 .3 0 0 0 0 .22 0 0 0 .32 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"),
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='600' height='600'%3E%3Cfilter id='f'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.012 .09' numOctaves='2' seed='4'/%3E%3CfeColorMatrix values='0 0 0 0 .5 0 0 0 0 .42 0 0 0 0 .3 0 0 0 .12 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23f)'/%3E%3C/svg%3E");
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='600' height='600'%3E%3Cfilter id='f'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.012 .09' numOctaves='2' seed='4' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .5 0 0 0 0 .42 0 0 0 0 .3 0 0 0 .12 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23f)'/%3E%3C/svg%3E");
 }
 
 /* Grain over the whole book; strongest on paper, a whisper at night. */
@@ -194,9 +198,10 @@ body {
     drop-shadow(0 -3px 0 #fbf8f1) drop-shadow(0 10px 14px rgb(40 26 10 / 0.28));
 }
 .tape {
+  /* Plain alpha, no multiply: inside a shadowed (filtered, so isolated) piece multiply already showed as
+     this, and over a bare print it would darken the tape. */
   background: var(--tape);
   box-shadow: 0 1px 2px rgb(60 40 10 / 0.18);
-  mix-blend-mode: multiply;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -208,28 +213,76 @@ body {
 
 /* ================================================== Chapter One: the scrapbook */
 :root {
-  --strip-unit: 1vw;
+  --strip-unit: 1vw; /* the size of things: photos, type, tape */
+  --spread-unit: 1vw; /* the width of a spread, and the route's x: one screen per spread */
   --one-height: 770svh; /* seven spreads */
+  /* Chapter One rises over the prologue's last stretch: its top enters the screen at
+     p = 1 - overlap / 280 (~.76; the prologue scrolls 380 - 100svh), as the flood comes up. */
+  --one-overlap: 68svh;
 }
-/* Portrait screens: each spread gets wider than the screen so the compositions keep their shape. */
+@media (max-width: 760px) {
+  :root {
+    --one-overlap: 60svh; /* the phone prologue is 320svh: enters at p = 1 - overlap / 220, ~.73 */
+  }
+}
+/* One's paper ground runs 24svh past both edges and fades out there, so neither edge is a hard line. */
+.one-ground {
+  mask-image: linear-gradient(to bottom, transparent 0, #000 24svh, #000 calc(100% - 24svh), transparent 100%);
+}
+/* Portrait screens: pieces keep their phone sizes (1.75vw), but each spread is still one screen wide,
+   recomposed for portrait from collage.js's `pt` placements below. */
 @media (max-aspect-ratio: 1/1) {
   :root {
     --strip-unit: 1.75vw;
-    --one-height: 957svh;
+    --one-height: 700svh; /* about the old dwell per photo: 6 screens of travel over 440svh */
+  }
+  /* !important: the landscape placement is the piece's inline style. */
+  .piece[style*='--px'],
+  .sheet[style*='--px'] {
+    left: var(--px) !important;
+    top: var(--py) !important;
+  }
+  .piece[style*='--pw'] {
+    width: calc(var(--pw) * var(--strip-unit));
+  }
+  .piece[style*='--ps'] {
+    font-size: calc(var(--ps) * var(--strip-unit));
+  }
+  .piece[style*='--pr'] {
+    rotate: var(--pr) !important;
+  }
+  .piece[style*='--pt-off'] {
+    display: none;
+  }
+  .sheet[style*='--pw'] {
+    width: var(--pw) !important;
+    height: var(--ph) !important;
+  }
+  .caption-fig {
+    max-width: min(34ch, calc(100vw - 32px));
+  }
+  /* A portrait route swings steeply; under the paper it never strikes through a caption. */
+  .route {
+    z-index: -1;
   }
 }
 .spread {
-  width: calc(100 * var(--strip-unit));
+  width: calc(100 * var(--spread-unit));
 }
 .piece {
   position: absolute;
-  margin: 0;
-  will-change: transform, opacity;
+  margin: 0; /* no will-change: GSAP promotes a piece while it animates; ~60 standing layers cost every frame */
 }
 figure.piece {
   width: calc(var(--w) * var(--strip-unit));
-  /* Soft contact shadow: the paper lifts off the page. */
-  filter: drop-shadow(0 14px 16px rgb(48 30 12 / 0.24)) drop-shadow(0 2px 2px rgb(48 30 12 / 0.18));
+}
+/* Soft contact shadow: the paper lifts off the page. A rectangular print takes a box-shadow (cheap to
+   composite); only cut-outs need a drop-shadow filter, and one pass of it. */
+figure.piece[data-cut] {
+  filter: drop-shadow(0 12px 14px rgb(48 30 12 / 0.26));
+}
+figure.piece:not([data-cut]) > img {
+  box-shadow: 0 12px 16px rgb(48 30 12 / 0.24), 0 2px 2px rgb(48 30 12 / 0.16);
 }
 .caption-fig {
   margin-top: 0.7em;
@@ -469,7 +522,7 @@ figure.piece {
   color: var(--ink);
 }
 .closing {
-  max-width: calc(52 * var(--strip-unit));
+  max-width: min(calc(52 * var(--strip-unit)), calc(100vw - 84px)); /* the strip ends 20px before it; keep 64px on the right */
   font-family: var(--font-display);
   font-style: italic;
   font-size: calc(5.2 * var(--strip-unit));
@@ -503,10 +556,20 @@ figure.piece {
   position: absolute;
   top: 0;
   left: 0;
-  width: calc(700 * var(--strip-unit));
+  width: calc(700 * var(--spread-unit));
   height: 100%;
   pointer-events: none;
+  overflow: hidden;
+  translate: -100% 0; /* undrawn until the scroll draws it (ChapterOne.jsx) */
+  will-change: transform;
+}
+.route > svg {
+  display: block;
+  width: 100%;
+  height: 100%;
   overflow: visible;
+  translate: 100% 0;
+  will-change: transform;
 }
 .route-line {
   fill: none;
@@ -519,12 +582,6 @@ figure.piece {
 .route-ghost {
   stroke-width: 1.2;
   opacity: 0.45;
-}
-.route-mask {
-  fill: none;
-  stroke: #fff;
-  stroke-width: 10;
-  stroke-dasharray: 1 1;
 }
 .route-stop {
   position: absolute;
@@ -555,7 +612,7 @@ figure.piece {
 /* A spread's stage: a torn sheet of coloured paper laid under its pieces, with the page's own grain. */
 .sheet {
   position: absolute;
-  filter: drop-shadow(0 12px 14px rgb(48 30 12 / 0.2)) drop-shadow(0 1px 1px rgb(48 30 12 / 0.22));
+  filter: drop-shadow(0 12px 14px rgb(48 30 12 / 0.22));
   will-change: transform;
 }
 .sheet-paper {
@@ -573,6 +630,7 @@ figure.piece {
 }
 /* About me: the first thing in the book, an index card with his photo, facts and links. */
 .about {
+  z-index: 1; /* above the route line, which would otherwise cross its links */
   display: flex;
   gap: calc(2 * var(--strip-unit));
   align-items: flex-start;
@@ -611,7 +669,7 @@ figure.piece {
   display: grid;
   gap: 0.45em;
   font-family: var(--font-serif);
-  font-size: max(14px, calc(1.1 * var(--strip-unit)));
+  font-size: max(15px, calc(1.1 * var(--strip-unit)));
   line-height: 1.3;
 }
 .about-facts li {
@@ -637,11 +695,14 @@ figure.piece {
   flex-wrap: wrap;
   gap: 0.4em 1.4em;
   font-family: var(--font-mono, ui-monospace, monospace);
-  font-size: max(12px, calc(0.85 * var(--strip-unit)));
+  font-size: max(13px, calc(0.85 * var(--strip-unit)));
   letter-spacing: 0.12em;
   text-transform: uppercase;
 }
 .about-links a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px; /* a thumb-sized target on the phone */
   text-decoration: underline;
   text-underline-offset: 4px;
 }
@@ -652,10 +713,12 @@ figure.piece {
 /* On a phone: photo and name side by side as the card's header, the facts at full width below. */
 @media (max-aspect-ratio: 1/1) {
   .about {
+    margin-top: -8svh; /* up, so its link row clears the page-number pill */
     display: grid;
     grid-template-columns: auto 1fr;
     align-items: center;
-    width: calc(48 * var(--strip-unit));
+    /* never past the right gutter: the card sits at 7 units, and its -1deg tilt widens it a little */
+    width: min(calc(48 * var(--strip-unit)), calc(100vw - 7 * var(--strip-unit) - 28px));
   }
   .about-body {
     display: contents;
@@ -700,6 +763,8 @@ figure.piece {
 /* The route's pen: a red nib at the tip of the line as it draws. */
 .route-nib {
   position: absolute;
+  top: 0;
+  left: 0; /* moved by transform along the route */
   z-index: 2;
   width: 14px;
   height: 14px;
@@ -722,51 +787,105 @@ figure.piece {
   display: inline-block;
   opacity: 0;
   transform: translate(var(--tx), var(--ty)) rotate(var(--tr)) scale(0.85);
-  filter: blur(6px);
+  /* Leaving: no stagger and a quick fade, so the break clears in a moment instead of lingering. */
   transition:
-    transform 1.25s var(--ease-out) var(--d),
-    opacity 0.7s ease var(--d),
-    filter 0.9s ease var(--d);
+    transform 0.9s var(--ease-out),
+    opacity 0.2s ease;
 }
 [data-on="1"] .assemble-letter,
 .assemble[data-on="1"] .assemble-letter {
   opacity: 1;
   transform: none;
-  filter: none;
+  transition:
+    transform 1.25s var(--ease-out) var(--d),
+    opacity 0.7s ease var(--d);
+}
+/* A title's kicker and subtitle: in after the letters start, out before they scatter. */
+.beat-sub {
+  transition: opacity 0.35s ease 0.25s;
+}
+[data-on="0"] .beat-sub {
+  opacity: 0;
+  transition: opacity 0.12s ease;
 }
 @media (prefers-reduced-motion: reduce) {
-  .assemble-letter {
+  .assemble-letter,
+  [data-on] .assemble-letter,
+  .beat-sub,
+  [data-on] .beat-sub {
     opacity: 1;
     transform: none;
-    filter: none;
     transition: none;
   }
 }
 
-/* Sound toggle: three bars that dance while the cinema is audible. */
-.sound-bars {
-  display: inline-flex;
-  align-items: flex-end;
-  gap: 2px;
-  height: 0.8em;
+/* phone sheets */
+/* On a phone the film's words and the job card sit in a sheet at the bottom; the 3D frames its subject
+   above it (kit.js lookBelow). Not .sheet: that name is Chapter One's torn paper. */
+@media (max-width: 767px) {
+  .film-sheet {
+    align-self: end;
+    justify-self: stretch;
+    max-width: none;
+    margin-bottom: 52px; /* clears the folio and the OS-edition link (Book.jsx, bottom-5) */
+    padding: 18px 18px 20px;
+    max-height: 44svh;
+    overflow: hidden;
+    background: rgb(3 5 11 / 0.94);
+    box-shadow: 0 -20px 40px rgb(3 5 11 / 0.5);
+    border-radius: 4px;
+  }
+  /* Full-strength words on the sheet: the /80 and /90 greys read as faded over a dark film. */
+  .film-sheet .text-night-ink\/80,
+  .film-sheet .text-night-ink\/90 {
+    color: color-mix(in srgb, var(--night-ink) 94%, transparent);
+  }
+  .job-sheet {
+    align-self: end;
+    justify-self: stretch;
+    max-width: none;
+    margin-bottom: 52px;
+    rotate: 0deg !important;
+  }
 }
-.sound-bars i {
-  width: 2px;
-  height: 30%;
-  background: currentColor;
-  transition: height 0.3s;
+/* Chapter Two's nameplate: which film is playing, always. Bottom-left on desktop (above the folio and the
+   OS link). */
+.film-caption {
+  position: absolute;
+  left: 6vw;
+  bottom: 72px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  column-gap: 14px;
+  max-width: 30rem;
+  padding: 10px 14px;
+  border-radius: 3px;
+  background: rgb(3 5 11 / 0.78);
+  color: var(--night-ink);
 }
-.sound-bars.is-on i {
-  animation: sound-bar 0.9s ease-in-out infinite alternate;
+/* A phone's bottom sheet already carries the film's number and name for its whole slot: no second plate under the header. */
+@media (max-width: 767px) {
+  .film-caption {
+    display: none;
+  }
 }
-.sound-bars.is-on i:nth-child(2) { animation-delay: -0.3s; }
-.sound-bars.is-on i:nth-child(3) { animation-delay: -0.6s; }
-@keyframes sound-bar {
-  from { height: 25%; }
-  to { height: 100%; }
-}
-@media (prefers-reduced-motion: reduce) {
-  .sound-bars.is-on i { animation: none; height: 70%; }
+/* Desktop: a solid panel with a crisp edge under the film's words, so no horizon or sky runs through them. */
+@media (min-width: 768px) {
+  .film-copy {
+    position: relative;
+    isolation: isolate;
+  }
+  .film-copy::before {
+    content: "";
+    position: absolute;
+    inset: -24px -28px;
+    z-index: -1;
+    background: rgb(3 5 11 / 0.86);
+    border: 1px solid rgb(233 226 208 / 0.14);
+    border-radius: 4px;
+    pointer-events: none;
+  }
 }
 
 /* Chapter Four's "Press start" prompt blinks like an attract screen. */

@@ -42,20 +42,22 @@ function onWave(mat, side, U) {
       .replace('#include <common>', '#include <common>\n' + WAVE_GLSL)
       .replace('#include <clipping_planes_fragment>', `#include <clipping_planes_fragment>
         float wd = waveD();
-        // The coast breaks up into 30 cm cubes just ahead of the front, each cube at its own moment.
-        float cubeAt = fract(sin(dot(floor(vWaveP / 0.3), vec3(12.99, 78.23, 37.71))) * 43758.5) * 1.4 * step(0.0, uWaveSide) * step(0.01, uWaveR);
+        // The coast breaks up into 30 cm cubes in a thin band just ahead of the front, each cube at its own moment.
+        float cubeAt = fract(sin(dot(floor(vWaveP / 0.3), vec3(12.99, 78.23, 37.71))) * 43758.5) * 0.6 * step(0.0, uWaveSide) * step(0.01, uWaveR);
         if ((wd - cubeAt) * uWaveSide < 0.0) discard;`)
       .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
         float live = step(0.01, uWaveR) * step(uWaveR, 9000.0);
         vec3 neon = mix(vec3(1.0, 0.45, 0.85), vec3(0.45, 0.9, 1.0), 0.5 + 0.5 * sin(vWaveP.y * 2.0 + uWaveT));
-        // The crest: a white-hot core inside a wide neon glow.
-        totalEmissiveRadiance += (neon * exp(-abs(wd) * 1.6) * 2.2 + vec3(1.0, 0.96, 1.0) * exp(-abs(wd) * 9.0) * 3.0) * live;
-        // Behind it, the blocks arrive drawn in light: their edges glow cyan, then fade as the front moves on.
+        // The crest: a white-hot core in a narrow neon glow. Both stay low until the front is clear of the
+        // traveller and the cabinet it starts from, so nothing closes round him like a glass dome.
+        float clear = smoothstep(3.0, 8.0, uWaveR);
+        totalEmissiveRadiance += (neon * exp(-abs(wd) * 3.0) * 1.6 * clear + vec3(1.0, 0.96, 1.0) * exp(-abs(wd) * 9.0) * 3.0 * mix(0.3, 1.0, clear)) * live;
+        // Behind it, the blocks arrive drawn in light: their edges glow cyan for a short trail behind the front.
         if (uWaveSide < 0.0) {
           vec3 g = 1.0 - smoothstep(0.0, 0.045, min(fract(vWaveP), 1.0 - fract(vWaveP)));
           float edge = max(g.x * g.y, max(g.y * g.z, g.x * g.z));
           float since = max(-wd, 0.0);
-          totalEmissiveRadiance += vec3(0.35, 0.95, 1.0) * edge * smoothstep(0.0, 0.4, since) * exp(-since / 3.0) * 2.6 * live;
+          totalEmissiveRadiance += vec3(0.35, 0.95, 1.0) * edge * smoothstep(0.0, 0.4, since) * exp(-since / 1.2) * 1.4 * live;
         }`)
   }
   mat.needsUpdate = true
@@ -251,6 +253,7 @@ export function createArcade(renderer, { loader, normalize, mobile = false }) {
             c *= side ? 0.72 + 0.34 * bhash(vec3(px.x + px.z, floor(px.y / 3.0), 7.0)) : 0.88 + 0.16 * n;
           #else
             c *= 0.93 + 0.1 * n;
+            if (side) c *= abs(vWaveN.x) > 0.5 ? 0.82 : 0.68; // lit tops, two darker sides (instances are unrotated)
           #endif
           c *= 0.8 + 0.2 * smoothstep(0.0, 0.04, edge);
           if (side) c *= 0.74 + 0.26 * smoothstep(0.0, 0.7, f.y);
@@ -316,13 +319,30 @@ export function createArcade(renderer, { loader, normalize, mobile = false }) {
     addBlock(x + 1, y + 1.5, z, w * 0.55, 1, w * 0.35, '#ffffff')
   }
   // The arcade cabinet, rebuilt in blocks where it stood (its screen faces back down the path), so the
-  // wave turns it to blocks rather than eating it.
+  // wave turns it to blocks rather than eating it. Its own mesh, marquee first, so update() can pop it
+  // out block by block once you walk on.
   const AX = ARCADE_X, AZ = ARCADE_Z
-  addBlock(AX, 0, AZ, 1, 1.1, 1, '#3b2470') // base
-  addBlock(AX - 0.55, 0.95, AZ, 0.3, 0.12, 0.9, '#24164a') // control panel
-  addBlock(AX + 0.1, 1.1, AZ, 0.8, 0.9, 1, '#3b2470') // upper body, set back
-  addBlock(AX - 0.31, 1.25, AZ, 0.04, 0.6, 0.76, '#7ff6ff') // screen
-  addBlock(AX + 0.05, 2.0, AZ, 0.9, 0.35, 1, '#ff5fb7') // marquee
+  const cab = [
+    [AX + 0.05, 2.0, AZ, 0.9, 0.35, 1, '#ff5fb7'], // marquee
+    [AX - 0.31, 1.25, AZ, 0.04, 0.6, 0.76, '#7ff6ff'], // screen
+    [AX + 0.1, 1.1, AZ, 0.8, 0.9, 1, '#3b2470'], // upper body, set back
+    [AX - 0.55, 0.95, AZ, 0.3, 0.12, 0.9, '#24164a'], // control panel
+    [AX, 0, AZ, 1, 1.1, 1, '#3b2470'], // base
+  ]
+  const cabinetBlocks = new THREE.InstancedMesh(cube, blockMats[3], cab.length)
+  const upright = new THREE.Quaternion() // its own: the motes leave the shared q turned
+  const placeCab = (j, k) => {
+    const [x, y, z, sx, sy, sz] = cab[j]
+    m4.compose(p.set(x, y, z), upright, s.set(sx, sy, sz).multiplyScalar(Math.max(1e-3, k)))
+    cabinetBlocks.setMatrixAt(j, m4)
+  }
+  cab.forEach((b, j) => {
+    placeCab(j, 1)
+    cabinetBlocks.setColorAt(j, new THREE.Color(b[6]))
+  })
+  cabinetBlocks.castShadow = cabinetBlocks.receiveShadow = true
+  scene.add(cabinetBlocks)
+  let cabMoved = false
   for (const kind of [1, 2, 3]) {
     const mine = bits.filter(b => b[7] === kind)
     const blocks = new THREE.InstancedMesh(cube, blockMats[kind], mine.length)
@@ -399,13 +419,14 @@ export function createArcade(renderer, { loader, normalize, mobile = false }) {
     g.fillStyle = col
     for (const [x, y, w = 1, h = 1] of pts) g.fillRect(x, y, w, h)
   }
-  const pixelMat = (cols, paint) => blockStd({
-    map: tex8(g => {
+  const pixelMat = (cols, paint) => {
+    const map = tex8(g => {
       for (let i = 0; i < 64; i++) dot(g, cols[Math.floor((Math.abs(Math.sin((i + cols.length * 7) * 12.9898) * 43758.5453) % 1) * cols.length)], [[i % 8, i >> 3]])
       paint?.(g)
-    }),
-    roughness: 0.85,
-  })
+    })
+    // A faint glow of their own colours, so the creatures read against the grass at mid-distance.
+    return blockStd({ map, emissiveMap: map, emissive: '#ffffff', emissiveIntensity: 0.15, roughness: 0.85 })
+  }
   // A box placed at [x, y, z]; a limb (hang) has its origin at its top, so it swings from its joint.
   const part = (w, h, d, mat, [x, y, z], hang = false) => {
     const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d).translate(0, hang ? -h / 2 : 0, 0), mat)
@@ -448,7 +469,7 @@ export function createArcade(renderer, { loader, normalize, mobile = false }) {
   // Beside the path ahead of where the walk through the blocks begins, a few metres off it either side.
   const mobs = [shambler, archer, golem, shambler, archer, shambler, golem].map((make, i) => {
     const m = make()
-    m.home = new THREE.Vector2(ARCADE_X + 7 + i * 4.2, i % 2 ? -3.6 - (i % 3) * 0.8 : 4.6 + (i % 3) * 0.8) // the camera rides at z ~2 on the + side
+    m.home = new THREE.Vector2(ARCADE_X + 7 + i * 4.2, i === 3 ? -3 : i % 2 ? -3.6 - (i % 3) * 0.8 : 4.6 + (i % 3) * 0.8) // the camera rides at z ~2 on the + side; the fourth stays close by the path, in frame as you walk
     m.pos = m.home.clone()
     m.to = m.home.clone()
     m.phase = i * 1.7
@@ -458,9 +479,9 @@ export function createArcade(renderer, { loader, normalize, mobile = false }) {
   const step2 = new THREE.Vector2()
 
   // Glowing cubes lifting off the wave front.
-  const MOTES = 260
+  const MOTES = mobile ? 60 : 100
   const motes = new THREE.InstancedMesh(new THREE.BoxGeometry(0.22, 0.22, 0.22), new THREE.MeshBasicMaterial({ color: new THREE.Color('#ffd6f4').multiplyScalar(3), transparent: true, opacity: 0.9, depthWrite: false }), MOTES)
-  const moteDir = Array.from({ length: MOTES }, () => new THREE.Vector3().randomDirection().setY(Math.random() * 0.5).normalize())
+  const moteDir = Array.from({ length: MOTES }, () => { const d = new THREE.Vector3().randomDirection(); return d.set(Math.abs(d.x), Math.random() * 0.5, d.z).normalize() }) // the front's upper half, ahead of the camera
   const moteSeed = Array.from({ length: MOTES }, () => Math.random())
   motes.frustumCulled = false
   scene.add(motes)
@@ -500,12 +521,14 @@ export function createArcade(renderer, { loader, normalize, mobile = false }) {
   function update(state, t, aspect) {
     const P = state.p
     const ss = (a, b, x) => THREE.MathUtils.smoothstep(x, a, b)
-    const walk1 = ss(0.04, 0.5, P), wave = ss(0.56, 0.76, P), walk2 = ss(0.78, 0.95, P)
+    const walk1 = ss(0.04, 0.5, P), wave = ss(0.565, 0.7, P), walk2 = ss(0.78, 0.95, P)
     const x = THREE.MathUtils.lerp(-10, ARCADE_X - 1.4, walk1) + walk2 * 20
     const dt = lastT === null ? 0 : Math.min(0.1, t - lastT)
     lastT = t
     U.uWaveT.value = t
-    U.uWaveR.value = wave <= 0 ? 0 : wave >= 1 ? 1e4 : 0.6 + wave * wave * 130
+    // Past the whole neon set by 0.68, the skyline ~265 m out across the water too (the late wave^6 term).
+    // Reduced motion: one cut from the coast to the blocks.
+    U.uWaveR.value = state.still ? (P < 0.62 ? 0 : 1e4) : wave <= 0 ? 0 : wave >= 1 ? 1e4 : 0.6 + 150 * Math.pow(wave, 1.5) + 250 * Math.pow(wave, 6)
     U.uDay.value = ss(0.6, 0.78, P)
     scene.fog.color.set('#5a3a66').lerp(new THREE.Color('#bfe0ff'), U.uDay.value)
     sun.color.set('#ffb38a').lerp(new THREE.Color('#fff6e0'), U.uDay.value)
@@ -587,20 +610,31 @@ export function createArcade(renderer, { loader, normalize, mobile = false }) {
         m.legs.forEach((l, k) => { l.rotation.x = k % 2 ? -swing : swing })
         m.arms.forEach((a, k) => { a.rotation.x = m.armRest + (k % 2 ? swing : -swing) * 0.12 })
       }
-    // Motes: on the wave's front, drifting up and out.
-    if (wave > 0 && wave < 1) {
+    // Motes: on the wave's front, drifting up and out, never over the traveller or the lens.
+    if (wave > 0 && wave < 1 && !state.still) {
       const R = U.uWaveR.value
       for (let i = 0; i < MOTES; i++) {
         const k = (t * 0.25 + moteSeed[i]) % 1
         p.copy(moteDir[i]).multiplyScalar(R * (0.96 + 0.06 * k)).add(U.uWaveO.value)
         p.y = Math.max(0.2, p.y) + k * 3
-        const near = THREE.MathUtils.smoothstep(p.distanceTo(camera.position), 3, 7) // none brush the lens
+        const near = THREE.MathUtils.smoothstep(p.distanceTo(camera.position), 3.5, 7) * (you ? THREE.MathUtils.smoothstep(p.distanceTo(you.root.position), 3, 4.5) : 1)
         m4.compose(p, q.setFromEuler(new THREE.Euler(k * 6, k * 4, 0)), s.setScalar((1 - k) * near))
         motes.setMatrixAt(i, m4)
       }
       motes.instanceMatrix.needsUpdate = true
       motes.visible = true
     } else motes.visible = false
+
+    // The block cabinet pops out as you walk on, top first, so it never stands beside the path ahead.
+    const cabK = cab.map((_, j) => ss(0.79 + j * 0.012, 0.805 + j * 0.012, P))
+    const gone = cabK.every(k => k >= 1)
+    // Written only while it moves, and once more to stand it back up when you scroll back before it.
+    if (cabK.some(k => k > 0 && k < 1) || (cabMoved && cabK.every(k => k <= 0))) {
+      cabK.forEach((k, j) => placeCab(j, (1 - k) * (1 + 0.25 * Math.sin(k * Math.PI))))
+      cabinetBlocks.instanceMatrix.needsUpdate = true
+      cabMoved = cabK.some(k => k > 0)
+    }
+    cabinetBlocks.visible = !gone
 
     // The third-person chase camera: behind and a little above, looking down the boulevard.
     camera.aspect = aspect
@@ -614,7 +648,7 @@ export function createArcade(renderer, { loader, normalize, mobile = false }) {
     // Dusk: the sun low behind the hotels, ahead of you; long shadows across the street.
     sun.position.set(x + 30, 9 + U.uDay.value * 20, -18 + U.uDay.value * 40)
     sun.target.position.set(x + 4, 0, -2)
-    return { here: you ? you.root.position : look, dream }
+    return { here: you ? you.root.position : look, dream, blocks: U.uWaveR.value > 1e3 }
   }
 
   return { scene, camera, update }
@@ -628,7 +662,8 @@ export function createArcade(renderer, { loader, normalize, mobile = false }) {
  * front +z) and then parented to the bone it rides on. Returns the pieces, hidden, for update().
  */
 function makeGear(you) {
-  const plate = (pal, outline, highlight) => {
+  // armour: a 2px shaded bevel (right and bottom) and a rivet in each corner; visor: a dark slit along the bottom.
+  const plate = (pal, outline, highlight, { armour = false, visor = false } = {}) => {
     const c = document.createElement('canvas')
     c.width = c.height = 16
     const g = c.getContext('2d')
@@ -639,6 +674,15 @@ function makeGear(you) {
     g.fillStyle = highlight
     g.fillRect(1, 1, 14, 1)
     g.fillRect(1, 1, 1, 14)
+    g.fillStyle = outline
+    if (armour) {
+      g.globalAlpha = 0.7
+      g.fillRect(13, 1, 2, 14)
+      g.fillRect(1, 13, 12, 2)
+      g.globalAlpha = 1
+      for (const [x, y] of [[3, 3], [12, 3], [3, 12], [12, 12]]) g.fillRect(x, y, 1, 1)
+    }
+    if (visor) g.fillRect(0, 13, 16, 3)
     g.strokeStyle = outline
     g.lineWidth = 1
     g.strokeRect(0.5, 0.5, 15, 15)
@@ -648,8 +692,11 @@ function makeGear(you) {
     return t
   }
   const mat = (tex, metalness, roughness) => new THREE.MeshStandardMaterial({ map: tex, metalness, roughness, flatShading: true })
-  const gold = mat(plate(['#f6d63c', '#f6d63c', '#f6d63c', '#f6d63c', '#eec73a', '#fbe270'], '#9a6c15', '#fff6a8'), 0.35, 0.55)
-  const iron = mat(plate(['#d6d6d6', '#d6d6d6', '#d6d6d6', '#d6d6d6', '#cbcbcb', '#e2e2e2'], '#7b7b7b', '#f6f6f6'), 0.3, 0.6)
+  const GOLD = ['#f6d63c', '#e3b92c', '#cf9f22', '#fbe270'], IRON = ['#d6d6d6', '#bdbdbd', '#a6a6a6', '#e9e9e9']
+  const gold = mat(plate(GOLD, '#9a6c15', '#fff6a8', { armour: true }), 0.35, 0.55)
+  const brow = mat(plate(GOLD, '#9a6c15', '#fff6a8', { armour: true, visor: true }), 0.35, 0.55)
+  const iron = mat(plate(IRON, '#7b7b7b', '#f6f6f6', { armour: true }), 0.3, 0.6)
+  const blade = mat(plate(IRON, '#7b7b7b', '#f6f6f6'), 0.3, 0.6) // the axe's iron, unriveted
   const ironDark = mat(plate(['#9a9a9a', '#8c8c8c', '#a8a8a8'], '#5e5e5e', '#c4c4c4'), 0.3, 0.6)
   const steel = mat(plate(['#eef2f6', '#e2e6ea'], '#a9b0b8', '#ffffff'), 0.4, 0.45)
   const wood = mat(plate(['#8a5a32', '#7a4e2a', '#9c6a3e'], '#4f3119', '#ad7c4c'), 0, 0.8)
@@ -667,7 +714,7 @@ function makeGear(you) {
   piece('Head', gold, [0.04, 0.26, 0.33], [-0.14, 1.6, 0]) // sides, down to the jaw
   piece('Head', gold, [0.04, 0.26, 0.33], [0.14, 1.6, 0])
   piece('Head', gold, [0.3, 0.28, 0.04], [0, 1.6, -0.165]) // back
-  piece('Head', gold, [0.3, 0.06, 0.04], [0, 1.69, 0.165]) // brow, the top of the face opening
+  piece('Head', brow, [0.3, 0.06, 0.04], [0, 1.69, 0.165]) // brow, the top of the face opening
   piece('Head', gold, [0.05, 0.13, 0.04], [-0.115, 1.56, 0.165]) // cheeks, its sides
   piece('Head', gold, [0.05, 0.13, 0.04], [0.115, 1.56, 0.165])
   // Chestplate: a box round a loose shirt (torso: x ±0.2, y 0.98..1.36, z ±0.125) and sleeves round the
@@ -679,9 +726,9 @@ function makeGear(you) {
   piece('RightHand', wood, [0.035, 0.035, 0.62], [-0.7, 1.26, 0.1])
   piece('RightHand', leather, [0.045, 0.045, 0.1], [-0.7, 1.26, -0.02]) // grip wrap
   piece('RightHand', ironDark, [0.05, 0.06, 0.07], [-0.7, 1.26, 0.37]) // socket
-  piece('RightHand', iron, [0.03, 0.06, 0.08], [-0.7, 1.315, 0.37]) // the blade, widening in steps
-  piece('RightHand', iron, [0.03, 0.05, 0.12], [-0.7, 1.37, 0.37])
-  piece('RightHand', iron, [0.03, 0.04, 0.15], [-0.7, 1.415, 0.37])
+  piece('RightHand', blade, [0.03, 0.06, 0.08], [-0.7, 1.315, 0.37]) // the blade, widening in steps
+  piece('RightHand', blade, [0.03, 0.05, 0.12], [-0.7, 1.37, 0.37])
+  piece('RightHand', blade, [0.03, 0.04, 0.15], [-0.7, 1.415, 0.37])
   piece('RightHand', steel, [0.032, 0.02, 0.16], [-0.7, 1.445, 0.37]) // the edge
   piece('RightHand', ironDark, [0.03, 0.04, 0.04], [-0.7, 1.215, 0.37]) // back spike
   you.root.updateMatrixWorld(true)

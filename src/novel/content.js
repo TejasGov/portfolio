@@ -18,6 +18,7 @@ export const PROJECTS = [
     ...p,
     title: p.title ?? d.title.replace(/ – .*/, ''),
     category: d.category,
+    shortCategory: d.shortCategory,
     tech: d.tech ?? d.stack?.join?.(', ') ?? '',
     link: real(d.link),
     linkLabel: d.linkLabel ?? 'Open',

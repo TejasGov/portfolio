@@ -3,7 +3,7 @@ import { toon, sky, paintTexture, textSprite, inkBox, inkMesh, frameLeft, FRAME 
 
 /*
  * Smash Cricket, the film: a floodlit ground at night. You show your hand to a giant webcam; its beam
- * reads the fingers, the number pops above your hand, a ball flies to the boundary and the board adds
+ * reads the fingers, the number pops in the beam, a ball flies to the boundary and the board adds
  * the runs. A six gets a cheer. A 10 s loop.
  */
 const LOOP = 10
@@ -169,7 +169,7 @@ export async function smash({ traveller }) {
       sb.last = `${k}`
       sb.draw(total, k >= 0 ? runs : '-')
     }
-    // The beam reads the raised hand; the numeral pops above it.
+    // The beam reads the raised hand; the numeral pops in the beam beside you.
     you.bone('RightHand').getWorldPosition(hand)
     cam.lens.getWorldPosition(lens)
     beam.position.copy(lens)
@@ -180,9 +180,10 @@ export async function smash({ traveller }) {
     beam.material.opacity = 0.08 + read * 0.35
     cam.led.material.color.setScalar(read > 0.3 ? 6 : 1.5).multiply(new THREE.Color('#ff4a3a'))
     for (const [n, sp] of Object.entries(numerals)) {
-      const on = k >= 0 && +n === runs ? THREE.MathUtils.smoothstep(since, 0.15, 0.35) * (1 - THREE.MathUtils.smoothstep(since, 1.2, 1.6)) : 0
+      const on = k >= 0 && +n === runs ? THREE.MathUtils.smoothstep(since, 0.15, 0.35) * (1 - THREE.MathUtils.smoothstep(since, 0.6, 0.9)) : 0 // gone well before the next throw, so no ghost numeral
       sp.material.opacity = on
-      sp.position.set(hand.x + 0.15, hand.y + 0.75 + since * 0.15, hand.z)
+      // In the beam at chest height, camera-right of you: the board fills the frame above your head (on a phone, the whole top).
+      sp.position.set(you.root.position.x + 0.85, 1.4 + since * 0.08, you.root.position.z)
       sp.scale.set(0.9 * 2 * (0.7 + 0.3 * on), 0.9 * (0.7 + 0.3 * on), 1)
     }
     // The ball: off the bat end of the pitch and away to the boundary (sixes go over the lights).
