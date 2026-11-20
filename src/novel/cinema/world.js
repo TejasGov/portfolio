@@ -273,6 +273,49 @@ export async function createCinema(canvas, { mobile = false, onProgress } = {}) 
     }
     return film
   }
+  const worlds = {
+    journey: () => (journey ??= createJourney(renderer, { loader, normalize })),
+    arcade: () => (arcade ??= createArcade(renderer, { loader, normalize, mobile })),
+  }
+  // Build a chapter's world ahead of its seam, then compile its shaders and upload its textures, so
+  // crossing into it doesn't stall. Called on every idle frame: it compiles again whenever the world
+  // has grown (its models load after it is built), and otherwise costs one traversal.
+  const seen = {}
+  let compiling = null
+  const prepare = name => {
+    const fresh = name === 'journey' ? !journey : !arcade
+    const w = worlds[name]()
+    if (fresh) return void w.update({ p: 0 }, 0, camera.aspect) // compile on a later frame: two short pauses, not one long one
+    let n = 0
+    w.scene.traverse(() => n++)
+    if (compiling || seen[name] === n) return
+    seen[name] = n
+    // Compile against a render target: the composer draws worlds into one, which takes a different
+    // shader variant (no tone mapping, linear output) from drawing to the screen.
+    const offscreen = fn => {
+      const prev = renderer.getRenderTarget()
+      renderer.setRenderTarget(scratch)
+      const out = fn()
+      renderer.setRenderTarget(prev)
+      return out
+    }
+    const frame = () => new Promise(requestAnimationFrame)
+    compiling = offscreen(() => renderer.compileAsync(w.scene, w.camera)).then(async () => {
+      // Upload its textures a few at a time, about 8 ms a frame.
+      const textures = new Set()
+      w.scene.traverse(o => {
+        for (const m of [o.material].flat()) for (const v of Object.values(m ?? {})) if (v?.isTexture) textures.add(v)
+      })
+      let t0 = performance.now()
+      for (const tex of textures) {
+        renderer.initTexture(tex)
+        if (performance.now() - t0 > 8) await frame(), (t0 = performance.now())
+      }
+      await frame()
+      offscreen(() => renderer.render(w.scene, w.camera)) // then one real draw: geometry and shadow map
+    }).finally(() => { compiling = null })
+  }
+  const scratch = new THREE.WebGLRenderTarget(64, 64)
   const filmScreen = new THREE.Mesh(
     new THREE.PlaneGeometry(SCREEN_W, SCREEN_H),
     new THREE.MeshBasicMaterial({ fog: false }), // opaque: the film's additive light piles alpha past 1
@@ -431,7 +474,7 @@ export async function createCinema(canvas, { mobile = false, onProgress } = {}) 
     scene.fog.density = THREE.MathUtils.lerp(0.022, 0.012, hs)
 
     // Chapter Three's journey is its own world, drawn instead of the hall.
-    const jy = state.journey ? (journey ??= createJourney(renderer, { loader, normalize })) : state.arcade ? (arcade ??= createArcade(renderer, { loader, normalize, mobile })) : null
+    const jy = state.journey ? worlds.journey() : state.arcade ? worlds.arcade() : null
     const walker = jy ? jy.update(state.journey ?? state.arcade, t, camera.aspect).here : null
     // The film: on the screen from the seats, or the whole frame once the camera is inside it.
     const f = jy ? null : state.film
@@ -479,7 +522,7 @@ export async function createCinema(canvas, { mobile = false, onProgress } = {}) 
   toneMap.mode = ToneMappingMode.AGX
   onProgress?.(1)
   return {
-    renderer, scene, camera, render, resize, loadFilm: id => getFilm().load(id), setDpr, get dpr() { return renderer.getPixelRatio() },
+    renderer, scene, camera, render, resize, loadFilm: id => getFilm().load(id), prepare, setDpr, get dpr() { return renderer.getPixelRatio() },
     setActive: v => { active = v },
     debug: { vol, bloom, toneMap, dust, lamp, hallMat, seats, projector, screenLight, hemi, bulb, flare, streak },
   }

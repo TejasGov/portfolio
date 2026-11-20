@@ -62,7 +62,11 @@ export default function Stage() {
       mouse.y += (store.mouse.y - mouse.y) * k
       const st = stateAt(store, mouse, innerWidth / innerHeight)
       // Make sure the reel being screened is loaded first.
-      if (section(store) === 'work') world.loadFilm(PROJECT_IDS[workSlot(store.work).i])
+      const sec = section(store)
+      if (sec === 'work') world.loadFilm(PROJECT_IDS[workSlot(store.work).i])
+      // Build the next chapter's world while the reader is paused, so its seam doesn't stall mid-scroll.
+      const next = { work: 'journey', three: 'arcade' }[sec]
+      if (next && now - scrolled > 400) world.prepare(next)
       world.render(st)
       lens.copy(LENS).project(world.camera)
       store.lens = [(lens.x * 0.5 + 0.5) * 100, (0.5 - lens.y * 0.5) * 100]
@@ -70,10 +74,14 @@ export default function Stage() {
       store.camDist = world.camera.position.distanceTo(LENS)
     }
 
+    let scrolled = 0
+    const onScroll = () => { scrolled = performance.now() }
+    addEventListener('scroll', onScroll, { passive: true })
     addEventListener('resize', resize)
     return () => {
       alive = false
       cancelAnimationFrame(raf)
+      removeEventListener('scroll', onScroll)
       removeEventListener('resize', resize)
       world?.renderer.dispose()
     }

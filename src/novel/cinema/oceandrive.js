@@ -139,7 +139,7 @@ export function buildOceanDrive(scene, { wrap = m => m, mobile = false } = {}) {
   strip(-6.2, -1.8, road)
   strip(-1.8, 1.8, std({ ...pbrSet('pavement', [L / 2.5, 1.4]), color: '#f6d9cf' }), 0.1)
   // Each lower strip tucks under its higher neighbour, so no crack opens at the step between them.
-  strip(1.5, 6.5, std({ color: '#86b062', roughness: 0.95 }), 0.05)
+  strip(1.5, 6.5, std({ map: tex('grass_col.webp', true, [L / 2.5, 2]), normalMap: tex('grass_nor.webp', false, [L / 2.5, 2]), color: '#a2cf74', roughness: 0.95 }), 0.05) // CC0 Poly Haven blade detail, tinted
   strip(6.2, 26, std({ ...pbrSet('sand', [L / 4, 5]), color: '#f6dcae' }), 0.02)
   // Kerbs and lane marks.
   for (const z of [-6.2, -1.8]) {
@@ -314,7 +314,7 @@ export function buildOceanDrive(scene, { wrap = m => m, mobile = false } = {}) {
   })
 
   // ------------------------------------------------------------ the promenade: lamps, palms' places
-  const lampMat = std({ color: '#e9e4f0', roughness: 0.4, metalness: 0.6 })
+  const lampMat = std({ color: '#1f3438', roughness: 0.45, metalness: 0.5 }) // dark painted iron: a slim silhouette at dusk, the globe does the glowing
   for (let x = -20; x < 70; x += 8) {
     const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.09, 4.2, 10), lampMat)
     pole.position.set(x, 2.1, -1.55)
