@@ -100,11 +100,7 @@ export function paintTexture(base, spots, { size = 512, count = 220, seed = 1 } 
  * texture; 'shadow' makes him a dark double with a glowing outline.
  */
 export async function loadTraveller(loader) {
-  const [gltf, walk] = await Promise.all([loader.loadAsync('/cinema/traveller.glb'), loader.loadAsync('/cinema/traveller-walk.glb')])
-  // The walk comes from the same rig, so its tracks drive the same bones.
-  const walkClip = walk.animations[0].clone()
-  walkClip.name = 'Walk'
-  gltf.animations.push(walkClip)
+  const gltf = await loader.loadAsync('/cinema/traveller.glb') // the rig, his texture and all eleven clips
   const box = new THREE.Box3().setFromObject(gltf.scene)
   const height = box.max.y - box.min.y
   return {

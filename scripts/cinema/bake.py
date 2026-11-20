@@ -44,6 +44,28 @@ bpy.ops.uv.smart_project(angle_limit=math.radians(66), island_margin=0.004, area
 bpy.ops.object.mode_set(mode='OBJECT')
 print('HALL tris', sum(len(p.vertices) - 2 for p in H.data.polygons), 'materials', len(H.data.materials))
 
+# Two more UV sets for the web's detail textures (TEXCOORD_1, TEXCOORD_2):
+#   detail - world-scale box projection, one texture tile per 3 m
+#   mid    - u = which detail texture this face takes (the material's 'detail' id)
+import bmesh
+bm = bmesh.new()
+bm.from_mesh(H.data)
+l_det = bm.loops.layers.uv.new('detail')
+l_mid = bm.loops.layers.uv.new('mid')
+ids = [m.get('detail', 0) for m in H.data.materials]
+for f in bm.faces:
+    n = f.normal
+    ax = max(range(3), key=lambda i: abs(n[i]))
+    for loop in f.loops:
+        c = loop.vert.co
+        u, v = ((c.y, c.z), (c.x, c.z), (c.x, c.y))[ax]
+        loop[l_det].uv = (u / 3.0, v / 3.0)
+        loop[l_mid].uv = (ids[f.material_index] + 0.5, 0.5)
+bm.to_mesh(H.data)
+bm.free()
+H.data.uv_layers.active = H.data.uv_layers['bake']
+H.data.uv_layers['bake'].active_render = True  # the bake writes through this one
+
 # ---------------------------------------------------------------- light states
 light_objs = {o.name: o for o in bpy.data.objects if o.type == 'LIGHT'}
 mats = {m.name: m for m in bpy.data.materials}
@@ -83,6 +105,12 @@ def state(name):
     emission('steplight', 18.0)
     emission('sconce', 26.0 if house else 9.0)
     emission('exit', 8.0)
+    emission('cove', 7.0 if house else 3.0)
+    for n, o in light_objs.items():
+        if n.startswith('scallop_'):
+            o.data.energy = 70 if house else 26
+        if n.startswith('foot_'):
+            o.data.energy = 90 if house else 140
 
 # ---------------------------------------------------------------- bake
 def bake(name):

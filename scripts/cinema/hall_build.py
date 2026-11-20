@@ -61,7 +61,12 @@ M = {
     'exit': mat('exit', (0.2, 1, 0.4), 0.5, emit=(0.15, 1.0, 0.35), strength=8.0),
     'door': mat('door', (0.02, 0.02, 0.025), 0.6),
     'brass': mat('brass', (0.6, 0.42, 0.18), 0.35, metal=1.0),
+    'cove': mat('cove', (1, 0.8, 0.55), 0.5, emit=(1.0, 0.72, 0.42), strength=6.0),
 }
+# Which detail texture each surface takes on the web (hall_detail.webp: R carpet, G fabric, B concrete, A velvet).
+DETAIL = {'carpet': 1, 'riser': 1, 'panel': 2, 'booth': 3, 'wall': 3, 'ceiling': 3, 'baffle': 3, 'curtain': 4}
+for name, m in M.items():
+    m['detail'] = DETAIL.get(name, 0)
 
 coll = bpy.data.collections.new('hall')
 bpy.context.scene.collection.children.link(coll)
@@ -192,6 +197,11 @@ for k in range(6):
         floor_y = max(0.0, min(last_top, (Z0 + 0.5 - zz) / ROW_D * ROW_H))
         box(f'sconce_{k}_{s}', (s * (WALL_X - 0.2), floor_y + 3.4, zz), (0.1, 0.5, 0.25), M['sconce'])
 
+# The proscenium cove: a warm line of light around the screen opening, the hall's signature glow.
+box('cove_top', (0, 8.25, SCREEN_Z - 0.32), (19.2, 0.06, 0.06), M['cove'])
+for s in (-1, 1):
+    box(f'cove_side_{s}', (s * 9.55, 4.1, SCREEN_Z - 0.32), (0.06, 8.3, 0.06), M['cove'])
+
 # ------------------------------------------------------------------ seat proxies (bake only)
 for r in range(ROWS):
     for c in range(22):
@@ -217,6 +227,20 @@ def light(kind, name, at, energy, color, size=None, rot=None, spot=None):
         o.rotation_euler = rot
     bpy.context.scene.collection.objects.link(o)
     return o
+
+# Every sconce throws a scallop of light up and down the fabric wall (two narrow spots each).
+for k in range(6):
+    zz = 6 - k * 3.2
+    for s in (-1, 1):
+        floor_y = max(0.0, min(last_top, (Z0 + 0.5 - zz) / ROW_D * ROW_H))
+        for d, tag in ((1, 'up'), (-1, 'dn')):
+            o = light('SPOT', f'scallop_{tag}_{k}_{s}', (s * (WALL_X - 0.45), floor_y + 3.4 + d * 0.3, zz), 70, (1.0, 0.7, 0.42), spot=(math.radians(55), 0.6))
+            o.rotation_euler = (W(s * (WALL_X - 0.05), floor_y + 3.4 + d * 4.0, zz) - o.location).to_track_quat('-Z', 'Y').to_euler()
+# Footlights at the foot of each curtain, grazing the velvet upward.
+for s in (-1, 1):
+    for x in (9.6, 10.6):
+        o = light('SPOT', f'foot_{s}_{x}', (s * x, 0.15, SCREEN_Z - 1.0), 120, (1.0, 0.45, 0.35), spot=(math.radians(40), 0.5))
+        o.rotation_euler = (W(s * x, 9.0, SCREEN_Z - 0.2) - o.location).to_track_quat('-Z', 'Y').to_euler()
 
 # The projected film washes the room from the screen.
 light('AREA', 'screen_glow', (0, 4.15, SCREEN_Z - 0.2), 900, (0.62, 0.74, 1.0), size=(18, 7.5), rot=(math.radians(90), 0, 0))

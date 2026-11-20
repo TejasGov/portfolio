@@ -1,6 +1,7 @@
 import * as THREE from 'three'
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js'
+import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js'
 import { RectAreaLightUniformsLib } from 'three/addons/lights/RectAreaLightUniformsLib.js'
 import {
   EffectComposer, RenderPass, EffectPass, BloomEffect, ChromaticAberrationEffect, NoiseEffect,
@@ -35,17 +36,21 @@ const seatAt = (r, c) => {
   return [x, r * ROW_H, Z0 - r * ROW_D + x * x * 0.004]
 }
 
-const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder)
+// Meshopt for the hall's own models; Draco for the films' and the journey's (scripts/cinema/compress.py).
+const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).setDRACOLoader(new DRACOLoader().setDecoderPath('/draco/'))
 
-function hallMaterial(show, house, gains) {
+function hallMaterial(show, house, gains, detail) {
   const m = new THREE.ShaderMaterial({
-    uniforms: THREE.UniformsUtils.merge([THREE.UniformsLib.fog, { uHouse: { value: 0 }, uExposure: { value: 1 }, uLog: { value: new THREE.Vector2(gains.show.a, Math.log1p(gains.show.rmax * gains.show.a)) } }]),
+    uniforms: THREE.UniformsUtils.merge([THREE.UniformsLib.fog, { uHouse: { value: 0 }, uExposure: { value: 1 }, uDetailK: { value: 0.9 }, uLog: { value: new THREE.Vector2(gains.show.a, Math.log1p(gains.show.rmax * gains.show.a)) } }]),
     vertexShader: /* glsl */ `
       #include <common>
       #include <fog_pars_vertex>
-      varying vec2 vUv;
+      attribute vec2 uv1; attribute vec2 uv2; // the bake's detail UVs and material id (scripts/cinema/bake.py)
+      varying vec2 vUv; varying vec2 vDet; varying float vMid;
       void main() {
         vUv = uv;
+        vDet = uv1;
+        vMid = uv2.x;
         vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
         gl_Position = projectionMatrix * mvPosition;
         #include <fog_vertex>
@@ -53,21 +58,27 @@ function hallMaterial(show, house, gains) {
     fragmentShader: /* glsl */ `
       #include <common>
       #include <fog_pars_fragment>
-      uniform sampler2D tShow; uniform sampler2D tHouse;
-      uniform float uHouse; uniform float uExposure; uniform vec2 uLog;
-      varying vec2 vUv;
+      uniform sampler2D tShow; uniform sampler2D tHouse; uniform sampler2D tDetail;
+      uniform float uHouse; uniform float uExposure; uniform vec2 uLog; uniform float uDetailK;
+      varying vec2 vUv; varying vec2 vDet; varying float vMid;
       // The bakes are log-encoded radiance (see the Blender bake script): r = (exp(c * L) - 1) / A.
       vec3 radiance(vec3 c) { return (exp(c * uLog.y) - 1.0) / uLog.x; }
       void main() {
         vec3 a = radiance(texture2D(tShow, vUv).rgb);
         vec3 b = radiance(texture2D(tHouse, vUv).rgb);
-        gl_FragColor = vec4(mix(a, b, uHouse) * uExposure, 1.0);
+        // Real surface under the baked light: carpet pattern, wall fabric, board-marked concrete, velvet.
+        vec4 dt = texture2D(tDetail, vDet);
+        float id = floor(vMid);
+        float c = id < 1.5 ? dt.r : id < 2.5 ? dt.g : id < 3.5 ? dt.b : dt.a;
+        float detail = id < 0.5 ? 1.0 : 1.0 + (c - 0.5) * 2.0 * uDetailK;
+        gl_FragColor = vec4(mix(a, b, uHouse) * uExposure * detail, 1.0);
         #include <fog_fragment>
       }`,
     fog: true,
   })
   m.uniforms.tShow = { value: show }
   m.uniforms.tHouse = { value: house }
+  m.uniforms.tDetail = { value: detail }
   return m
 }
 
@@ -125,16 +136,23 @@ export async function createCinema(canvas, { mobile = false, onProgress } = {}) 
   })
 
   // ------------------------------------------------------------ the baked hall
-  const [hallGltf, show, house, gains, seatGltf, projGltf] = await Promise.all([
+  const detailTex = tex.loadAsync('/cinema/hall_detail.webp').then(t => {
+    t.wrapS = t.wrapT = THREE.RepeatWrapping
+    t.colorSpace = THREE.NoColorSpace
+    t.anisotropy = 8
+    return t
+  })
+  const [hallGltf, show, house, gains, seatGltf, projGltf, detail] = await Promise.all([
     loader.loadAsync('/cinema/hall.glb'),
     loadTex('/cinema/hall_show.webp'),
     loadTex('/cinema/hall_house.webp'),
     fetch('/cinema/hall_gains.json').then(r => r.json()),
     loader.loadAsync('/cinema/seat.glb'),
     loader.loadAsync('/cinema/projector.glb'),
+    detailTex,
   ])
   onProgress?.(0.6)
-  const hallMat = hallMaterial(show, house, gains)
+  const hallMat = hallMaterial(show, house, gains, detail)
   hallMat.uniforms.uExposure.value = 1
   hallGltf.scene.traverse(o => {
     if (o.isMesh) o.material = hallMat
@@ -163,6 +181,44 @@ export async function createCinema(canvas, { mobile = false, onProgress } = {}) 
     }
   seats.frustumCulled = false
   scene.add(seats)
+
+  // ------------------------------------------------------------ the star ceiling
+  // Fibre-optic stars between the ceiling baffles, each twinkling at its own pace; they fade when the
+  // house lights come up.
+  const starN = mobile ? 900 : 2200
+  const starPos = new Float32Array(starN * 3), starSeed = new Float32Array(starN)
+  for (let i = 0; i < starN; i++) {
+    starPos.set([(Math.random() * 2 - 1) * 10.8, 12.47, -11.2 + Math.random() * 26.4], i * 3)
+    starSeed[i] = Math.random()
+  }
+  const starGeo = new THREE.BufferGeometry()
+  starGeo.setAttribute('position', new THREE.BufferAttribute(starPos, 3))
+  starGeo.setAttribute('aSeed', new THREE.BufferAttribute(starSeed, 1))
+  const starU = { uTime: { value: 0 }, uOn: { value: 1 }, uDpr: { value: dpr } }
+  const stars = new THREE.Points(starGeo, new THREE.ShaderMaterial({
+    uniforms: starU,
+    vertexShader: /* glsl */ `
+      attribute float aSeed; uniform float uTime; uniform float uDpr; varying float vA; varying vec3 vC;
+      void main() {
+        vec4 mv = modelViewMatrix * vec4(position, 1.0);
+        float tw = 0.55 + 0.45 * sin(uTime * (0.6 + aSeed * 1.8) + aSeed * 40.0);
+        vA = tw * (0.4 + aSeed * 0.6);
+        vC = mix(vec3(1.0, 0.86, 0.66), vec3(0.8, 0.88, 1.0), step(0.7, aSeed));
+        gl_PointSize = clamp((1.2 + aSeed * 1.6) * uDpr * 14.0 / -mv.z, 1.0, 4.0);
+        gl_Position = projectionMatrix * mv;
+      }`,
+    fragmentShader: /* glsl */ `
+      uniform float uOn; varying float vA; varying vec3 vC;
+      void main() {
+        float r = length(gl_PointCoord - 0.5);
+        gl_FragColor = vec4(vC * vA * uOn * 2.4 * smoothstep(0.5, 0.0, r), 1.0);
+      }`,
+    transparent: true,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+  }))
+  stars.frustumCulled = false
+  scene.add(stars)
 
   // ------------------------------------------------------------ the projector, in its booth
   // Its lens points along the model's +x; turned a quarter so it looks out of the window at the screen.
@@ -312,6 +368,7 @@ export async function createCinema(canvas, { mobile = false, onProgress } = {}) 
   function setDpr(d) {
     renderer.setPixelRatio(d)
     dust.material.uniforms.uDpr.value = d
+    starU.uDpr.value = d
     const s = renderer.getSize(new THREE.Vector2())
     resize(s.x, s.y)
   }
@@ -365,6 +422,8 @@ export async function createCinema(canvas, { mobile = false, onProgress } = {}) 
     hallMat.uniforms.uHouse.value = hs
     hallMat.uniforms.uExposure.value = state.exposure ?? 1
     houseLight.intensity = hs * 1.4
+    starU.uTime.value = t
+    starU.uOn.value = 1 - hs * 0.85
     screenLight.intensity = 0.9 * (1 - hs)
     scene.fog.density = THREE.MathUtils.lerp(0.022, 0.012, hs)
 
