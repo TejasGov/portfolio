@@ -14,11 +14,13 @@ const TITLE = [['Places I ', false], ['worked', true]]
  * Progress starts as soon as the chapter rises into view, so it picks up exactly where Chapter Two ends.
  */
 const N = JOURNEY.length
-// Opaque from about k+0.45, before the stand at stop k begins (k+0.5, journey.js placeAt()), so the card
-// never arrives ghosted after the stop is already centred. Card 0 waits for the seam title to clear
-// (gone at three 0.05) and is whole by 0.06; the last card is gone before the recede (0.97, timeline.js).
-const slip = k => [k === 0 ? 0.053 : (k + 0.3) / N, k === N - 1 ? 0.968 : (k + 0.99) / N]
-const BEATS = JOURNEY.map((s, k) => ({ at: slip(k), edge: 0.007, s })) // 0.007 x 820svh: ~6svh mid-wipe
+// In slot k (journey.js placeAt) the walk to stop k is u 0..0.5 and the stand is 0.5..1. Card k holds from
+// u 0.22 (he is ~44% of the way to stop k) to u 0.22 of slot k+1 (~44% of the way to the next), the
+// stretch where diorama k is most in frame, and hands straight over to card k+1. Card 0 waits for the seam
+// title to clear (gone at three 0.05); the last card is gone before the recede (0.97, timeline.js).
+const slip = k => [k === 0 ? 0.053 : (k + 0.22) / N, k === N - 1 ? 0.968 : (k + 1.22) / N]
+// In 0.005 x 820svh (~4svh) top-first; out in 0.0008 (<1svh), so no frame shows the outgoing card sliced.
+const BEATS = JOURNEY.map((s, k) => ({ at: slip(k), edge: [0.005, 0.0008], s }))
 // One title for the Two to Three seam, on one progress that runs work 0..1 then 1 + three.
 const SEAM = [{ at: [0.946, 1.05], edge: [0.01, 0.006] }] // whole from work 0.956, as the hall washes to paper
 const seam23 = () => store.set('seam23', store.three > 0 ? 1 + store.three : store.work)

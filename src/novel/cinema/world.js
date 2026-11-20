@@ -409,12 +409,13 @@ export async function createCinema(canvas, { mobile = false, onProgress } = {}) 
   composer.addPass(new EffectPass(camera, new ChromaticAberrationEffect({ offset: new THREE.Vector2(0.0008, 0.0005), radialModulation: true, modulationOffset: 0.25 }), bloom, toneMap, vignette, grain))
   const sketch = new SketchPass(camera, noise)
   composer.addPass(sketch)
+  sketch.uniforms.uDpr.value = dpr
 
   // ------------------------------------------------------------ film frames on the screen
   // The spot's projective map is square; the screen fills its full width and a centred band of its height.
   const band = SCREEN_H / SCREEN_W
   let lastCard = ''
-  function card(key, { kicker = '', title = '', field = ['#03060c', '#1a2a46'], ink = '#ffffff' } = {}) {
+  function card(key, { kicker = '', title = '', field = ['#03060c', '#1a2a46'], ink = '#ffffff', glow = false } = {}) {
     if (key === lastCard) return
     lastCard = key
     // A CPU-backed canvas: uploading a GPU canvas after a redraw read it back and stalled a frame ~50 ms.
@@ -431,17 +432,33 @@ export async function createCinema(canvas, { mobile = false, onProgress } = {}) 
     g.fillStyle = ink
     g.textAlign = 'center'
     g.textBaseline = 'middle'
+    // An email of any length stays inside the screen; a portrait phone frames only its middle half.
+    const fitFont = (text, px, font) => {
+      g.font = font(px)
+      const fit = Math.min(1, ((mobile ? 0.46 : 0.86) * S) / g.measureText(text).width)
+      if (fit < 1) g.font = font(px * fit)
+      return fit
+    }
     if (kicker) {
-      g.font = `500 ${Math.round(h * 0.05)}px "Geist Mono Variable", monospace`
+      const mono = px => `500 ${Math.round(px)}px "Geist Mono Variable", monospace`
+      let spaced = kicker.toUpperCase().split('').join(' ')
+      // Too wide for the phone's crop: tighter (thin-space) tracking first, then a smaller size.
+      if (mobile && fitFont(spaced, h * 0.05, mono) < 1) spaced = kicker.toUpperCase().split('').join('\u2009')
+      fitFont(spaced, h * 0.05, mono)
       g.globalAlpha = 0.8
-      g.fillText(kicker.toUpperCase().split('').join(' '), S / 2, y0 + h * 0.28)
+      g.fillText(spaced, S / 2, y0 + h * 0.28)
       g.globalAlpha = 1
     }
     if (title) {
-      g.font = `400 ${Math.round(h * 0.3)}px "Instrument Serif", serif`
-      // An email of any length stays inside the screen; a portrait phone frames only its middle half.
-      const fit = Math.min(1, ((mobile ? 0.46 : 0.86) * S) / g.measureText(title).width)
-      if (fit < 1) g.font = `400 ${Math.round(h * 0.3 * fit)}px "Instrument Serif", serif`
+      fitFont(title, h * 0.3, px => `400 ${Math.round(px)}px "Instrument Serif", serif`)
+      if (glow) {
+        // Warm projector white with a halo, so the last card reads as lit while the house comes up.
+        g.fillStyle = '#fff4e0'
+        g.shadowColor = 'rgb(255 214 150 / 0.7)'
+        g.shadowBlur = h * 0.08
+        g.fillText(title, S / 2, y0 + h * 0.56)
+        g.shadowBlur = 0
+      }
       g.fillText(title, S / 2, y0 + h * 0.56)
     }
     // A film frame is never clean: faint grain and a soft gate edge.
@@ -470,6 +487,7 @@ export async function createCinema(canvas, { mobile = false, onProgress } = {}) 
     renderer.setPixelRatio(d)
     dust.material.uniforms.uDpr.value = d
     starU.uDpr.value = d
+    sketch.uniforms.uDpr.value = d
     const s = renderer.getSize(new THREE.Vector2())
     resize(s.x, s.y)
   }
@@ -561,7 +579,7 @@ export async function createCinema(canvas, { mobile = false, onProgress } = {}) 
     renderPass.mainScene = away ? away.scene : scene
     renderPass.mainCamera = away ? away.camera : camera
     vol.enabled = !away
-    grain.blendMode.opacity.value = grainBase * (away ? 0.45 : 1) // the hall keeps its film grain; the painted worlds read cleaner
+    grain.blendMode.opacity.value = grainBase * (res?.blocks && !onScreen ? 0.18 : away ? 0.45 : 1) // the hall keeps its film grain; the painted worlds read cleaner, the block world cleanest
     // Backing out of the screen at the end of Chapter Four, the game's own grade gives way to the hall's
     // as the hall comes into view (k: 0 inside the screen, 1 at the seats), so nothing jumps at the cut.
     const k = onScreen ? state.arcade.back ?? 1 : 1
@@ -591,6 +609,7 @@ export async function createCinema(canvas, { mobile = false, onProgress } = {}) 
       su.uAuto.value = sk.tint ? 0 : 1
       su.uGrid.value = sk.grid ?? 0.4
       su.uShimmer.value = sk.shimmer ?? 0.8
+      su.uRaw.value = sk.raw ? 1 : 0
     }
     su.uTime.value = t
     composer.render()

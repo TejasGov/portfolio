@@ -63,6 +63,13 @@ export function workSlot(w) {
 const HALL_REACH = 40 // from the screen to past the booth
 const FILM_ORIGIN = V(0, 1.1, 0) // where each film's subject stands
 /** A film's own wave: near things first, the painted sky last. */
+// The hall's bloom front, measured so the share of the frame in colour grows evenly with scroll (it is
+// mostly the screen and the hall within ~14 of it), at 1440x900 and 390x844; past 30 it is behind the camera.
+const HALL_BLOOM = [-6, 2, 4.4, 6.3, 7.7, 8.9, 10, 11.4, 13.6, 18.8, 22.1, 30, HALL_REACH]
+const hallBloom = t => {
+  const x = Math.min(1, Math.max(0, t)) * (HALL_BLOOM.length - 1), i = Math.min(HALL_BLOOM.length - 2, Math.floor(x))
+  return THREE.MathUtils.lerp(HALL_BLOOM[i], HALL_BLOOM[i + 1], x - i)
+}
 const filmReach = k => (k < 0.7 ? -2 + (k / 0.7) * 16 : 14 + ((k - 0.7) / 0.3) * 250)
 
 const out = { pos: V(0, 0, 0), target: V(0, 0, 0) }
@@ -84,15 +91,16 @@ export function stateAt(s, mouse, aspect) {
     const u = ss(0.0, 0.88, p)
     PRO_POS.getPoint(u, out.pos)
     PRO_LOOK.getPoint(u, out.target)
-    st.lamp = 1 + 7 * ss(0.74, 0.9, p)
-    st.pull = ss(0.66, 0.88, p)
+    st.lamp = 1 + 7 * ss(0.7, 0.82, p)
+    st.pull = ss(0.62, 0.84, p)
     st.swirl = 1 + st.pull * 6
-    st.bloom = 1 + 3.2 * ss(0.74, 0.92, p)
-    st.flare = 1 + 9 * ss(0.72, 0.9, p)
+    st.bloom = 1 + 3.2 * ss(0.7, 0.84, p)
+    st.flare = 1 + 9 * ss(0.68, 0.82, p)
     st.focus = THREE.MathUtils.lerp(4, 11, ss(0.1, 0.4, p))
-    st.flood = ss(0.78, 0.9, p)
-    // All paper (>= 1.25) by p .95; Chapter One rises over the second half of the sweep (--one-overlap).
-    st.sweep = ss(0.86, 0.95, p) * 1.3
+    // A short flash: the flood is up by .82, then the pixel front crosses it and the screen is all
+    // paper (>= 1.25) by p ~.89, just as Chapter One's title (rising from p ~.76, --one-overlap) arrives.
+    st.flood = ss(0.72, 0.82, p)
+    st.sweep = ss(0.79, 0.9, p) * 1.3
     st.card = { key: 'prologue', kicker: 'Now showing', title: 'Tejas Govind' }
     // Clear the air while the camera faces the screen, so the name reads through the beam.
     const facingScreen = ss(0.16, 0.26, p) * (1 - ss(0.42, 0.52, p))
@@ -115,7 +123,7 @@ export function stateAt(s, mouse, aspect) {
     const seat = portrait ? WORK_POS_PORTRAIT : WORK_POS
     const seatLook = portrait ? WORK_LOOK_PORTRAIT : WORK_LOOK
     inPos.copy(SCREEN).setZ(SCREEN.z - insideDistance(portrait ? 62 : 40, aspect))
-    const push = ss(0.07, 0.15, w) * (1 - ss(0.85, 0.93, w))
+    const push = ss(0.075, 0.15, w) * (1 - ss(0.85, 0.93, w))
     const k = push * push * (3 - 2 * push)
     out.pos.copy(seat).lerp(inPos, k)
     out.target.copy(seatLook).lerp(SCREEN, k)
@@ -127,14 +135,19 @@ export function stateAt(s, mouse, aspect) {
     st.lamp = 1.6
     st.density = 0.08 * (1 - push)
     st.dust = 0.05 * (1 - push)
-    if (w <= 0) st.sketch = { r: -4, origin: SCREEN, band: 1.6, ...PROJECTOR } // still on the India chapter's paper
-    else if (w < 0.05) st.sketch = { r: -4 + ss(0, 0.045, w) * (HALL_REACH + 4), origin: SCREEN, band: 1.6, ...PROJECTOR }
+    // Still on the India chapter's paper: the drawing inks itself onto it as One leaves, never shown shredded.
+    // Full ink early: wherever One's paper has already uncovered the hall, the drawing is there.
+    if (w <= 0) st.sketch = { r: -4, origin: SCREEN, band: 1.6, ink: ss(0.08, 0.4, s.workIn), ...PROJECTOR }
+    // A wide, soft front over ~half a screen of scroll: light spreading from the screen, not a cut. raw: the
+    // colour it reveals is the hall exactly as it stays after the seam, so its end is not a jump in brightness.
+    else if (w < 0.07) st.sketch = { r: hallBloom(w / 0.065), origin: SCREEN, band: 3.0, raw: true, ...PROJECTOR }
     // ...and the drawing lifts off the page, so the journey can be drawn on it.
     else if (w > 0.93) st.sketch = { r: -4 + ss(0.93, 0.97, w) * (HALL_REACH + 4), origin: SCREEN, band: 1.6, colourBehind: false, ink: 1 - ss(0.985, 0.999, w), ...PROJECTOR }
-    else if (st.film.inside >= 1) {
+    // Reduced motion: no ink wave between films, they cut straight.
+    else if (st.film.inside >= 1 && !s.still) {
       // Inside: each film blooms out of ink, plays, and washes back to ink before the cut to the next.
       // The first film is already on the screen in colour during the push, so it does not restart from ink.
-      const bloom = i === 0 ? 1 : ss(0, 0.09, t), wash = ss(0.91, 1, t)
+      const bloom = i === 0 ? 1 : ss(0, 0.05, t), wash = ss(0.91, 1, t)
       st.sketch = wash > 0
         ? { r: filmReach(wash), origin: FILM_ORIGIN, band: 0.8, colourBehind: false, grid: 0.7, shimmer: 1 }
         : { r: bloom >= 1 ? 1e5 : filmReach(bloom), origin: FILM_ORIGIN, band: 0.8, grid: 0.7, shimmer: 1 }
@@ -152,7 +165,7 @@ export function stateAt(s, mouse, aspect) {
     // block world is the chapter's own (arcade.js). It ends as a film does: the game is on the cinema's
     // screen, and the camera backs out of it to your seat in the hall, where the epilogue begins.
     const p = s.four
-    st.arcade = { p }
+    st.arcade = { p, still: s.still } // reduced motion: the wave is a cut
     const bloom = ss(0.012, 0.07, p)
     if (bloom < 1) st.sketch = { follow: true, r: -4 + bloom * 70, origin: SCREEN, band: 1.4, ink: 0.35 + 0.65 * ss(0, 0.012, p), ...NEON }
     else if (p > 0.93) {
@@ -169,17 +182,24 @@ export function stateAt(s, mouse, aspect) {
     const u = ss(0.05, 1.0, e) // the dolly runs to the last frame, so the house never freezes under the panel
     EPI_POS.getPoint(u, out.pos)
     EPI_LOOK.getPoint(u, out.target)
-    st.house = ss(0.08, 0.6, e)
-    // The house lights wash the screen, so the projector rises with them. The screen keeps "The End":
-    // the address lives only in the contact card below it (Epilogue.jsx), so it is never shown twice.
-    st.lamp = 1 + 2.5 * st.house
-    st.exposure = THREE.MathUtils.lerp(3, 1.6, st.house)
-    st.dust = 0.3
-    st.density = 0.2 // a thinner beam than the prologue's, so the card reads through it
-    st.card = { key: 'end', kicker: 'Thank you for watching', title: 'The End' }
+    const up = ss(0.08, 0.6, e)
+    // The house lights wash the screen (their light floors its dark field), so they stop at 45%, the hall's
+    // exposure holds it bright, and the projector rises well above them while the beam's haze and bloom
+    // thin out: "The End" stays lit on a dark field. The screen keeps "The End": the address lives only
+    // in the contact card below it (Epilogue.jsx), so it is never shown twice.
+    // The projector leads the house, on the arrival: the lamp is up and haze, dust and bloom are cleared
+    // by the time the epilogue is 40% risen, so "The End" is lit as the contact card arrives below it.
+    const lampUp = ss(0.12, 0.4, s.epiIn)
+    st.house = 0.45 * up
+    st.lamp = 1 + 17 * lampUp // bright enough that the title reads near white; the field below is darker to match
+    st.exposure = THREE.MathUtils.lerp(3, 2.6, up)
+    st.dust = 0.3 * (1 - 0.8 * lampUp)
+    st.density = 0.2 * (1 - lampUp) // a thinner beam than the prologue's, so the card reads through it
+    st.bloom = 1 - 0.8 * lampUp
+    st.card = { key: 'end', kicker: 'Thank you for watching', title: 'The End', glow: true, field: ['#04060b', '#19233a'] }
     // Arriving from Chapter Four's back-out: the game is still on the screen; it fades out as the
     // epilogue rises, and "The End" comes up behind it.
-    const fade = 1 - ss(0.2, 0.8, s.epiIn)
+    const fade = 1 - ss(0.08, 0.3, s.epiIn) // off the screen before the title is fully lit
     if (fade > 0) st.arcade = { p: 1, onScreen: true, show: fade }
   }
 

@@ -1,5 +1,4 @@
 import { useLayoutEffect, useRef } from 'react'
-import PixelFringe from '../lib/PixelFringe'
 import { usePaper, useRunningHead } from '../lib/chapters'
 import { gsap, reducedMotion } from '../lib/scroll'
 import { store } from '../lib/store'
@@ -94,12 +93,16 @@ function AboutCard({ style }) {
 
 /* -------------------------------------------------------------- pieces */
 
+/** A piece's portrait placement (collage.js `pt`), as variables the phone stylesheet reads. */
+const portrait = pt =>
+  pt === false ? { '--pt-off': 1 } : pt ? { '--px': `${pt.x}%`, '--py': `${pt.y}%`, '--pw': pt.w, '--ps': pt.size, '--pr': pt.r != null ? `${pt.r}deg` : undefined } : {}
+
 function Piece({ it }) {
-  const style = { left: `${it.x}%`, top: `${it.y}%`, rotate: `${it.r ?? 0}deg` }
+  const style = { left: `${it.x}%`, top: `${it.y}%`, rotate: `${it.r ?? 0}deg`, ...portrait(it.pt) }
   switch (it.kind) {
     case 'img':
       return (
-        <figure className="piece" data-in={it.fly ? 'fly' : 'img'} data-depth={it.depth ?? 0} style={{ ...style, '--w': it.w }}>
+        <figure className="piece" data-in={it.fly ? 'fly' : 'img'} data-cut={it.src.endsWith('-s') ? '1' : undefined} data-depth={it.depth ?? 0} style={{ ...style, '--w': it.w }}>
           <img {...photo(it.src)} alt="" className={`block w-full ${it.duotone ? 'duotone' : ''} ${it.spin ? 'spin-slow' : ''}`} />
           {it.duotone && <span className="duotone-ink" aria-hidden="true" />}
           {it.steam && <Steam />}
@@ -202,9 +205,10 @@ function torn(seed, n = 36, j = 1.4) {
   return `polygon(${pts.map(([x, y]) => `${x.toFixed(2)}% ${y.toFixed(2)}%`).join(',')})`
 }
 function Sheet({ sheet, seed }) {
-  const { color, x, y, w, h, r = 0, from = 'left', grid = false } = sheet
+  const { color, x, y, w, h, r = 0, from = 'left', grid = false, pt } = sheet
+  const phone = pt && { '--px': `${pt.x}%`, '--py': `${pt.y}%`, '--pw': `${pt.w}%`, '--ph': `${pt.h}%` }
   return (
-    <div className="sheet" data-from={from} style={{ left: `${x}%`, top: `${y}%`, width: `${w}%`, height: `${h}%`, rotate: `${r}deg` }} aria-hidden="true">
+    <div className="sheet" data-from={from} style={{ left: `${x}%`, top: `${y}%`, width: `${w}%`, height: `${h}%`, rotate: `${r}deg`, ...phone }} aria-hidden="true">
       <div className={`sheet-paper${grid ? ' sheet-grid' : ''}`} style={{ backgroundColor: color, clipPath: torn(seed) }} />
     </div>
   )
@@ -220,19 +224,18 @@ const STOPS = [[104, 85, 'Prayagraj'], [214, 89, 'Architecture'], [314, 89, 'Cha
 function Route() {
   return (
     <>
-      <svg className="route" viewBox="0 0 700 100" preserveAspectRatio="none" aria-hidden="true">
-        <defs>
-          <mask id="route-reveal" maskUnits="userSpaceOnUse" x="0" y="0" width="700" height="100">
-            <path className="route-mask" d={ROUTE} pathLength="1" />
-          </mask>
-        </defs>
-        {/* Two passes of the pen, a hair apart, so the line reads hand-drawn rather than plotted. */}
-        <path className="route-line route-ghost" d={ROUTE} mask="url(#route-reveal)" transform="translate(0.15 0.35)" />
-        <path className="route-line" d={ROUTE} mask="url(#route-reveal)" />
-      </svg>
+      {/* Revealed by a pair of opposing translates (compositor only): the old mask re-rasterised the
+          strip-wide SVG every frame and halved Chapter One's frame rate. */}
+      <div className="route">
+        <svg viewBox="0 0 700 100" preserveAspectRatio="none" aria-hidden="true">
+          {/* Two passes of the pen, a hair apart, so the line reads hand-drawn rather than plotted. */}
+          <path className="route-line route-ghost" d={ROUTE} transform="translate(0.15 0.35)" />
+          <path className="route-line" d={ROUTE} />
+        </svg>
+      </div>
       <span className="route-nib" aria-hidden="true" />
       {STOPS.map(([x, y, label]) => (
-        <span key={label} className="route-stop" data-in="stop" style={{ left: `calc(${x} * var(--strip-unit))`, top: `${y}%` }}>
+        <span key={label} className="route-stop" data-in="stop" style={{ left: `calc(${x} * var(--spread-unit))`, top: `${y}%` }}>
           <span className="route-pin" />
           <span className="route-label">{label}</span>
         </span>
@@ -249,7 +252,7 @@ export default function ChapterOne({ spreads = SPREADS }) {
   const ref = useRef(null)
   const strip = useRef(null)
   usePaper(ref)
-  useRunningHead(ref, 'Chapter One · About me')
+  useRunningHead(ref, 'Chapter One · About me', { start: 'top 75%' }) // as its paper covers the prologue (Prologue.jsx ends there)
 
   useLayoutEffect(() => {
     if (reducedMotion()) return undefined
@@ -259,8 +262,16 @@ export default function ChapterOne({ spreads = SPREADS }) {
     const early = () => [0, 1].forEach(i => decodeAll(spreadEls[i]))
     early()
     let primed = false
+    let letters // the title-letter drop, played when the gate opens
+    const sticky = strip.current.parentElement
     const onStore = (key, v) => {
-      if (key === 'prologue' && v > 0.5 && !primed) { primed = true; early() }
+      if (key !== 'prologue') return
+      if (v > 0.5 && !primed) { primed = true; early() }
+      // Gate: nothing of One floats over the dark hall; it shows once the takeover paper covers the screen.
+      const a = Math.min(1, Math.max(0, (v - 0.85) / 0.04))
+      sticky.style.opacity = a
+      sticky.style.visibility = a ? '' : 'hidden'
+      if (letters) v >= 0.86 ? letters.play() : letters.reverse()
     }
     store.listeners.add(onStore)
     const ctx = gsap.context(() => {
@@ -270,21 +281,32 @@ export default function ChapterOne({ spreads = SPREADS }) {
       // portrait spread is wider than the screen, so the full run would cut the last sentence off.
       const last = el.querySelector('.closing')
       const travel = () => Math.min(el.scrollWidth - innerWidth, last ? last.parentElement.offsetLeft + last.offsetLeft - 20 : Infinity)
+      const about = el.querySelector('.about')
+      const svg = el.querySelector('.route > svg')
+      let cardRight = 0, unit = 1 // the About card's right edge (plus 24px of air) and one spread unit, in strip px
+      const portrait = () => innerWidth / innerHeight <= 1
       // The scrapbook slides sideways while the page scrolls down.
       const move = gsap.to(el, {
-        x: () => -travel(),
+        x: () => {
+          // Re-read on every refresh (resize, rotation). A phone's About card spans the view: the route
+          // starts right of it, so the line never runs under it.
+          cardRight = about ? about.parentElement.offsetLeft + about.offsetLeft + about.offsetWidth + 24 : 0
+          unit = (el.querySelector('.spread')?.offsetWidth ?? 100) / 100
+          if (svg) svg.style.clipPath = portrait() ? `inset(0 0 0 ${cardRight}px)` : ''
+          return -travel()
+        },
         ease: 'none',
-        // Hold on the title card before the scrapbook starts to travel: ~60% of a screen, or 1.6 on a
-        // portrait screen, where the About card fills the view and needs reading before it moves.
-        scrollTrigger: { trigger: section, start: () => `top+=${Math.round(innerHeight * (innerWidth / innerHeight <= 1 ? 1.6 : 0.6))} top`, end: 'bottom bottom', scrub: 0.7, invalidateOnRefresh: true },
+        // Hold on the title card before the scrapbook starts to travel: ~60% of a screen, long enough to
+        // read the About card whole (on a phone it fills the view), short enough not to read as a stuck page.
+        scrollTrigger: { trigger: section, start: () => `top+=${Math.round(innerHeight * 0.6)} top`, end: 'bottom bottom', scrub: 0.7, invalidateOnRefresh: true },
       })
       // The route draws itself across the strip, a red nib at its tip leading you from spread to spread.
       const line = el.querySelector('.route-line:not(.route-ghost)')
       const nib = el.querySelector('.route-nib')
       const length = line?.getTotalLength() ?? 0
-      gsap.fromTo('.route-mask', { strokeDashoffset: 1 }, {
-        strokeDashoffset: 0,
-        autoRound: false, // the line is measured 0..1 (pathLength); whole-pixel rounding would snap it on at once
+      let nibOut = 1 // the outro's fade (below); the nib's opacity is this tween's to write
+      const route = el.querySelector('.route')
+      gsap.to({}, {
         ease: 'none',
         scrollTrigger: { trigger: section, start: 'top top', end: 'bottom bottom', scrub: 0.7 },
         onUpdate() {
@@ -292,21 +314,34 @@ export default function ChapterOne({ spreads = SPREADS }) {
           const k = this.progress()
           const pt = line.getPointAtLength(k * length)
           // By transform, not left/top, so the nib never relayouts the strip (it is 100svh tall).
-          nib.style.translate = `calc(${pt.x.toFixed(2)} * var(--strip-unit)) ${pt.y.toFixed(2)}svh`
-          nib.style.opacity = k > 0.002 && k < 0.998 ? 1 : 0
+          nib.style.translate = `calc(${pt.x.toFixed(2)} * var(--spread-unit)) ${pt.y.toFixed(2)}svh`
+          // The route runs left to right, so drawing it up to the nib is a reveal up to the nib's x.
+          route.style.translate = `calc(${(pt.x - 700).toFixed(2)} * var(--spread-unit)) 0`
+          route.firstElementChild.style.translate = `calc(${(700 - pt.x).toFixed(2)} * var(--spread-unit)) 0`
+          // A phone: no route until the strip has carried the About card into the left 40% of the view,
+          // and no nib over the card's links.
+          const phone = portrait()
+          const lineOn = !phone || cardRight + gsap.getProperty(el, 'x') < 0.4 * innerWidth
+          if (svg) svg.style.visibility = lineOn ? '' : 'hidden'
+          nib.style.opacity = lineOn && (!phone || pt.x * unit > cardRight) && k > 0.002 && k < 0.998 ? nibOut : 0
         },
       })
 
-      // Title letters assemble from scattered paper scraps as the page takes over from the light.
-      gsap.from('.title-letter', {
-        x: () => gsap.utils.random(-160, 160),
-        y: () => gsap.utils.random(-140, 140),
-        rotation: () => gsap.utils.random(-50, 50),
+      // While One rises, hold its sticky in the viewport (it would only stick at 'top top'), so spread 0
+      // arrives in its final composition. The sticky, not the strip: the sticky's overflow would clip a
+      // translated strip.
+      gsap.fromTo(sticky, { y: () => -innerHeight }, { y: 0, ease: 'none', scrollTrigger: { trigger: section, start: 'top bottom', end: 'top top', scrub: true, invalidateOnRefresh: true } })
+
+      // Title letters drop into place as the gate opens (onStore). Timed, not scrubbed, and never moved
+      // sideways, so no frame a reader stops on shows the letters out of order.
+      letters = gsap.from('.title-letter', {
+        yPercent: 60,
+        rotation: () => gsap.utils.random(-12, 12),
         opacity: 0,
+        duration: 0.55,
         ease: 'expo.out',
-        stagger: { each: 0.02, from: 'random' },
-        // Done by the time the page is three-quarters up, so a reader who stops mid-seam reads the title whole.
-        scrollTrigger: { trigger: section, start: 'top 85%', end: 'top 40%', scrub: 0.8 },
+        stagger: 0.03,
+        paused: true,
       })
 
       spreadEls.forEach((spread, i) => {
@@ -314,7 +349,8 @@ export default function ChapterOne({ spreads = SPREADS }) {
         const onEnter = () => decodeAll(spreadEls[i + 1])
         const tl = gsap.timeline({
           scrollTrigger: i === 0
-            ? { trigger: section, start: 'top 70%', end: 'top top', scrub: 0.8, onEnter }
+            // Prologue ~.83 to ~.93: the notes are written by ~.9 and the About card is whole before One sticks.
+            ? { trigger: section, start: 'top 80%', end: 'top 55%', scrub: 0.8, onEnter }
             : { trigger: spread, containerAnimation: move, start: 'left 88%', end: 'left 20%', scrub: 0.8, onEnter },
         })
         // The sheet is laid down first, from its own edge, like a hand sliding a page into the book.
@@ -369,6 +405,15 @@ export default function ChapterOne({ spreads = SPREADS }) {
           })
         })
       })
+      // The outro leaves before One's bottom edge carries it up under the header: the photo and card
+      // first, then the closing line, the last stop and the route's tail.
+      const outro = spreadEls[spreadEls.length - 1]
+      // fromTo: the entrance timeline also owns these opacities, so a recorded start value could be its 0.
+      const leave = (targets, end, onUpdate) => gsap.fromTo(targets, { opacity: 1 }, { opacity: 0, ease: 'none', immediateRender: false, scrollTrigger: { trigger: section, start: 'bottom bottom', end, scrub: true, onUpdate } })
+      leave(outro.querySelectorAll(':scope > figure.piece, :scope > .notecard'), 'bottom 90%') // 90 not 88: the photo's rotated box tops out at ~183px
+      // The spread itself, not the closing line: the line's entrance (scrubbing behind a fast scroll, via
+      // move) can write its opacity back to 1 after this leave has finished, stranding it under the header.
+      leave([outro, [...el.querySelectorAll('.route-stop')].at(-1), route].filter(Boolean), 'bottom 74%', self => (nibOut = 1 - self.progress))
       gsap.from(el.querySelectorAll('[data-in="stop"]'), {
         scale: 0,
         stagger: 0.2,
@@ -376,8 +421,10 @@ export default function ChapterOne({ spreads = SPREADS }) {
         scrollTrigger: { trigger: section, start: 'top top', end: 'bottom bottom', scrub: 0.7 },
       })
     }, ref)
+    onStore('prologue', store.prologue) // the store only reports changes
     return () => {
       store.listeners.delete(onStore)
+      sticky.style.opacity = sticky.style.visibility = ''
       ctx.revert()
     }
   }, [])
@@ -385,15 +432,15 @@ export default function ChapterOne({ spreads = SPREADS }) {
   // Reduced motion: no sideways travel — the spreads simply stack and scroll like pages.
   const still = reducedMotion()
   return (
-    <section ref={ref} id="one" aria-labelledby="one-title" className="paper relative z-20" style={{ height: still ? 'auto' : 'var(--one-height)', marginTop: still ? 0 : 'calc(-1 * var(--one-overlap))' }}>
-      <PixelFringe edge="bottom" />
+    <section ref={ref} id="one" aria-labelledby="one-title" className="relative isolate z-20 text-ink" style={{ height: still ? 'auto' : 'var(--one-height)', marginTop: still ? 0 : 'calc(-1 * var(--one-overlap))' }}>
+      <div aria-hidden="true" className="one-ground paper pointer-events-none absolute inset-x-0 -top-[24svh] -bottom-[24svh] -z-10" />
       <div className={still ? 'relative' : 'sticky top-0 h-svh overflow-hidden'}>
         <div ref={strip} className={`strip relative flex ${still ? 'flex-col' : 'h-full'}`}>
           {spreads.map((s, i) => (
             <div key={s.id} className={`spread relative shrink-0 ${still ? 'h-svh' : 'h-full'}`} aria-label={s.label}>
               {s.sheet && <Sheet sheet={s.sheet} seed={i + 1} />}
               {i === 0 && (
-                <div className="absolute top-[18%] left-[max(16px,7%)] max-w-[60%]">
+                <div className="absolute top-[18%] left-[max(16px,calc(7*var(--strip-unit)))] max-w-[calc(60*var(--strip-unit))]">
                   <p className="poster text-stamp" style={{ '--s': 4.2 }}>Chapter One</p>
                   <h2 id="one-title" className="mt-4 font-display text-[calc(var(--strip-unit)*8.6)] leading-[0.88] tracking-[-0.02em] text-ink" aria-label={TITLE}>
                     {/* Letters fly in individually, but each word stays unbroken across lines. */}

@@ -43,9 +43,9 @@ const SoundIcon = ({ on }) => (
 /**
  * The book's chrome: a running head (name · current chapter · contents) and a page counter.
  * Every item sits on a small pill, like the corner readouts: blend modes went grey or vanished over the
- * bright worlds. Dark over the films (0.72 keeps white at 4.5:1), cream over paper, so it never fights the page.
+ * bright worlds. Dark over the films, cream over paper, so it never fights the page; the swap crossfades.
  */
-const DARK = 'bg-[rgb(10_10_14/0.72)] text-white'
+const DARK = 'bg-[rgb(10_10_14/0.92)] text-white' // near opaque, so lit geometry never shows through
 const CREAM = 'bg-[rgb(239_232_218/0.88)] text-ink ring-1 ring-ink/15'
 export default function Book() {
   const [label, setLabel] = useState('Prologue · Lights down')
@@ -55,7 +55,8 @@ export default function Book() {
   const page = useRef(null)
   const dialog = useRef(null)
   // Paper: a paper chapter covers the screen (store.night), or Chapter Three's paper-coloured world is up.
-  const PILL = `rounded-sm px-2 whitespace-nowrap backdrop-blur-sm md:px-3 ${!night || label.startsWith('Chapter Three') ? CREAM : DARK}` // px-2 on phones: the four pills fit 390 px on one line
+  const paper = !night || label.startsWith('Chapter Three')
+  const PILL = `rounded-sm px-2 whitespace-nowrap backdrop-blur-sm transition-[background-color,color,box-shadow] duration-200 md:px-3 ${paper ? CREAM : DARK}` // px-2 on phones: the four pills fit 390 px on one line
   const TAP = `inline-flex items-center min-h-11 ${PILL}` // 44 px tap target
 
   useEffect(() => {
@@ -72,7 +73,12 @@ export default function Book() {
       raf = requestAnimationFrame(tick)
     }
     raf = requestAnimationFrame(tick)
+    // The folio steps aside for the colophon, so it never sits on its text.
+    const io = new IntersectionObserver(([e]) => page.current?.classList.toggle('invisible', e.isIntersecting))
+    const colophon = document.querySelector('footer[aria-label="Colophon"]')
+    if (colophon) io.observe(colophon)
     return () => {
+      io.disconnect()
       store.listeners.delete(fn)
       cancelAnimationFrame(raf)
     }
@@ -80,6 +86,8 @@ export default function Book() {
 
   return (
     <>
+      {/* Over the night worlds, the screen's lit top rail fades out under the header band. */}
+      <div aria-hidden="true" className={`pointer-events-none fixed inset-x-0 top-0 z-[49] h-[104px] bg-gradient-to-b from-[rgb(3_5_11/0.9)] via-[rgb(3_5_11/0.55)] to-transparent transition-opacity duration-200 md:h-[120px] ${paper ? 'opacity-0' : 'opacity-100'}`} />
       <header className="pointer-events-none fixed inset-x-0 top-0 z-50 flex items-start justify-between p-5 md:p-7">
         <a href="#prologue" className={`kicker pointer-events-auto ${TAP}`}>Tejas Govind</a>
         <p className={`kicker hidden min-h-11 items-center md:inline-flex ${PILL}`}>{label}</p>
@@ -117,11 +125,12 @@ export default function Book() {
           <ol className="mt-8 space-y-1">
             {CONTENTS.map(c => (
               <li key={c.id}>
-                <button type="button" onClick={() => goToId(c.id)} className="group flex w-full items-baseline gap-4 py-2 text-left">
+                {/* Under 480px the subtitle stacks under the title instead of squeezing the leader to a stub. */}
+                <button type="button" onClick={() => goToId(c.id)} className="group flex w-full flex-wrap items-baseline gap-x-4 py-2 text-left min-[480px]:flex-nowrap">
                   <span className="kicker w-8 opacity-60">{c.n}</span>
-                  <span className="font-display text-2xl group-hover:italic">{c.title}</span>
-                  <span className="mx-2 flex-1 border-b border-dotted border-ink/30" aria-hidden="true" />
-                  <span className="font-serif text-sm italic opacity-70">{c.sub}</span>
+                  <span className="font-display text-2xl whitespace-nowrap group-hover:italic">{c.title}</span>
+                  <span className="mx-2 hidden flex-1 border-b border-dotted border-ink/30 min-[480px]:block" aria-hidden="true" />
+                  <span className="block basis-full pl-12 font-serif text-sm italic opacity-70 min-[480px]:basis-auto min-[480px]:pl-0">{c.sub}</span>
                 </button>
                 {(c.id === 'two' || c.id === 'three') && (
                   <ul className="mb-2 ml-12">

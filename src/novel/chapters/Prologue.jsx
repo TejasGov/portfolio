@@ -24,7 +24,7 @@ const FACTS = ROLES.filter(r => ['Daiwa Capital Markets America', 'COA'].include
 export default function Prologue() {
   const ref = useRef(null)
   useProgress(ref, 'prologue')
-  useRunningHead(ref, 'Prologue · Lights down')
+  useRunningHead(ref, 'Prologue · Lights down', { end: 'bottom 143%' }) // = Chapter One's top at 75% (--one-overlap 68svh): its paper has the screen
   const bind = useBeats('prologue', BEATS)
   const phone = matchMedia('(max-width: 760px)').matches // read once: the camera is progress-driven, so only the length changes
 

@@ -91,6 +91,7 @@ export default function Stage() {
       const k = reduced() ? 0 : 0.06
       mouse.x += (store.mouse.x - mouse.x) * k
       mouse.y += (store.mouse.y - mouse.y) * k
+      view.still = reduced()
       const st = stateAt(view, mouse, innerWidth / innerHeight)
       // Make sure the reel being screened is loaded first.
       const sec = section(view)

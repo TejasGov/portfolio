@@ -1,5 +1,6 @@
-import { useLayoutEffect, useRef } from 'react'
-import { gsap } from '../lib/scroll'
+import { useEffect, useLayoutEffect, useRef } from 'react'
+import { ScrollTrigger } from '../lib/scroll'
+import { store } from '../lib/store'
 import { useBeats } from '../lib/Beats'
 import { useProgress, useRunningHead } from '../lib/chapters'
 import { CONTACT } from '../content'
@@ -12,10 +13,10 @@ const TITLE = [['Write to ', false], ['me.', true]]
  * Epilogue: the projector dims and the house lights come up over the hall (a second Blender bake,
  * crossfaded in cinema/world.js). Contact details, then the colophon with every credit.
  */
-const BEATS = [
-  { at: [0.03, 0.24], kind: 'line' },
-  { at: [0.32, 1.6], kind: 'contact' }, // after the lamp dip (timeline.js), as the screen turns to the address
-]
+// On one progress, epiIn (0..1) then 1 + epilogue (1..2): the card comes up during the arrival, just after
+// the screen lights "The End" (timeline.js), and holds until the colophon covers it.
+const BEATS = [{ at: [0.4, 2.6], edge: [0.03, 0.03], kind: 'contact' }]
+const epiAll = () => store.set('epiAll', store.epilogue > 0 ? 1 + store.epilogue : store.epiIn)
 const ext = { target: '_blank', rel: 'noreferrer' }
 
 export default function Epilogue() {
@@ -24,42 +25,54 @@ export default function Epilogue() {
   useProgress(ref, 'epilogue')
   useProgress(ref, 'epiIn', { start: 'top bottom', end: 'top top' })
   useRunningHead(whole, 'Epilogue · House lights', { start: 'top bottom' })
-  const bind = useBeats('epilogue', BEATS)
+  useEffect(() => {
+    epiAll()
+    const on = key => (key === 'epilogue' || key === 'epiIn') && epiAll()
+    store.listeners.add(on)
+    return () => store.listeners.delete(on)
+  }, [])
+  const bind = useBeats('epiAll', BEATS)
   const stage = useRef(null)
   const colophon = useRef(null)
-  // As the colophon rises, the contact card goes, so it never slides up under the header.
+  // As the colophon rises, the card wipes away from its lower edge, a little ahead of the colophon covering
+  // it: its button goes first, its address last, as the colophon's own contact row comes into view, so
+  // there is always one way to write on screen and never two buttons. A wipe, not a fade: a half-clear
+  // card would show the screen's title through it.
+  const card = useRef(null)
   useLayoutEffect(() => {
-    const t = gsap.to(stage.current, { opacity: 0, ease: 'none', scrollTrigger: { trigger: colophon.current, start: 'top bottom', end: 'top 70%', scrub: true } })
-    return () => { t.scrollTrigger?.kill(); t.kill() }
+    const st = ScrollTrigger.create({
+      trigger: colophon.current,
+      start: 'top bottom',
+      end: 'top 88%',
+      onUpdate: self => {
+        const cut = self.progress * (stage.current.offsetHeight - card.current.offsetTop)
+        stage.current.style.clipPath = cut ? `inset(-100px -100px ${cut.toFixed(1)}px -100px)` : ''
+      },
+    })
+    return () => st.kill()
   }, [])
 
   return (
     <div ref={whole}>
-      <section ref={ref} id="epilogue" aria-labelledby="epilogue-title" className="relative" style={{ height: '170svh' }}>
-        <div className="sticky top-0 h-svh">
-          <div ref={stage} className="absolute inset-0 grid px-6 md:px-[6vw]">
-            {/* Bottom-left, over the seats: the screen above is still showing "The End". */}
-            <div ref={bind(0)} className="pointer-events-none col-start-1 row-start-1 self-end pb-[11svh] opacity-0">
-              <p className="max-w-[18ch] font-display text-[clamp(2rem,3.6vw,3.4rem)] leading-[1] italic [text-shadow:0_4px_50px_rgb(3_5_11/0.95)]">
-                House lights up.
-              </p>
-            </div>
-            {/* Centred under the screen, low enough to leave the address on it clear; mb clears the phone's folio pill. */}
-            <div ref={bind(1)} className="beat-sharp col-start-1 row-start-1 mb-[52px] max-w-[40rem] self-end justify-self-center rounded-sm bg-[rgb(3_5_11/0.82)] p-5 text-center opacity-0 shadow-[0_30px_80px_rgb(0_0_0/0.5)] md:mb-[5svh] md:p-7">
-              <p className="kicker text-glow/80">Epilogue</p>
-              <Assemble as="h2" id="epilogue-title" parts={TITLE} className="mt-4 block font-display text-[clamp(2.2rem,4.5vw,3.6rem)] leading-[0.9] tracking-[-0.02em]" />
-              <a
-                href={`mailto:${CONTACT.email}`}
-                className="mt-5 inline-block border-b border-night-ink/40 pb-1 font-serif text-[clamp(1.2rem,5vw,1.9rem)] break-all transition-colors hover:border-glow hover:text-glow"
-              >
-                {CONTACT.email}
+      <section ref={ref} id="epilogue" aria-labelledby="epilogue-title" className="relative" style={{ height: '130svh' }}>
+        {/* Fixed, not sticky: the card stays put from the arrival on; the colophon (z-10, opaque) rises over it. */}
+        <div ref={stage} className="pointer-events-none fixed inset-0 z-[5] grid px-6 md:px-[6vw]">
+          {/* Under the screen, clear of its lower frame (compact on a phone, where the frame sits low); mb clears the folio pill. */}
+          <div ref={el => { bind(0)(el); card.current = el }} className="beat-sharp pointer-events-auto col-start-1 row-start-1 mb-[52px] max-w-[40rem] self-end justify-self-center rounded-sm bg-[rgb(10_12_18)] p-4 text-center opacity-0 shadow-[0_30px_80px_rgb(0_0_0/0.5)] md:mb-[3svh] md:max-w-[46rem] md:p-6">
+            <p className="kicker hidden text-glow/80 md:block">Epilogue</p>
+            <Assemble as="h2" id="epilogue-title" parts={TITLE} className="block font-display text-[clamp(1.9rem,4.5vw,3.6rem)] leading-[0.9] tracking-[-0.02em] md:mt-2" />
+            <a
+              href={`mailto:${CONTACT.email}`}
+              className="mt-2 inline-block border-b border-night-ink/40 pb-1 font-serif text-[clamp(1.2rem,5vw,1.9rem)] break-all transition-colors hover:border-glow hover:text-glow md:text-[1.7rem] md:leading-tight"
+            >
+              {CONTACT.email}
+            </a>
+            {/* On desktop the button and links share a row, so the card stays clear of the screen's lower frame. */}
+            <div className="mt-3 flex flex-col items-center md:flex-row md:flex-wrap md:justify-center md:gap-x-6">
+              <a href={`mailto:${CONTACT.email}`} className="inline-flex min-h-11 items-center bg-glow px-6 font-mono text-[13px] tracking-[0.18em] text-night uppercase hover:opacity-90">
+                Email me
               </a>
-              <div className="mt-5">
-                <a href={`mailto:${CONTACT.email}`} className="inline-flex min-h-11 items-center bg-glow px-6 font-mono text-[13px] tracking-[0.18em] text-night uppercase hover:opacity-90">
-                  Email me
-                </a>
-              </div>
-              <ul className="kicker mt-4 flex flex-wrap justify-center gap-x-7 text-[15px] text-night-ink/90">
+              <ul className="kicker mt-1 flex flex-wrap justify-center gap-x-6 text-[15px] text-night-ink/90 md:mt-0 md:gap-x-6">
                 {CONTACT.links.map(l => (
                   <li key={l.label}>
                     <a href={l.href} {...ext} className="inline-flex min-h-11 items-center underline-offset-4 hover:text-night-ink hover:underline">
@@ -73,8 +86,23 @@ export default function Epilogue() {
         </div>
       </section>
 
-      <footer ref={colophon} className="relative z-10 bg-night px-6 pt-[14svh] pb-[16svh] md:px-[6vw]" aria-label="Colophon">
-        <div className="mx-auto max-w-5xl border-t border-night-ink/15 pt-10">
+      <footer ref={colophon} className="relative z-10 bg-night px-6 pt-[6svh] pb-[16svh] md:px-[6vw]" aria-label="Colophon">
+        {/* High in the footer, so it is in full view before the card above goes, and held under the header to the last line. The address itself is the card's alone. */}
+        <div className="sticky top-[72px] z-10 mx-auto flex max-w-5xl flex-wrap items-center gap-x-7 gap-y-2 bg-night py-2 md:top-[84px]">
+          <a href={`mailto:${CONTACT.email}`} className="inline-flex min-h-11 items-center bg-glow px-6 font-mono text-[13px] tracking-[0.18em] text-night uppercase hover:opacity-90">
+            Email me
+          </a>
+          <ul className="kicker flex flex-wrap gap-x-7 text-[15px] text-night-ink/90">
+            {CONTACT.links.map(l => (
+              <li key={l.label}>
+                <a href={l.href} {...ext} className="inline-flex min-h-11 items-center underline-offset-4 hover:text-night-ink hover:underline">
+                  {l.label} ↗
+                </a>
+              </li>
+            ))}
+          </ul>
+        </div>
+        <div className="mx-auto mt-[8svh] max-w-5xl border-t border-night-ink/15 pt-10">
           <h2 className="font-display text-4xl italic">Colophon</h2>
           <p className="mt-4 max-w-[62ch] font-serif text-base leading-relaxed text-night-ink/65">
             Set in Instrument Serif, Newsreader, Geist Mono, Anton and Caveat. The cinema was modelled and light-baked in Blender, with

@@ -5,8 +5,7 @@ import { Pass } from 'postprocessing'
  * The world as an ink drawing on the book's paper, and the wave that turns it back into the lit world.
  * One pass at the end of the chain, from depth alone:
  *   ink lines  - the Laplacian of linear depth (silhouettes and creases), wobbled by noise like a pen
- *   hatching   - diagonal strokes where a surface turns away from an upper-left key light, crossed in
- *                the deepest shade
+ *   hatching   - one direction of diagonal strokes where a surface turns away from an upper-left key light
  *   paper      - the site's paper colour with a little fibre, so the drawing meets the paper chapters
  *                with no cut
  * The wave is in world space: a wavy sphere growing from `origin` (or a plane along `dir`). Behind its
@@ -25,8 +24,8 @@ uniform sampler2D inputBuffer; uniform highp sampler2D depthBuffer; uniform high
 uniform mat4 uInvProj; uniform mat4 uCamWorld; uniform vec2 uTexel; uniform float uTime;
 uniform vec3 uOrigin; uniform float uR; uniform float uBand; uniform float uColorBehind;
 uniform float uPlane; uniform vec3 uDir; uniform float uLines;
-uniform vec3 uTint; uniform vec3 uTint2; uniform float uAuto; uniform float uGrid; uniform float uShimmer;
-uniform vec3 uPaper; uniform vec3 uInk; uniform vec3 uKey; uniform float uScale;
+uniform vec3 uTint; uniform vec3 uTint2; uniform float uAuto; uniform float uGrid; uniform float uShimmer; uniform float uRaw;
+uniform vec3 uPaper; uniform vec3 uInk; uniform vec3 uKey; uniform float uScale; uniform float uDpr;
 varying vec2 vUv;
 
 vec3 viewAt(vec2 uv) {
@@ -72,12 +71,11 @@ void main() {
   float lit = max(dot(nw, normalize(uKey)), 0.0);
   float shade = far ? 0.0 : 1.0 - lit;
   float hw = (noise3(vec3(px * 0.003, 1.3)) - 0.5) * 0.8;
-  // A light single hatch on turned-away walls; the cross-hatch only in the deepest shade, so flat walls never moire.
-  float h1 = hatch(px, 0.79, 7.0 * uScale, smoothstep(0.68, 1.0, shade) * 0.6, hw) * smoothstep(0.68, 0.8, shade);
-  float h2 = hatch(px, -0.62, 9.0 * uScale, smoothstep(0.9, 1.0, shade) * 0.5, hw * 1.3) * smoothstep(0.9, 0.97, shade);
+  // One light diagonal hatch on turned-away walls, never under 10 CSS px apart: a second direction aliased into a checker grid.
+  float h1 = hatch(px, 0.79, max(10.0 * uDpr, 7.0 * uScale), smoothstep(0.68, 1.0, shade) * 0.6, hw) * smoothstep(0.68, 0.8, shade);
   // Fade the strokes with distance, as an illustrator would leave the back of the room loose.
   float dist = smoothstep(60.0, 8.0, zc);
-  float ink = clamp(line + (h1 * 0.45 + h2 * 0.35) * dist, 0.0, 1.0) * uLines; // uLines fades the drawing on and off the page
+  float ink = clamp(line + h1 * 0.35 * dist, 0.0, 1.0) * uLines; // uLines fades the drawing on and off the page
   float fibre = noise3(vec3(px * 0.35, 2.1)) * 0.06 + noise3(vec3(px * 0.03, 4.0)) * 0.05;
   vec3 paper = uPaper * (0.97 + fibre - 0.04);
   vec3 drawing = mix(paper, uInk, ink * 0.88);
@@ -104,6 +102,8 @@ void main() {
     vec2 off = grad / max(length(grad), 1e-5) * uTexel * (3.5 * uScale) * near * sin(d * 6.0 - uTime * 3.0);
     world_col = texture2D(inputBuffer, vUv + off).rgb;
   }
+  // uRaw: undo the output encode below for the world, so its colour matches the untouched path (uR > 1e4) exactly.
+  if (uRaw > 0.5) world_col = sRGBTransferEOTF(vec4(world_col, 1.0)).rgb;
   // The crest's colour: the seam's own tint, two-toned along the front, or (uAuto) the hue of the world it reveals.
   vec3 hue = world_col / max(max(world_col.r, max(world_col.g, world_col.b)), 1e-3);
   vec3 tint = mix(uTint, uTint2, 0.5 + 0.5 * sin(world.y * 1.3 + world.x * 0.2 + uTime * 0.8));
@@ -142,8 +142,8 @@ export class SketchPass extends Pass {
         inputBuffer: { value: null }, depthBuffer: { value: null }, tNoise: { value: noise },
         uInvProj: { value: new THREE.Matrix4() }, uCamWorld: { value: new THREE.Matrix4() }, uTexel: { value: new THREE.Vector2() },
         uTime: { value: 0 }, uOrigin: { value: new THREE.Vector3() }, uR: { value: 1e5 }, uBand: { value: 1.2 }, uColorBehind: { value: 1 }, uPlane: { value: 0 }, uDir: { value: new THREE.Vector3(1, 0, 0) }, uLines: { value: 1 },
-        uTint: { value: new THREE.Color() }, uTint2: { value: new THREE.Color() }, uAuto: { value: 1 }, uGrid: { value: 0.4 }, uShimmer: { value: 0.8 },
-        uPaper: { value: lin('#efe8da') }, uInk: { value: lin('#1d1913') }, uKey: { value: new THREE.Vector3(-0.5, 0.8, -0.4) }, uScale: { value: 1 },
+        uTint: { value: new THREE.Color() }, uTint2: { value: new THREE.Color() }, uAuto: { value: 1 }, uGrid: { value: 0.4 }, uShimmer: { value: 0.8 }, uRaw: { value: 0 },
+        uPaper: { value: lin('#efe8da') }, uInk: { value: lin('#1d1913') }, uKey: { value: new THREE.Vector3(-0.5, 0.8, -0.4) }, uScale: { value: 1 }, uDpr: { value: 1 },
       },
       vertexShader: VERT,
       fragmentShader: FRAG,
