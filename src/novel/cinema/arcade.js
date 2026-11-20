@@ -489,7 +489,7 @@ export function createArcade(renderer, { loader, normalize, mobile = false }) {
   const danceLight = new THREE.PointLight('#ff7ad9', 0, 6, 1.4)
   scene.add(danceLight)
 
-  const camera = new THREE.PerspectiveCamera(42, 1, 0.1, 700)
+  const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 700) // the hall's own lens, so leaving through the screen doesn't jump
   const look = new THREE.Vector3(), cam = new THREE.Vector3(), dreamCam = new THREE.Vector3(), dreamLook = new THREE.Vector3()
   let lastT = null, cue = ''
 

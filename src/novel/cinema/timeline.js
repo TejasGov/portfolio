@@ -136,12 +136,21 @@ export function stateAt(s, mouse, aspect) {
     st.sketch = { follow: true, dir: ALONG, r, band: 1.0, ink: ss(0, 0.02, p) * (1 - ss(0.985, 0.999, p)), grid: 0.3, shimmer: 0.6 }
   } else if (sec === 'four') {
     // Press Start: drawn onto the page around you and blooming into the neon coast; the wave to the
-    // block world is the chapter's own (arcade.js); at the end the drawing lifts off for the epilogue.
+    // block world is the chapter's own (arcade.js). It ends as a film does: the game is on the cinema's
+    // screen, and the camera backs out of it to your seat in the hall, where the epilogue begins.
     const p = s.four
     st.arcade = { p }
     const bloom = ss(0.012, 0.07, p)
     if (bloom < 1) st.sketch = { follow: true, r: -4 + bloom * 70, origin: SCREEN, band: 1.4, ink: ss(0, 0.012, p), ...NEON }
-    else if (p > 0.955) st.sketch = { follow: true, r: 70 - ss(0.955, 0.985, p) * 74, origin: SCREEN, band: 1.4, ink: 1 - ss(0.985, 0.999, p), tint: '#8fe3ff', tint2: '#ffffff', grid: 0.8, shimmer: 1 }
+    else if (p > 0.93) {
+      const back = ss(0.93, 0.995, p)
+      st.arcade.onScreen = true
+      st.arcade.back = back
+      inPos.copy(SCREEN).setZ(SCREEN.z - insideDistance(st.fov, aspect)) // where the screen exactly fills the frame
+      out.pos.copy(inPos).lerp(EPI_POS.getPoint(0), back)
+      out.target.copy(SCREEN).lerp(EPI_LOOK.getPoint(0), back)
+      Object.assign(st, { focus: 15, exposure: 3, lamp: 1.6, density: 0.08 * back, dust: 0.05 * back })
+    }
   } else {
     const e = s.epilogue
     const u = ss(0.05, 0.85, e)
@@ -153,9 +162,10 @@ export function stateAt(s, mouse, aspect) {
     st.dust = 0.3
     st.density = 0.2 // a thinner beam than the prologue's, so "The End" reads through it
     st.card = { key: 'end', kicker: 'Thank you for watching', title: 'The End' }
-    // Arriving from Chapter Three's paper: the hall in ink, then colour from the screen.
-    const bloom = ss(0, 0.1, e)
-    if (bloom < 1) st.sketch = { r: -4 + bloom * (HALL_REACH + 4), origin: SCREEN, band: 1.6, ink: ss(0, 0.6, s.epiIn), ...PROJECTOR }
+    // Arriving from Chapter Four's back-out: the game is still on the screen; it fades out as the
+    // epilogue rises, and "The End" comes up behind it.
+    const fade = 1 - ss(0.2, 0.8, s.epiIn)
+    if (fade > 0) st.arcade = { p: 1, onScreen: true, show: fade }
   }
 
   // A hand on the camera: gentle parallax from the pointer.

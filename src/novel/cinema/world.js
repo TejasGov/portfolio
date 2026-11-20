@@ -8,7 +8,7 @@ import {
   VignetteEffect, ToneMappingEffect, ToneMappingMode, BlendFunction,
 } from 'postprocessing'
 import { noiseVolume, beamFrame, VolumetricPass, makeDust, glowTexture } from './core'
-import { createFilm } from './film'
+import { createFilm, FILM_ASPECT } from './film'
 import { createJourney } from './journey'
 import { createArcade } from './arcade'
 import { SketchPass } from './sketch'
@@ -316,6 +316,12 @@ export async function createCinema(canvas, { mobile = false, onProgress } = {}) 
     }).finally(() => { compiling = null })
   }
   const scratch = new THREE.WebGLRenderTarget(64, 64)
+  let gameRT = null
+  const showOnScreen = tex => {
+    if (filmScreen.material.map === tex) return
+    filmScreen.material.map = tex
+    filmScreen.material.needsUpdate = true
+  }
   const filmScreen = new THREE.Mesh(
     new THREE.PlaneGeometry(SCREEN_W, SCREEN_H),
     new THREE.MeshBasicMaterial({ fog: false }), // opaque: the film's additive light piles alpha past 1
@@ -475,7 +481,9 @@ export async function createCinema(canvas, { mobile = false, onProgress } = {}) 
 
     // Chapter Three's journey is its own world, drawn instead of the hall.
     const jy = state.journey ? worlds.journey() : state.arcade ? worlds.arcade() : null
-    const res = jy ? jy.update(state.journey ?? state.arcade, t, camera.aspect) : null
+    // Chapter Four ends on the cinema's screen: the game plays there, framed for it, while the hall is drawn.
+    const onScreen = !!state.arcade?.onScreen
+    const res = jy ? jy.update(state.journey ?? state.arcade, t, onScreen ? FILM_ASPECT : camera.aspect) : null
     const walker = res?.here ?? null
     // The film: on the screen from the seats, or the whole frame once the camera is inside it.
     const f = jy ? null : state.film
@@ -485,20 +493,36 @@ export async function createCinema(canvas, { mobile = false, onProgress } = {}) 
       f.portrait = camera.aspect < 0.85
       getFilm().update(f, t)
       filmScreen.material.color.setScalar(f.show ?? 1)
+      showOnScreen(film.rt.texture)
       if (inFilm) film.cropFor(camera.aspect, renderer.getDrawingBufferSize(drawSize).y)
       else film.renderToTexture()
     }
-    const away = jy ?? (inFilm ? film : null) // a world other than the hall fills the frame
+    if (onScreen) {
+      gameRT ??= new THREE.WebGLRenderTarget(mobile ? 1152 : 2048, Math.round((mobile ? 1152 : 2048) / FILM_ASPECT), { type: THREE.HalfFloatType, samples: mobile ? 0 : 4 })
+      const prev = renderer.getRenderTarget()
+      renderer.setRenderTarget(gameRT)
+      renderer.clear()
+      renderer.render(jy.scene, jy.camera)
+      renderer.setRenderTarget(prev)
+      showOnScreen(gameRT.texture)
+      filmScreen.visible = (state.arcade.show ?? 1) > 0.001
+      filmScreen.material.color.setScalar(state.arcade.show ?? 1)
+    }
+    const away = onScreen ? null : jy ?? (inFilm ? film : null) // a world other than the hall fills the frame
     renderPass.mainScene = away ? away.scene : scene
     renderPass.mainCamera = away ? away.camera : camera
     vol.enabled = !away
-    vignette.darkness = away ? 0.42 : 0.72 // a film is graded on its own; the hall's heavy vignette would muddy it
+    // Backing out of the screen at the end of Chapter Four, the game's own grade gives way to the hall's
+    // as the hall comes into view (k: 0 inside the screen, 1 at the seats), so nothing jumps at the cut.
+    const k = onScreen ? state.arcade.back ?? 1 : 1
+    vignette.darkness = away ? 0.42 : THREE.MathUtils.lerp(0.42, 0.72, k) // a film is graded on its own; the hall's heavy vignette would muddy it
     // The films and the journey are bright, painted daylight: bloom only their true highlights and keep
     // their colour (Neutral); the dark hall keeps AgX, which holds the lamp's flood gracefully.
-    const mode = away ? ToneMappingMode.NEUTRAL : ToneMappingMode.AGX
+    const mode = away || onScreen ? ToneMappingMode.NEUTRAL : ToneMappingMode.AGX
     if (toneMap.mode !== mode) toneMap.mode = mode
-    bloom.luminanceMaterial.threshold = away ? 0.95 : 0.32
+    bloom.luminanceMaterial.threshold = away ? 0.95 : THREE.MathUtils.lerp(0.95, 0.32, k)
     if (away) bloom.intensity = 0.55 + (res?.dream ?? 0) * 0.9 // the arcade dance blooms softer and wider
+    else if (onScreen) bloom.intensity = THREE.MathUtils.lerp(0.55, bloom.intensity, k)
     // The seams: the world as an ink drawing on the book's paper, and the wave between the two.
     const sk = state.sketch
     const su = sketch.uniforms
