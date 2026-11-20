@@ -78,7 +78,7 @@ The first film sandbox (point clouds) and the burn/ring seams were rejected. Tej
   - `yudhveer.js`: duel with your shadow.
   - `commitcity.js`: the contribution graph rising into a city.
 - [x] The old solid models, screenshot stills and point clouds are removed from the world.
-- [ ] Chapter Three: the traveller's journey.
-- [ ] Hall rebuild with Poly Haven materials, then rebake.
-- [ ] Compress the GLBs through Blender (Draco + WebP); `npx gltf-transform` is blocked here.
-- [ ] Final verification on desktop and phone.
+- [x] Chapter Three: the traveller's journey (`cinema/journey.js`, six Meshy dioramas, `JOURNEY` in content.js).
+- [x] Hall rebuilt and rebaked at 4K: sconce scallops, proscenium cove, footlights, detail textures, star ceiling.
+- [x] GLBs compressed through Blender (`scripts/cinema/compress.py`).
+- [x] Desktop and phone frames checked in the test browser. A real phone, Safari and a laptop GPU are still to check.
