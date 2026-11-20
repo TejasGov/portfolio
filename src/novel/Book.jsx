@@ -4,7 +4,7 @@ import { sound } from './lib/sound'
 
 export const CONTENTS = [
   { id: 'prologue', n: '—', title: 'Prologue', sub: 'Lights down' },
-  { id: 'one', n: 'I', title: 'Chai, Cricket & Cinema', sub: 'A flashback to Prayagraj' },
+  { id: 'one', n: 'I', title: 'About me', sub: 'Who I am, where I’m from' },
   { id: 'two', n: 'II', title: 'Now Showing', sub: 'Five projects' },
   { id: 'three', n: 'III', title: 'Places I Worked', sub: 'Prayagraj to New York' },
   { id: 'four', n: 'IV', title: 'Press Start', sub: 'An ode to games' },

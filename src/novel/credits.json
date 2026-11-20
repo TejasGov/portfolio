@@ -198,5 +198,37 @@
     "license": "CC BY 3.0",
     "page": "https://commons.wikimedia.org/wiki/File:PVR_Cinemas.jpg",
     "edit": "resized, torn-paper edge"
+  },
+  {
+    "file": "cathedral",
+    "title": "All Saints Cathedral, Prayagraj, Uttar Pradesh, India (2018)553.jpg",
+    "author": "Ar.anujgupta",
+    "license": "CC BY-SA 4.0",
+    "page": "https://commons.wikimedia.org/wiki/File:All_Saints_Cathedral,_Prayagraj,_Uttar_Pradesh,_India_(2018)553.jpg",
+    "edit": "resized"
+  },
+  {
+    "file": "khusro-bagh",
+    "title": "Tomb of Nisar Begum at Khusro Bagh Allahabad.jpg",
+    "author": "सत्यम् मिश्र",
+    "license": "CC BY-SA 4.0",
+    "page": "https://commons.wikimedia.org/wiki/File:Tomb_of_Nisar_Begum_at_Khusro_Bagh_Allahabad.jpg",
+    "edit": "resized"
+  },
+  {
+    "file": "muir-college",
+    "title": "Muir Central College, Allahabad.jpg",
+    "author": "TuckDB Postcards",
+    "license": "CC BY 4.0",
+    "page": "https://commons.wikimedia.org/wiki/File:Muir_Central_College,_Allahabad.jpg",
+    "edit": "resized"
+  },
+  {
+    "file": "thornhill",
+    "title": "Thornhill Mayne Memorial, Alfred Park, Allahabad.jpg",
+    "author": "Dananuj",
+    "license": "CC BY-SA 3.0",
+    "page": "https://commons.wikimedia.org/wiki/File:Thornhill_Mayne_Memorial,_Alfred_Park,_Allahabad.jpg",
+    "edit": "resized"
   }
 ]

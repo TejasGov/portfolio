@@ -3,6 +3,8 @@ import PixelFringe from '../lib/PixelFringe'
 import { usePaper, useRunningHead } from '../lib/chapters'
 import { gsap, reducedMotion } from '../lib/scroll'
 import { SPREADS, src } from './collage'
+import { ALL_ROLES, CONTACT } from '../content'
+import { SUMMARY } from '@/data/aboutData'
 
 /* ------------------------------------------------------------- doodles */
 
@@ -39,6 +41,42 @@ const Whoosh = () => (
     <path d="M8 70 H 110" />
   </svg>
 )
+
+/* ------------------------------------------------------------ about me */
+
+// What a visitor should know first. Every line comes from Tejas's own data: his summary (the 2023
+// site's), his current main roles, his links.
+const NOW = ['Daiwa Capitals Market America', 'COA']
+const HIS_LINE = SUMMARY.slice(SUMMARY.indexOf('The kind of person'))
+const link = label => CONTACT.links.find(l => l.label === label)?.href
+
+function AboutCard({ style }) {
+  const now = NOW.map(org => ALL_ROLES.find(r => r.org === org)).filter(Boolean)
+  return (
+    <div className="piece about" data-in="about" style={style}>
+      <figure className="about-photo">
+        <img src={src('tejas-t')} alt="Tejas Govind" draggable="false" />
+        <span className="tape" style={{ left: '50%', top: '-3%', rotate: '-4deg' }} />
+      </figure>
+      <div className="about-body">
+        <p className="about-name" data-line>Tejas Govind</p>
+        <ul className="about-facts">
+          <li data-line><span className="kicker">Studying</span> Computer Science, University at Buffalo · class of 2027</li>
+          {now.map(r => (
+            <li key={r.org} data-line><span className="kicker">Now</span> {r.role}, {r.org} · {r.place}</li>
+          ))}
+          <li data-line><span className="kicker">From</span> Prayagraj, India</li>
+        </ul>
+        <p className="about-line" data-line>“{HIS_LINE}”</p>
+        <p className="about-links" data-line>
+          <a href={`mailto:${CONTACT.email}`}>Email</a>
+          <a href={link('GitHub')} target="_blank" rel="noreferrer">GitHub ↗</a>
+          <a href={link('LinkedIn')} target="_blank" rel="noreferrer">LinkedIn ↗</a>
+        </p>
+      </div>
+    </div>
+  )
+}
 
 /* -------------------------------------------------------------- pieces */
 
@@ -116,6 +154,8 @@ function Piece({ it }) {
           ))}
         </div>
       )
+    case 'about':
+      return <AboutCard style={style} />
     case 'card':
       return (
         <div className="piece notecard" data-in="img" style={style}>
@@ -148,10 +188,10 @@ function torn(seed, n = 36, j = 1.4) {
   return `polygon(${pts.map(([x, y]) => `${x.toFixed(2)}% ${y.toFixed(2)}%`).join(',')})`
 }
 function Sheet({ sheet, seed }) {
-  const { color, x, y, w, h, r = 0, from = 'left' } = sheet
+  const { color, x, y, w, h, r = 0, from = 'left', grid = false } = sheet
   return (
     <div className="sheet" data-from={from} style={{ left: `${x}%`, top: `${y}%`, width: `${w}%`, height: `${h}%`, rotate: `${r}deg` }} aria-hidden="true">
-      <div className="sheet-paper" style={{ backgroundColor: color, clipPath: torn(seed) }} />
+      <div className={`sheet-paper${grid ? ' sheet-grid' : ''}`} style={{ backgroundColor: color, clipPath: torn(seed) }} />
     </div>
   )
 }
@@ -160,15 +200,15 @@ function Sheet({ sheet, seed }) {
 
 // A hand-drawn route through all six spreads, in (vw within the strip, % of height).
 const ROUTE =
-  'M 30 93 C 60 97, 80 72, 104 85 S 140 97, 160 83 S 196 62, 214 89 S 250 97, 270 81 S 300 60, 318 87 S 360 97, 380 75 S 420 62, 436 89 S 480 97, 500 88 S 512 76, 514 70'
-const STOPS = [[104, 85, 'Prayagraj'], [214, 89, 'Chai'], [318, 87, 'Cricket'], [436, 89, 'Cinema'], [514, 70, 'Then']]
+  'M 30 93 C 60 97, 80 72, 104 85 S 140 97, 160 83 S 196 62, 214 89 S 240 97, 260 83 S 296 62, 314 89 S 350 97, 370 81 S 400 60, 418 87 S 460 97, 480 75 S 520 62, 536 89 S 580 97, 600 88 S 612 76, 614 70'
+const STOPS = [[104, 85, 'Prayagraj'], [214, 89, 'Architecture'], [314, 89, 'Chai'], [418, 87, 'Cricket'], [536, 89, 'Cinema'], [614, 70, 'Then']]
 
 function Route() {
   return (
     <>
-      <svg className="route" viewBox="0 0 600 100" preserveAspectRatio="none" aria-hidden="true">
+      <svg className="route" viewBox="0 0 700 100" preserveAspectRatio="none" aria-hidden="true">
         <defs>
-          <mask id="route-reveal" maskUnits="userSpaceOnUse" x="0" y="0" width="600" height="100">
+          <mask id="route-reveal" maskUnits="userSpaceOnUse" x="0" y="0" width="700" height="100">
             <path className="route-mask" d={ROUTE} pathLength="1" />
           </mask>
         </defs>
@@ -189,13 +229,13 @@ function Route() {
 
 /* ------------------------------------------------------------- chapter */
 
-const TITLE = 'Chai, Cricket & Cinema'
+const TITLE = 'About me'
 
 export default function ChapterOne({ spreads = SPREADS }) {
   const ref = useRef(null)
   const strip = useRef(null)
   usePaper(ref)
-  useRunningHead(ref, 'Chapter One · Chai, Cricket & Cinema')
+  useRunningHead(ref, 'Chapter One · About me')
 
   useLayoutEffect(() => {
     if (reducedMotion()) return undefined
@@ -266,12 +306,16 @@ export default function ChapterOne({ spreads = SPREADS }) {
           } else if (kind === 'poster' && it.dataset.fx) {
             const letters = it.querySelectorAll('.pl')
             const fx = it.dataset.fx
-            if (fx === 'stamp') tl.from(letters, { y: -140, scale: 1.7, rotation: () => gsap.utils.random(-24, 24), opacity: 0, duration: 0.35, ease: 'back.out(2.4)', stagger: 0.08 }, at)
+            if (fx === 'build') tl.from(letters, { yPercent: 70, scaleY: 0.2, transformOrigin: '50% 100%', opacity: 0, duration: 0.45, ease: 'power4.out', stagger: 0.07 }, at)
+            else if (fx === 'stamp') tl.from(letters, { y: -140, scale: 1.7, rotation: () => gsap.utils.random(-24, 24), opacity: 0, duration: 0.35, ease: 'back.out(2.4)', stagger: 0.08 }, at)
             else if (fx === 'steam') tl.from(letters, { y: 90, x: () => gsap.utils.random(-30, 30), opacity: 0, filter: 'blur(8px)', duration: 0.6, ease: 'sine.out', stagger: 0.1 }, at)
             else if (fx === 'bounce') tl.from(letters, { y: -260, opacity: 0, duration: 0.6, ease: 'bounce.out', stagger: 0.06 }, at)
             else tl.from(letters, { opacity: 0, duration: 0.3, ease: 'steps(4)', stagger: { each: 0.07, from: 'random' } }, at) // marquee: bulbs flicking on
           } else if (kind === 'poster') tl.from(it, { yPercent: 40, opacity: 0, duration: 0.6, ease: 'expo.out' }, at)
-          else if (kind === 'note') tl.fromTo(it, { clipPath: 'inset(-60% 100% -60% -15%)' }, { clipPath: 'inset(-60% -15% -60% -15%)', duration: 0.45, ease: 'none' }, at + 0.25) // written on, left to right
+          else if (kind === 'about') {
+            tl.from(it, { y: 120, rotation: -4, opacity: 0, duration: 0.5, ease: 'expo.out' }, 0)
+            tl.fromTo(it.querySelectorAll('[data-line]'), { clipPath: 'inset(-20% 100% -20% -2%)' }, { clipPath: 'inset(-20% -2% -20% -2%)', duration: 0.3, ease: 'none', stagger: 0.07 }, 0.2)
+          } else if (kind === 'note') tl.fromTo(it, { clipPath: 'inset(-60% 100% -60% -15%)' }, { clipPath: 'inset(-60% -15% -60% -15%)', duration: 0.45, ease: 'none' }, at + 0.25) // written on, left to right
           else if (kind === 'stamp') tl.from(it, { scale: 2.2, opacity: 0, rotation: '+=18', duration: 0.3, ease: 'back.out(3)' }, at + 0.3)
           else if (kind === 'cast') tl.from(it.querySelectorAll('.cast-member'), { y: 140, rotation: () => gsap.utils.random(-25, 25), opacity: 0, duration: 0.5, ease: 'back.out(1.5)', stagger: 0.06 }, at)
           else tl.from(it, { y: 18, opacity: 0, duration: 0.4, ease: 'power3.out' }, at + 0.25)
