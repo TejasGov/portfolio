@@ -281,6 +281,14 @@ export function createArcade(renderer, { loader, normalize, mobile = false }) {
     addBlock(x, y, z, w, 1.5, w * 0.55, '#ffffff')
     addBlock(x + 1, y + 1.5, z, w * 0.55, 1, w * 0.35, '#ffffff')
   }
+  // The arcade cabinet, rebuilt in blocks where it stood (its screen faces back down the path), so the
+  // wave turns it to blocks rather than eating it.
+  const AX = ARCADE_X, AZ = 1.0
+  addBlock(AX, 0, AZ, 1, 1.1, 1, '#3b2470') // base
+  addBlock(AX - 0.55, 0.95, AZ, 0.3, 0.12, 0.9, '#24164a') // control panel
+  addBlock(AX + 0.1, 1.1, AZ, 0.8, 0.9, 1, '#3b2470') // upper body, set back
+  addBlock(AX - 0.31, 1.25, AZ, 0.04, 0.6, 0.76, '#7ff6ff') // screen
+  addBlock(AX + 0.05, 2.0, AZ, 0.9, 0.35, 1, '#ff5fb7') // marquee
   const blocks = new THREE.InstancedMesh(cube, blocksMat, bits.length)
   bits.forEach(([x, y, z, sx, sy, sz, c], i) => {
     m4.compose(p.set(x, y, z), q, s.set(sx, sy, sz))
