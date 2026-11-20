@@ -114,6 +114,11 @@ export async function loadTraveller(loader) {
         o.frustumCulled = false
         o.castShadow = true
         const map = o.material.map
+        if (look === 'pbr') {
+          // Physically shaded, for the realistic street of Chapter Four: no ink outline.
+          o.material = new THREE.MeshStandardMaterial({ map, roughness: 0.78 })
+          return
+        }
         o.material = look === 'shadow'
           ? toon({ color: '#1b1420', emissive: new THREE.Color(glow).multiplyScalar(0.05) })
           : toon({ map })

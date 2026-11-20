@@ -1,5 +1,6 @@
 import * as THREE from 'three'
-import { loadTraveller, toon, paintTexture, textSprite, inkBox } from './films/kit'
+import { loadTraveller, toon } from './films/kit'
+import { buildOceanDrive, duskSky } from './oceandrive'
 
 /*
  * Chapter Four, "Press Start": an ode to the games Tejas grew up on, in two original worlds that share
@@ -23,6 +24,7 @@ float waveD() {
 
 /** Make a material belong to one side of the wave: side +1 = the coast (gone inside), -1 = the blocks. */
 function onWave(mat, side, U) {
+  mat.userData.waveSide = side
   mat.onBeforeCompile = sh => {
     Object.assign(sh.uniforms, U, { uWaveSide: { value: side } })
     sh.vertexShader = sh.vertexShader
@@ -46,134 +48,75 @@ function onWave(mat, side, U) {
   return mat
 }
 
-/** A sky that crossfades from the neon sunset to the bright block-world day. */
-function twoSkies(U) {
-  return new THREE.Mesh(
-    new THREE.SphereGeometry(300, 32, 16),
-    new THREE.ShaderMaterial({
-      uniforms: { uDay: U.uDay, uT: U.uWaveT },
-      vertexShader: 'varying vec3 vDir; void main() { vDir = position; gl_Position = (projectionMatrix * viewMatrix * modelMatrix * vec4(position, 1.0)).xyww; }',
-      fragmentShader: /* glsl */ `
-        uniform float uDay; uniform float uT; varying vec3 vDir;
-        void main() {
-          vec3 d = normalize(vDir);
-          float h = d.y;
-          // Dusk: violet overhead, magenta to orange at the sea line, a striped sun sinking into it.
-          vec3 dusk = mix(vec3(1.0, 0.55, 0.32), vec3(0.92, 0.25, 0.55), smoothstep(0.0, 0.12, h));
-          dusk = mix(dusk, vec3(0.16, 0.08, 0.32), smoothstep(0.12, 0.55, h));
-          vec3 sd = normalize(vec3(1.0, 0.06, 0.55)); // ahead and to the right of the walk, over the sea
-          float s = length(d - sd);
-          float disc = smoothstep(0.17, 0.16, s);
-          float stripe = step(0.5, fract((d.y - 0.03) * 70.0)) + step(0.075, d.y);
-          dusk = mix(dusk, mix(vec3(1.0, 0.85, 0.35), vec3(1.0, 0.35, 0.55), smoothstep(0.2, -0.05, d.y - sd.y + 0.12)), disc * min(stripe, 1.0));
-          dusk += vec3(1.0, 0.4, 0.5) * exp(-s * 5.0) * 0.35;
-          float star = step(0.9975, fract(sin(dot(floor(d.xz * 300.0), vec2(12.99, 78.23))) * 43758.5)) * smoothstep(0.25, 0.6, h);
-          dusk += star * 0.8;
-          // Day: clear blue with soft banded clouds.
-          vec3 day = mix(vec3(0.75, 0.88, 1.0), vec3(0.32, 0.6, 0.98), smoothstep(0.0, 0.5, h));
-          gl_FragColor = vec4(mix(dusk, day, uDay), 1.0);
-        }`,
-      side: THREE.BackSide,
-      depthWrite: false,
-    }),
-  )
-}
-
-function neonSign(text, color, h = 1) {
-  const sp = textSprite(text, { font: '400 150px "Instrument Serif", serif', color: '#ffffff', glow: color, size: h, width: 1024, height: 220 })
-  sp.material.color.set(color).multiplyScalar(2.2) // past 1, so it blooms
-  return sp
-}
-
-export function createArcade(renderer, { loader, normalize }) {
+export function createArcade(renderer, { loader, normalize, mobile = false }) {
   const scene = new THREE.Scene()
-  scene.fog = new THREE.Fog('#3a1d4a', 40, 130)
+  scene.fog = new THREE.Fog('#5a3a66', 55, 190)
   const U = { uWaveO: { value: new THREE.Vector3(ARCADE_X, 1, 0.8) }, uWaveR: { value: 0 }, uWaveT: { value: 0 }, uDay: { value: 0 } }
-  scene.add(twoSkies(U))
-  const coast = (opts) => onWave(toon(opts), 1, U)
+  const sky = duskSky(U)
+  scene.add(sky)
+  // The sky also lights the street and shows in every glass, car and puddle: an environment map of it.
+  {
+    const envScene = new THREE.Scene()
+    envScene.add(duskSky({ uDay: { value: 0 } }))
+    scene.environment = new THREE.PMREMGenerator(renderer).fromScene(envScene, 0.02).texture
+    scene.environmentIntensity = 1.2
+  }
+  const coast = m => onWave(m, 1, U)
   const block = (opts) => onWave(toon(opts), -1, U)
 
-  // ------------------------------------------------------------ the neon coast
-  const X0 = -18, X1 = 64
-  const strip = (z0, z1, mat, y = 0) => {
-    const m = new THREE.Mesh(new THREE.PlaneGeometry(X1 - X0, z1 - z0).rotateX(-Math.PI / 2), mat)
-    m.position.set((X0 + X1) / 2, y, (z0 + z1) / 2)
-    m.receiveShadow = true
-    scene.add(m)
-    return m
-  }
-  strip(-12, -6.5, coast({ color: '#d9b8c8' }))
-  strip(-6.5, -1.6, coast({ map: paintTexture('#2c2638', ['#241f30', '#352e44'], { seed: 51 }) }))
-  const tiles = paintTexture('#f2d7d0', ['#e8c4bf', '#f8e6df'], { seed: 52 })
-  tiles.repeat.set(40, 2)
-  strip(-1.6, 1.6, coast({ map: tiles }), 0.02)
-  strip(1.6, 14, coast({ map: paintTexture('#f3d9a8', ['#e9c88e', '#f8e5bd'], { seed: 53 }) }))
-  // Lane dashes on the road.
-  for (let x = X0; x < X1; x += 3) {
-    const dash = new THREE.Mesh(new THREE.PlaneGeometry(1.4, 0.12).rotateX(-Math.PI / 2), coast({ color: '#ffe9a8', emissive: '#4a3a10' }))
-    dash.position.set(x, 0.01, -4)
-    scene.add(dash)
-  }
-  // The sea: a sunset mirror with a broken path of light toward the sun.
-  const sea = new THREE.Mesh(new THREE.PlaneGeometry(400, 260).rotateX(-Math.PI / 2), onWave(new THREE.ShaderMaterial({
+  // ------------------------------------------------------------ the neon coast (oceandrive.js)
+  const drive = buildOceanDrive(scene, { wrap: coast, mobile })
+  // The sea: the dusk in a long, low swell, a broken path of light toward the sun.
+  const sea = new THREE.Mesh(new THREE.PlaneGeometry(500, 300).rotateX(-Math.PI / 2), onWave(new THREE.ShaderMaterial({
     uniforms: { ...U },
     vertexShader: 'varying vec3 vWaveP; void main() { vec4 w = modelMatrix * vec4(position, 1.0); vWaveP = w.xyz; gl_Position = projectionMatrix * viewMatrix * w; }',
     fragmentShader: /* glsl */ `
       ${WAVE_GLSL}
       void main() {
         float wd = waveD(); if (wd < 0.0) discard;
-        vec3 v = normalize(vWaveP - cameraPosition);
-        float far = smoothstep(0.0, 120.0, distance(vWaveP, cameraPosition));
-        vec3 c = mix(vec3(0.42, 0.16, 0.42), vec3(0.95, 0.4, 0.5), far);
-        float glint = step(0.6, fract(sin(floor(vWaveP.x * 1.5) * 12.9 + floor(vWaveP.z * 3.0) * 78.2 + uWaveT * 0.6) * 43758.5));
-        float path = exp(-abs(vWaveP.x - cameraPosition.x - (vWaveP.z - cameraPosition.z) * 0.55) * 0.08);
-        c += vec3(1.0, 0.75, 0.45) * glint * path * 0.9;
+        float far = smoothstep(0.0, 160.0, distance(vWaveP, cameraPosition));
+        vec3 c = mix(vec3(0.16, 0.2, 0.36), vec3(0.95, 0.5, 0.52), far * far);
+        float swell = sin(vWaveP.z * 0.9 + uWaveT * 0.8 + sin(vWaveP.x * 0.3)) * 0.5 + 0.5;
+        c *= 0.85 + 0.25 * swell;
+        float glint = step(0.72, fract(sin(floor(vWaveP.x * 1.2) * 12.9 + floor(vWaveP.z * 2.4) * 78.2 + floor(uWaveT * 2.0)) * 43758.5));
+        float path = exp(-abs((vWaveP.z - cameraPosition.z) * 0.55 - (vWaveP.x - cameraPosition.x) * 0.0 - 0.0) * 0.0) * exp(-abs(atan(vWaveP.z - cameraPosition.z, vWaveP.x - cameraPosition.x) + 0.5) * 3.0);
+        c += vec3(1.0, 0.72, 0.45) * glint * path * 1.4;
         gl_FragColor = vec4(c, 1.0);
       }`,
   }), 1, U))
-  sea.position.set(20, -0.05, 144)
+  sea.position.set(20, -0.05, 176)
   scene.add(sea)
 
   const props = new THREE.Group()
   scene.add(props)
-  const place = (url, size, at, yaw, side = 1) => loader.loadAsync(url).then(gltf => {
+  const place = (url, size, at, yaw, { side = 1, tint = null, rough = 0.75, metal = 0 } = {}) => loader.loadAsync(url).then(gltf => {
     const g = normalize(gltf.scene, size, yaw)
     const box = new THREE.Box3().setFromObject(g)
     g.position.set(at[0], at[1] - box.min.y, at[2])
     g.traverse(o => {
       if (!o.isMesh) return
-      o.material = side > 0 ? coast({ map: o.material.map }) : block({ map: o.material.map })
+      o.material = side > 0
+        ? coast(new THREE.MeshStandardMaterial({ map: o.material.map, color: tint ?? '#ffffff', roughness: rough, metalness: metal }))
+        : block({ map: o.material.map })
       o.castShadow = o.receiveShadow = true
     })
     props.add(g)
     return g
   }).catch(() => null)
-  const HOTELS = []
-  for (let i = 0; i < 9; i++) {
-    const x = -12 + i * 8.6
-    HOTELS.push([x, i % 2])
-    place(i % 2 ? '/cinema/arcade/motel.glb' : '/cinema/arcade/hotel.glb', i % 2 ? 9 : 11, [x, 0, -10.5], i % 2 ? -0.1 : 0.15)
-  }
-  for (let x = -14; x < 60; x += 6.5) place('/cinema/arcade/palm.glb', 6.5 + ((x * 7) % 3), [x, 0, 4.4], x) // on the sand, clear of the chase camera
-  for (const [x, z] of [[6, 9], [19, 11], [27, 8], [44, 10]]) place('/cinema/arcade/palm.glb', 7, [x, 0, z], x)
-  place('/cinema/arcade/car.glb', 4.4, [12, 0, -3.1], Math.PI / 2 + 0.05)
-  place('/cinema/arcade/arcade.glb', 1.9, [ARCADE_X, 0.02, 1.0], -Math.PI / 2 - 0.3)
-  // Lamp posts with neon bars, and signs of our own.
-  for (let x = -12; x < 60; x += 9) {
-    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.07, 4.2, 8), coast({ color: '#2b2440' }))
-    pole.position.set(x, 2.1, -1.9)
-    const bar = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.08, 0.08), coast({ color: '#000000', emissive: x % 2 ? '#ff3da8' : '#3de4ff', emissiveIntensity: 3 }))
-    bar.position.set(x, 4.2, -1.9)
-    scene.add(pole, bar)
-  }
-  const signs = [['Neon Coast', '#ff3da8', -12], ['Motel', '#3de4ff', -3.4], ['Open late', '#ffd23d', 13.8], ['Arcade', '#b06bff', 31]].map(([t, c, x]) => {
-    const sign = neonSign(t, c, 1.1)
-    sign.position.set(x, 9.2, -6.6)
-    scene.add(sign)
-    return sign
+  // Palms along the promenade's lawn and on the beach; a few parked coupes; the arcade at the end.
+  for (let x = -20; x < 68; x += 7) place('/cinema/arcade/palm.glb', 7.5 + ((x * 7) % 3), [x, 0, 5.6], x, { rough: 0.85 }) // far enough from the chase camera to frame, not block
+  for (const [x, z] of [[8, 10], [21, 12], [39, 9], [58, 11]]) place('/cinema/arcade/palm.glb', 8, [x, 0, z], x, { rough: 0.85 })
+  for (const [x, tint] of [[-6, '#ffffff'], [14, '#bff3ea'], [41, '#ffd7e6']]) place('/cinema/arcade/car.glb', 4.4, [x, 0, -2.9], Math.PI / 2 + 0.04, { tint, rough: 0.32, metal: 0.4 })
+  place('/cinema/arcade/arcade.glb', 1.9, [ARCADE_X, 0.1, 1.0], -Math.PI / 2 - 0.3, { rough: 0.4 }).then(g => {
+    g?.traverse(o => { if (o.isMesh) { o.material.emissiveMap = o.material.map; o.material.emissive.set('#ffffff'); o.material.emissiveIntensity = 0.55 } })
   })
+  const cabinetLight = new THREE.PointLight('#d77bff', 14, 7, 1.6)
+  cabinetLight.position.set(ARCADE_X - 0.8, 1.4, 1.6)
+  scene.add(cabinetLight)
+  const HOTELS = drive.hotels.map(h => [h.x, h.floors < 4])
 
   // ------------------------------------------------------------ the block world, in the same place
+  const X0 = -18, X1 = 64 // the stretch of coast the blocks rebuild
   const cube = new THREE.BoxGeometry(1, 1, 1).translate(0, 0.5, 0)
   // One column per metre: top colour by height (sand, grass, stone), sides banded every metre so a
   // column reads as stacked blocks; a little per-block speckle, our own palette, no borrowed textures.
@@ -255,22 +198,22 @@ export function createArcade(renderer, { loader, normalize }) {
   scene.add(motes)
 
   // ------------------------------------------------------------ light
-  const sun = new THREE.DirectionalLight('#ffb2a0', 2.2)
+  const sun = new THREE.DirectionalLight('#ffb38a', 2.4)
   sun.castShadow = true
   sun.shadow.mapSize.set(2048, 2048)
   Object.assign(sun.shadow.camera, { left: -14, right: 14, top: 14, bottom: -14, near: 1, far: 80 })
-  const hemi = new THREE.HemisphereLight('#c79bff', '#3a2140', 1.4)
+  const hemi = new THREE.HemisphereLight('#c9b6ff', '#4a3550', 1.15)
   scene.add(sun, sun.target, hemi)
 
   let you = null
   loadTraveller(loader).then(t => {
-    you = t.make()
+    you = t.make({ look: 'pbr' }) // shaded like the street around him, not ink-and-paint
     scene.add(you.root)
   })
 
   const camera = new THREE.PerspectiveCamera(42, 1, 0.1, 700)
   const look = new THREE.Vector3(), cam = new THREE.Vector3()
-  let lastT = null, cue = ''
+  let lastT = null, cue = '', shadowSide = 0
 
   /**
    * state: { p (0..1 through the chapter) }. Walk the coast (to the arcade), the wave, walk the blocks.
@@ -286,11 +229,24 @@ export function createArcade(renderer, { loader, normalize }) {
     U.uWaveT.value = t
     U.uWaveR.value = wave <= 0 ? 0 : wave >= 1 ? 1e4 : 0.6 + wave * wave * 130
     U.uDay.value = ss(0.6, 0.78, P)
-    scene.fog.color.set('#3a1d4a').lerp(new THREE.Color('#bfe0ff'), U.uDay.value)
-    sun.color.set('#ffb2a0').lerp(new THREE.Color('#fff6e0'), U.uDay.value)
-    sun.intensity = 2.2 + U.uDay.value * 1.2
-    hemi.color.set('#c79bff').lerp(new THREE.Color('#e6f2ff'), U.uDay.value)
-    hemi.groundColor.set('#3a2140').lerp(new THREE.Color('#6a8a50'), U.uDay.value)
+    scene.fog.color.set('#5a3a66').lerp(new THREE.Color('#bfe0ff'), U.uDay.value)
+    sun.color.set('#ffb38a').lerp(new THREE.Color('#fff6e0'), U.uDay.value)
+    sun.intensity = 2.4 + U.uDay.value * 1.0
+    hemi.color.set('#b9a3ff').lerp(new THREE.Color('#e6f2ff'), U.uDay.value)
+    hemi.groundColor.set('#3a2a40').lerp(new THREE.Color('#6a8a50'), U.uDay.value)
+    hemi.intensity = 1.15 + U.uDay.value * 0.4
+    scene.environmentIntensity = 1.2 * (1 - U.uDay.value * 0.5)
+    drive.update(t, x)
+    // Shadows ignore the wave's discard, so only the world in front casts them (the coast until the
+    // wave has mostly passed, then the blocks); flipped once each way.
+    const castSide = U.uWaveR.value > 40 ? -1 : 1
+    if (castSide !== shadowSide) {
+      shadowSide = castSide
+      scene.traverse(o => {
+        const side = o.isMesh && o.material?.userData?.waveSide
+        if (side) o.castShadow = side === castSide
+      })
+    }
 
     if (you) {
       you.root.position.set(x, 0.02, 0)
@@ -307,8 +263,6 @@ export function createArcade(renderer, { loader, normalize }) {
       you.root.rotation.y += (face - you.root.rotation.y) * 0.1
       you.mixer.update(dt)
     }
-    // Sprites can't take the wave's discard: switch the signs off as the front passes them.
-    for (const sign of signs) sign.visible = sign.position.distanceTo(U.uWaveO.value) > U.uWaveR.value
     // Motes: on the wave's front, drifting up and out.
     if (wave > 0 && wave < 1) {
       const R = U.uWaveR.value
@@ -332,8 +286,9 @@ export function createArcade(renderer, { loader, normalize }) {
     camera.position.lerp(cam, camera.position.lengthSq() ? 0.12 : 1)
     look.set(x + 6, 1.5, -1.2)
     camera.lookAt(look)
-    sun.position.set(x + 20, 14, 30)
-    sun.target.position.set(x, 0, 0)
+    // Dusk: the sun low behind the hotels, ahead of you; long shadows across the street.
+    sun.position.set(x + 30, 9 + U.uDay.value * 20, -18 + U.uDay.value * 40)
+    sun.target.position.set(x + 4, 0, -2)
     return { here: you ? you.root.position : look }
   }
 

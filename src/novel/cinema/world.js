@@ -431,7 +431,7 @@ export async function createCinema(canvas, { mobile = false, onProgress } = {}) 
     scene.fog.density = THREE.MathUtils.lerp(0.022, 0.012, hs)
 
     // Chapter Three's journey is its own world, drawn instead of the hall.
-    const jy = state.journey ? (journey ??= createJourney(renderer, { loader, normalize })) : state.arcade ? (arcade ??= createArcade(renderer, { loader, normalize })) : null
+    const jy = state.journey ? (journey ??= createJourney(renderer, { loader, normalize })) : state.arcade ? (arcade ??= createArcade(renderer, { loader, normalize, mobile })) : null
     const walker = jy ? jy.update(state.journey ?? state.arcade, t, camera.aspect).here : null
     // The film: on the screen from the seats, or the whole frame once the camera is inside it.
     const f = jy ? null : state.film

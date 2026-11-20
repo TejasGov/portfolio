@@ -54,7 +54,7 @@ The portfolio is **a night at the movies**. It runs in one 3D world, a cinema bu
 | `src/novel/cinema/sketch.js` | The ink-drawing pass and its waves. |
 | `src/novel/cinema/film.js`, `films/*.js` | The films. `kit.js` holds the shared ink-and-paint kit and the traveller; there is one scene file per project. |
 | `src/novel/cinema/journey.js` | Chapter Three's world: path, dioramas, scenery and sky. |
-| `src/novel/cinema/arcade.js` | Chapter Four's two worlds and the wave between them. Every coast material discards inside the wave and every block material outside it. The props are Meshy models in `public/cinema/arcade/`. |
+| `src/novel/cinema/arcade.js`, `oceandrive.js` | Chapter Four. `oceandrive.js` models the Art Deco street procedurally: stucco hotels with eyebrow ledges, neon fins, corner towers and café awnings, plus the road, the promenade, lamps and lifeguard huts. It uses CC0 PBR textures in `public/cinema/arcade/tex/` and is lit by its dusk sky (PMREM) and the neon. `arcade.js` adds the sea, the Meshy palms, coupes and cabinet, the block world, and the wave between the two. Every coast material discards inside the wave and every block material outside it. |
 | `src/novel/cinema/core.js` | Beam frame, volumetric pass, dust and noise volume. |
 | `src/novel/stage/Stage.jsx`, `Takeover.jsx` | The canvas and render loop (paused under paper chapters, with adaptive resolution); the prologue's flood and pixel sweep. |
 | `src/novel/content.js` | Project copy (`PROJECTS`) and the journey's stops and roles (`JOURNEY`). |

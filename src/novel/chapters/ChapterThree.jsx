@@ -32,7 +32,7 @@ export default function ChapterThree() {
               <div key="title" ref={bind(k)} className="pointer-events-none col-start-1 row-start-1 self-center text-ink opacity-0">
                 <p className="kicker text-stamp">Chapter Three</p>
                 <Assemble as="h2" id="three-title" parts={TITLE} className="mt-4 block font-display text-[clamp(3.4rem,8vw,7.4rem)] leading-[0.88] tracking-[-0.02em]" />
-                <p className="mt-5 max-w-[34ch] font-serif text-lg text-ink/70 italic">From Prayagraj to New York, on foot. Keep scrolling and walk with me.</p>
+                <p className="mt-5 max-w-[34ch] font-serif text-lg text-ink/70 italic">Prayagraj, 2022 to New York, 2026.</p>
               </div>
             ) : (
               <article key={b.s.id} ref={bind(k)} className="paper col-start-1 row-start-1 max-w-[25rem] self-start p-6 text-ink opacity-0 shadow-[0_18px_40px_rgb(20_14_8/0.28)] md:p-7" style={{ rotate: `${k % 2 ? 0.8 : -0.9}deg` }} aria-label={`${b.s.when}, ${b.s.place}`}>
