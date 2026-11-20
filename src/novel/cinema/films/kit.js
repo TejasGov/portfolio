@@ -52,7 +52,8 @@ export function sky({ top = '#2b1b3a', mid = '#c2563a', low = '#f2b277', sunDir 
     new THREE.SphereGeometry(200, 32, 16),
     new THREE.ShaderMaterial({
       uniforms: { uTop: { value: new THREE.Color(top) }, uMid: { value: new THREE.Color(mid) }, uLow: { value: new THREE.Color(low) }, uSunDir: { value: sunDir.clone().normalize() }, uSun: { value: new THREE.Color(sun) } },
-      vertexShader: 'varying vec3 vDir; void main() { vDir = position; gl_Position = projectionMatrix * viewMatrix * modelMatrix * vec4(position, 1.0); }',
+      // Pinned to the far plane (z = w): the sky is always the background, for depth and for the ink pass.
+      vertexShader: 'varying vec3 vDir; void main() { vDir = position; gl_Position = (projectionMatrix * viewMatrix * modelMatrix * vec4(position, 1.0)).xyww; }',
       fragmentShader: /* glsl */ `
         uniform vec3 uTop, uMid, uLow, uSun; uniform vec3 uSunDir; varying vec3 vDir;
         void main() {

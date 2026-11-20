@@ -21,6 +21,7 @@ export default function Epilogue() {
   const ref = useRef(null)
   const whole = useRef(null) // the section and the colophon: the running head holds to the last line
   useProgress(ref, 'epilogue')
+  useProgress(ref, 'epiIn', { start: 'top bottom', end: 'top top' })
   useRunningHead(whole, 'Epilogue · House lights')
   const bind = useBeats('epilogue', BEATS)
 

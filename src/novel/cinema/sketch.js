@@ -22,6 +22,7 @@ const FRAG = /* glsl */ `
 uniform sampler2D inputBuffer; uniform highp sampler2D depthBuffer; uniform highp sampler3D tNoise;
 uniform mat4 uInvProj; uniform mat4 uCamWorld; uniform vec2 uTexel; uniform float uTime;
 uniform vec3 uOrigin; uniform float uR; uniform float uBand; uniform float uColorBehind;
+uniform float uPlane; uniform vec3 uDir; uniform float uLines;
 uniform vec3 uPaper; uniform vec3 uInk; uniform vec3 uKey; uniform float uScale;
 varying vec2 vUv;
 
@@ -45,7 +46,7 @@ void main() {
 
   vec2 px = vUv / uTexel;
   float rawZ = texture2D(depthBuffer, vUv).r;
-  bool far = rawZ > 0.99999;
+  bool far = rawZ > 0.999999;
   vec3 p = viewAt(vUv);
   vec3 world = (uCamWorld * vec4(p, 1.0)).xyz;
 
@@ -72,13 +73,17 @@ void main() {
   float h2 = hatch(px, -0.62, 9.0 * uScale, smoothstep(0.8, 1.0, shade) * 0.7, hw * 1.3) * smoothstep(0.8, 0.9, shade);
   // Fade the strokes with distance, as an illustrator would leave the back of the room loose.
   float dist = smoothstep(60.0, 8.0, zc);
-  float ink = clamp(line + (h1 * 0.45 + h2 * 0.35) * dist, 0.0, 1.0);
+  float ink = clamp(line + (h1 * 0.45 + h2 * 0.35) * dist, 0.0, 1.0) * uLines; // uLines fades the drawing on and off the page
   float fibre = noise3(vec3(px * 0.35, 2.1)) * 0.06 + noise3(vec3(px * 0.03, 4.0)) * 0.05;
   vec3 paper = uPaper * (0.97 + fibre - 0.04);
   vec3 drawing = mix(paper, uInk, ink * 0.88);
 
   // ---- the wave
-  float d = (far ? 1e3 : length(world - uOrigin)) - uR + (noise3(world * 0.09 + vec3(0.0, uTime * 0.02, 0.0)) - 0.5) * uBand * 2.2;
+  // A growing sphere from the origin, or (uPlane) a flat front that travels along uDir.
+  float reach = uPlane > 0.5 ? dot(world - uOrigin, uDir) : length(world - uOrigin);
+  // The sky: last to bloom from a point; with a travelling front, it takes the colour of where the camera stands.
+  float farReach = uPlane > 0.5 ? dot(uCamWorld[3].xyz - uOrigin, uDir) : 250.0;
+  float d = (far ? farReach : reach) - uR + (noise3(world * 0.09 + vec3(0.0, uTime * 0.02, 0.0)) - 0.5) * uBand * 2.2;
   float behind = 1.0 - smoothstep(-0.25, 0.25, d);
   float colourK = uColorBehind > 0.5 ? behind : 1.0 - behind;
   // Watercolour bleed just on the drawing side of the front: the paper takes the world's hue.
@@ -104,7 +109,7 @@ export class SketchPass extends Pass {
       uniforms: {
         inputBuffer: { value: null }, depthBuffer: { value: null }, tNoise: { value: noise },
         uInvProj: { value: new THREE.Matrix4() }, uCamWorld: { value: new THREE.Matrix4() }, uTexel: { value: new THREE.Vector2() },
-        uTime: { value: 0 }, uOrigin: { value: new THREE.Vector3() }, uR: { value: 1e5 }, uBand: { value: 1.2 }, uColorBehind: { value: 1 },
+        uTime: { value: 0 }, uOrigin: { value: new THREE.Vector3() }, uR: { value: 1e5 }, uBand: { value: 1.2 }, uColorBehind: { value: 1 }, uPlane: { value: 0 }, uDir: { value: new THREE.Vector3(1, 0, 0) }, uLines: { value: 1 },
         uPaper: { value: lin('#efe8da') }, uInk: { value: lin('#1d1913') }, uKey: { value: new THREE.Vector3(-0.5, 0.8, -0.4) }, uScale: { value: 1 },
       },
       vertexShader: VERT,

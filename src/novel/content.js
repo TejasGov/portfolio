@@ -43,3 +43,17 @@ export const CONTACT = {
     { label: 'X', href: 'https://x.com/TejasGovin17982' },
   ],
 }
+
+/*
+ * Chapter Three: the traveller's journey, oldest first. Each stop is a little world (a Meshy diorama in
+ * public/cinema/journey/) with the roles that belong to that place and time.
+ */
+const STOPS = [
+  { id: 'prayagraj', when: '2022', place: 'Prayagraj', orgs: ['Sunflower Association'] },
+  { id: 'campus', when: '2024', place: 'Buffalo', orgs: ['Clean Campus', 'UB Campus Dining & Shops'] },
+  { id: 'gym', when: '2025', place: 'UB Athletics', orgs: ['UB Athletics'] },
+  { id: 'library', when: '2025', place: 'Libraries & labs', orgs: ['UB Libraries', 'UB College of Arts & Sciences'] },
+  { id: 'garage', when: '2025–26', place: 'Remote & Buffalo', orgs: ['MedTourEasy', 'COA', 'University at Buffalo', 'Society of Computing at UB'] },
+  { id: 'nyc', when: '2026', place: 'New York', orgs: ['Daiwa Capitals Market America'] },
+]
+export const JOURNEY = STOPS.map(s => ({ ...s, roles: ALL_ROLES.filter(r => s.orgs.includes(r.org)).reverse() }))

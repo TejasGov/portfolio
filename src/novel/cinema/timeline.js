@@ -40,7 +40,8 @@ const BEAM_WHITE = new THREE.Color(0.6, 0.76, 1.0)
 
 /** Which world section is driving: the one whose progress is mid-way. */
 export function section(s) {
-  if (s.epilogue > 0) return 'epilogue'
+  if (s.epilogue > 0 || s.epiIn > 0) return 'epilogue'
+  if (s.three > 0) return 'three'
   if (s.work > 0 || s.workIn > 0) return 'work'
   return 'prologue'
 }
@@ -65,6 +66,7 @@ const filmReach = k => (k < 0.7 ? -2 + (k / 0.7) * 16 : 14 + ((k - 0.7) / 0.3) *
 
 const out = { pos: V(0, 0, 0), target: V(0, 0, 0) }
 const inPos = V(0, 0, 0)
+const ALONG = V(1, 0, 0) // the journey's path runs along +x
 
 export function stateAt(s, mouse, aspect) {
   const portrait = aspect < 0.85
@@ -110,7 +112,8 @@ export function stateAt(s, mouse, aspect) {
     st.dust = 0.05 * (1 - push)
     if (w <= 0) st.sketch = { r: -4, origin: SCREEN, band: 1.6 } // still on the India chapter's paper
     else if (w < 0.05) st.sketch = { r: -4 + ss(0, 0.045, w) * (HALL_REACH + 4), origin: SCREEN, band: 1.6 }
-    else if (w > 0.93) st.sketch = { r: -4 + ss(0.93, 0.995, w) * (HALL_REACH + 4), origin: SCREEN, band: 1.6, colourBehind: false }
+    // ...and the drawing lifts off the page, so the journey can be drawn on it.
+    else if (w > 0.93) st.sketch = { r: -4 + ss(0.93, 0.975, w) * (HALL_REACH + 4), origin: SCREEN, band: 1.6, colourBehind: false, ink: 1 - ss(0.975, 0.998, w) }
     else if (st.film.inside >= 1) {
       // Inside: each film blooms out of ink, plays, and washes back to ink before the cut to the next.
       const bloom = ss(0, 0.16, t), wash = ss(0.84, 1, t)
@@ -118,6 +121,13 @@ export function stateAt(s, mouse, aspect) {
         ? { r: filmReach(wash), origin: FILM_ORIGIN, band: 0.8, colourBehind: false }
         : { r: bloom >= 1 ? 1e5 : filmReach(bloom), origin: FILM_ORIGIN, band: 0.8 }
     }
+  } else if (sec === 'three') {
+    // The journey: drawn onto the page, colour blooms around the traveller and travels with him,
+    // and at the end the colour recedes and the drawing lifts off the page again.
+    const p = s.three
+    st.journey = { p }
+    const r = THREE.MathUtils.lerp(-6, 3.2, ss(0.025, 0.06, p)) - ss(0.955, 0.985, p) * 60
+    st.sketch = { follow: true, dir: ALONG, r, band: 1.0, ink: ss(0, 0.02, p) * (1 - ss(0.985, 0.999, p)) }
   } else {
     const e = s.epilogue
     const u = ss(0.05, 0.85, e)
@@ -131,7 +141,7 @@ export function stateAt(s, mouse, aspect) {
     st.card = { key: 'end', kicker: 'Thank you for watching', title: 'The End' }
     // Arriving from Chapter Three's paper: the hall in ink, then colour from the screen.
     const bloom = ss(0, 0.1, e)
-    if (bloom < 1) st.sketch = { r: -4 + bloom * (HALL_REACH + 4), origin: SCREEN, band: 1.6 }
+    if (bloom < 1) st.sketch = { r: -4 + bloom * (HALL_REACH + 4), origin: SCREEN, band: 1.6, ink: ss(0, 0.6, s.epiIn) }
   }
 
   // A hand on the camera: gentle parallax from the pointer.

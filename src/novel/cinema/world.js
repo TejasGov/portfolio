@@ -8,6 +8,7 @@ import {
 } from 'postprocessing'
 import { noiseVolume, beamFrame, VolumetricPass, makeDust, glowTexture } from './core'
 import { createFilm } from './film'
+import { createJourney } from './journey'
 import { SketchPass } from './sketch'
 
 /*
@@ -205,6 +206,7 @@ export async function createCinema(canvas, { mobile = false, onProgress } = {}) 
   // Chapter Two's film plays on this, a hair in front of the lit screen.
   // Built on first use: its render target and 150k-point cloud cost nothing until Chapter Two needs them.
   let film = null
+  let journey = null
   const getFilm = () => {
     if (!film) {
       film = createFilm(renderer, { mobile, loader })
@@ -366,8 +368,11 @@ export async function createCinema(canvas, { mobile = false, onProgress } = {}) 
     screenLight.intensity = 0.9 * (1 - hs)
     scene.fog.density = THREE.MathUtils.lerp(0.022, 0.012, hs)
 
+    // Chapter Three's journey is its own world, drawn instead of the hall.
+    const jy = state.journey ? (journey ??= createJourney(renderer, { loader, normalize })) : null
+    const walker = jy ? jy.update(state.journey, t, camera.aspect).here : null
     // The film: on the screen from the seats, or the whole frame once the camera is inside it.
-    const f = state.film
+    const f = jy ? null : state.film
     const inFilm = !!f && f.inside >= 1
     filmScreen.visible = !!f && !inFilm && (f.show ?? 1) > 0.001
     if (f) {
@@ -376,19 +381,23 @@ export async function createCinema(canvas, { mobile = false, onProgress } = {}) 
       if (inFilm) film.cropFor(camera.aspect, renderer.getDrawingBufferSize(drawSize).y)
       else film.renderToTexture()
     }
-    renderPass.mainScene = inFilm ? film.scene : scene // inFilm implies the film exists
-    renderPass.mainCamera = inFilm ? film.camera : camera
-    vol.enabled = !inFilm
-    vignette.darkness = inFilm ? 0.42 : 0.72 // a film is graded on its own; the hall's heavy vignette would muddy it
+    const away = jy ?? (inFilm ? film : null) // a world other than the hall fills the frame
+    renderPass.mainScene = away ? away.scene : scene
+    renderPass.mainCamera = away ? away.camera : camera
+    vol.enabled = !away
+    vignette.darkness = away ? 0.42 : 0.72 // a film is graded on its own; the hall's heavy vignette would muddy it
     // The seams: the world as an ink drawing on the book's paper, and the wave between the two.
     const sk = state.sketch
     const su = sketch.uniforms
-    sketch.cam = inFilm ? film.camera : camera
+    sketch.cam = away ? away.camera : camera
     su.uR.value = sk ? sk.r : 1e5
     if (sk) {
-      su.uOrigin.value.copy(sk.origin)
+      su.uOrigin.value.copy(sk.follow && walker ? walker : sk.origin)
       su.uBand.value = sk.band ?? 1.2
       su.uColorBehind.value = sk.colourBehind === false ? 0 : 1
+      su.uPlane.value = sk.dir ? 1 : 0
+      if (sk.dir) su.uDir.value.copy(sk.dir)
+      su.uLines.value = sk.ink ?? 1
     }
     su.uTime.value = t
     composer.render()
