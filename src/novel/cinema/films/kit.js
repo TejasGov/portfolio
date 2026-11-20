@@ -100,7 +100,16 @@ export function paintTexture(base, spots, { size = 512, count = 220, seed = 1 } 
  * texture; 'shadow' makes him a dark double with a glowing outline.
  */
 export async function loadTraveller(loader) {
-  const gltf = await loader.loadAsync('/cinema/traveller.glb') // the rig, his texture and all eleven clips
+  const gltf = await loader.loadAsync('/cinema/traveller.glb') // the rig, his texture and all his clips
+  // Every clip loops in place: take out the hips' net drift across a clip (a dance step that travels),
+  // so a loop never snaps him back to where it started.
+  for (const clip of gltf.animations) {
+    const tr = clip.tracks.find(k => k.name.endsWith('Hips.position'))
+    if (!tr || !clip.duration) continue
+    const v = tr.values, n = tr.times.length
+    const drift = [0, 1, 2].map(i => v[(n - 1) * 3 + i] - v[i])
+    for (let k = 0; k < n; k++) for (let i = 0; i < 3; i++) v[k * 3 + i] -= drift[i] * (tr.times[k] / clip.duration)
+  }
   const box = new THREE.Box3().setFromObject(gltf.scene)
   const height = box.max.y - box.min.y
   return {

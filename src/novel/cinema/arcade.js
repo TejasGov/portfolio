@@ -13,6 +13,7 @@ import { buildOceanDrive, duskSky, neonSignTexture } from './oceandrive'
  * inside the wave, every block material outside it), with glowing cubes lifting off the front.
  */
 let ARCADE_X = 34.5 // set from the street's layout: the arcade stands opposite the club's door
+const ARCADE_Z = -0.9 // on the street side of your path, clear of the chase camera, which rides on the beach side
 const WAVE_GLSL = /* glsl */ `
 uniform vec3 uWaveO; uniform float uWaveR; uniform float uWaveSide; uniform float uWaveT;
 varying vec3 vWaveP;
@@ -73,7 +74,7 @@ export function createArcade(renderer, { loader, normalize, mobile = false }) {
   // ------------------------------------------------------------ the neon coast (oceandrive.js)
   const drive = buildOceanDrive(scene, { wrap: coast, mobile })
   ARCADE_X = drive.clubX
-  U.uWaveO.value.set(ARCADE_X, 1, 0.8)
+  U.uWaveO.value.set(ARCADE_X, 1, -0.8)
   // The sea: the dusk in a long, low swell, a broken path of light toward the sun.
   const sea = new THREE.Mesh(new THREE.PlaneGeometry(500, 300).rotateX(-Math.PI / 2), onWave(new THREE.ShaderMaterial({
     uniforms: { ...U },
@@ -134,11 +135,11 @@ export function createArcade(renderer, { loader, normalize, mobile = false }) {
       car.lights.forEach(l => scene.add(l))
     })
   }
-  place('/cinema/arcade/arcade.glb', 1.9, [ARCADE_X, 0.1, 1.0], -Math.PI / 2 - 0.3, { rough: 0.4 }).then(g => {
+  place('/cinema/arcade/arcade.glb', 1.9, [ARCADE_X, 0.1, ARCADE_Z], -Math.PI / 2 + 0.3, { rough: 0.4 }).then(g => {
     g?.traverse(o => { if (o.isMesh) { o.material.emissiveMap = o.material.map; o.material.emissive.set('#ffffff'); o.material.emissiveIntensity = 0.55 } })
   })
   const cabinetLight = new THREE.PointLight('#d77bff', 14, 7, 1.6)
-  cabinetLight.position.set(ARCADE_X - 0.8, 1.4, 1.6)
+  cabinetLight.position.set(ARCADE_X - 0.8, 1.4, ARCADE_Z + 0.6)
   scene.add(cabinetLight)
   // The club: an original 80s streamline moderne nightclub (Meshy), set back behind its entrance
   // pavilion, its name in our own neon on its marquee, and searchlights sweeping the sky behind it.
@@ -283,7 +284,7 @@ export function createArcade(renderer, { loader, normalize, mobile = false }) {
   }
   // The arcade cabinet, rebuilt in blocks where it stood (its screen faces back down the path), so the
   // wave turns it to blocks rather than eating it.
-  const AX = ARCADE_X, AZ = 1.0
+  const AX = ARCADE_X, AZ = ARCADE_Z
   addBlock(AX, 0, AZ, 1, 1.1, 1, '#3b2470') // base
   addBlock(AX - 0.55, 0.95, AZ, 0.3, 0.12, 0.9, '#24164a') // control panel
   addBlock(AX + 0.1, 1.1, AZ, 0.8, 0.9, 1, '#3b2470') // upper body, set back
@@ -330,14 +331,24 @@ export function createArcade(renderer, { loader, normalize, mobile = false }) {
   const hemi = new THREE.HemisphereLight('#c9b6ff', '#4a3550', 1.15)
   scene.add(sun, sun.target, hemi)
 
-  let you = null
+  // Dressed for the coast: his own texture with the shirt repainted as an original aloha print with an
+  // open collar and buttons (scripts/cinema/aloha.py), and, in the block world, block-built gear.
+  const aloha = new THREE.TextureLoader().load('/cinema/traveller_aloha.webp')
+  aloha.flipY = false // glTF's UV convention, like the texture it replaces
+  aloha.colorSpace = THREE.SRGBColorSpace
+  let you = null, gear = null
   loadTraveller(loader).then(t => {
     you = t.make({ look: 'pbr' }) // shaded like the street around him, not ink-and-paint
+    you.root.traverse(o => { if (o.isSkinnedMesh) o.material.map = aloha })
+    gear = makeGear(you) // fitted in his rest pose, so before the mixer first poses him
     scene.add(you.root)
   })
+  // A danced moment at the arcade: a soft pink light circling him while he moves.
+  const danceLight = new THREE.PointLight('#ff7ad9', 0, 6, 1.4)
+  scene.add(danceLight)
 
   const camera = new THREE.PerspectiveCamera(42, 1, 0.1, 700)
-  const look = new THREE.Vector3(), cam = new THREE.Vector3()
+  const look = new THREE.Vector3(), cam = new THREE.Vector3(), dreamCam = new THREE.Vector3(), dreamLook = new THREE.Vector3()
   let lastT = null, cue = ''
 
   /**
@@ -392,21 +403,34 @@ export function createArcade(renderer, { loader, normalize, mobile = false }) {
       })
     }
 
+    // The dance at the arcade, in a dreamy slow motion: the camera eases in, the light softens and blooms.
+    const dream = ss(0.5, 0.515, P) * (1 - ss(0.552, 0.566, P))
     if (you) {
       you.root.position.set(x, 0.02, 0)
-      const moving = (walk1 > 0 && walk1 < 1) || (walk2 > 0 && walk2 < 1)
+      const strut = walk1 > 0 && walk1 < 1 // his own walk on the coast
+      const trek = walk2 > 0 && walk2 < 1
       const atArcade = P > 0.5 && P < 0.56
       const jumping = P >= 0.575 && P < 0.62
-      const happy = P > 0.95
-      const next = jumping ? 'Regular_Jump' : happy ? 'happy_jump_m' : atArcade ? 'Idle' : moving ? 'Walk' : 'Idle'
+      const done = P > 0.95
+      const next = jumping ? 'Regular_Jump' : done ? 'Axe_Breathe_and_Look_Around' : atArcade ? 'Step_Hip_Hop_Dance' : strut ? 'Confident_Strut' : trek ? 'Walk' : 'Idle'
       if (next !== cue) {
         cue = next
-        you.play(you.actions[next] ? next : 'Idle', { fade: 0.3 })
+        you.play(you.actions[next] ? next : 'Idle', { fade: 0.35 })
       }
-      const face = atArcade ? -0.25 : Math.PI / 2
+      if (you.actions.Step_Hip_Hop_Dance) you.actions.Step_Hip_Hop_Dance.timeScale = 0.72
+      const face = atArcade ? -0.35 : Math.PI / 2 // he dances turned to you, three-quarters
       you.root.rotation.y += (face - you.root.rotation.y) * 0.1
       you.mixer.update(dt)
+      // The gear goes on as the wave takes him, popping in over a third of a second.
+      const inBlocks = U.uWaveR.value > you.root.position.distanceTo(U.uWaveO.value) + 0.3
+      gear.k = THREE.MathUtils.clamp(gear.k + (inBlocks ? dt : -dt) * 3, 0, 1)
+      for (const g of gear.parts) {
+        g.visible = gear.k > 0
+        g.scale.setScalar(g.userData.scale * Math.max(1e-3, THREE.MathUtils.smoothstep(gear.k, 0, 1) * (1 + 0.25 * Math.sin(gear.k * Math.PI))))
+      }
     }
+    danceLight.intensity = dream * 16
+    danceLight.position.set(x + Math.sin(t * 1.3) * 1.3, 1.7, Math.cos(t * 1.3) * 1.3)
     // Motes: on the wave's front, drifting up and out.
     if (wave > 0 && wave < 1) {
       const R = U.uWaveR.value
@@ -427,14 +451,73 @@ export function createArcade(renderer, { loader, normalize, mobile = false }) {
     camera.updateProjectionMatrix()
     const portrait = aspect < 0.85
     cam.set(x - (portrait ? 7.5 : 5.2), portrait ? 3.6 : 2.5, portrait ? 2.6 : 1.9)
+    cam.lerp(dreamCam.set(x - (portrait ? 3.6 : 2.6), portrait ? 1.9 : 1.6, portrait ? 4.2 : 3.2), dream)
     camera.position.lerp(cam, camera.position.lengthSq() ? 0.12 : 1)
-    look.set(x + 6, 1.5, -1.2)
+    look.set(x + 6, 1.5, -1.2).lerp(dreamLook.set(x, 1.15, 0), dream)
     camera.lookAt(look)
     // Dusk: the sun low behind the hotels, ahead of you; long shadows across the street.
     sun.position.set(x + 30, 9 + U.uDay.value * 20, -18 + U.uDay.value * 40)
     sun.target.position.set(x + 4, 0, -2)
-    return { here: you ? you.root.position : look }
+    return { here: you ? you.root.position : look, dream }
   }
 
   return { scene, camera, update }
+}
+
+/**
+ * Block-world gear in our own pixel palette: a gold helmet, an iron chestplate with shoulder plates, and
+ * an axe. Each piece is placed around him in his rest pose (metres; y up, his front +z) and then
+ * parented to the bone it rides on, keeping where it sits. Returns the pieces, hidden, for update().
+ */
+function makeGear(you) {
+  const pixels = cols => {
+    const c = document.createElement('canvas')
+    c.width = c.height = 8
+    const g = c.getContext('2d')
+    for (let i = 0; i < 64; i++) {
+      g.fillStyle = cols[Math.floor(Math.abs(Math.sin(i * 12.9898) * 43758.5453) % 1 * cols.length)]
+      g.fillRect(i % 8, i >> 3, 1, 1)
+    }
+    const t = new THREE.CanvasTexture(c)
+    t.magFilter = t.minFilter = THREE.NearestFilter
+    t.colorSpace = THREE.SRGBColorSpace
+    return t
+  }
+  const mat = (cols, metalness, roughness) => new THREE.MeshStandardMaterial({ map: pixels(cols), metalness, roughness, flatShading: true })
+  const gold = mat(['#f5cf4a', '#edc340', '#f8d85e', '#e6b93a'], 0.9, 0.26)
+  const iron = mat(['#d9dde2', '#cfd3d9', '#e2e6ea', '#c7ccd2'], 0.85, 0.32)
+  const ironDark = mat(['#9aa1ab', '#8a919b', '#a9b0b9'], 0.8, 0.42)
+  const wood = mat(['#8a5a32', '#7a4e2a', '#9c6a3e', '#6d4425'], 0, 0.8)
+  const parts = []
+  const piece = (bone, material, [w, h, d], [x, y, z]) => {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), material)
+    m.position.set(x, y, z)
+    m.castShadow = true
+    you.root.add(m)
+    parts.push([bone, m])
+  }
+  // Helmet: a gold box shell over the head (head: x ±0.11, y 1.45..1.72, z ±0.13).
+  piece('Head', gold, [0.28, 0.07, 0.31], [0, 1.735, 0])
+  piece('Head', gold, [0.03, 0.18, 0.31], [-0.14, 1.63, 0])
+  piece('Head', gold, [0.03, 0.18, 0.31], [0.14, 1.63, 0])
+  piece('Head', gold, [0.28, 0.2, 0.03], [0, 1.62, -0.155])
+  piece('Head', gold, [0.28, 0.045, 0.03], [0, 1.69, 0.155])
+  // Chestplate: around a loose shirt (torso: x ±0.2, y 0.98..1.36, z ±0.125), shoulder plates on the arms.
+  piece('Spine01', iron, [0.46, 0.32, 0.3], [0, 1.2, 0])
+  piece('Spine01', ironDark, [0.44, 0.07, 0.29], [0, 1.02, 0])
+  piece('Spine01', ironDark, [0.2, 0.06, 0.02], [0, 1.25, 0.152])
+  piece('LeftArm', iron, [0.17, 0.08, 0.3], [0.25, 1.36, 0])
+  piece('RightArm', iron, [0.17, 0.08, 0.3], [-0.25, 1.36, 0])
+  // Axe in the right fist (fist about x -0.7, y 1.26; its grip runs front to back).
+  piece('RightHand', wood, [0.035, 0.035, 0.6], [-0.7, 1.26, 0.1])
+  piece('RightHand', iron, [0.03, 0.15, 0.1], [-0.7, 1.335, 0.33])
+  piece('RightHand', iron, [0.03, 0.08, 0.06], [-0.7, 1.43, 0.36])
+  piece('RightHand', ironDark, [0.034, 0.05, 0.05], [-0.7, 1.27, 0.37])
+  you.root.updateMatrixWorld(true)
+  for (const [bone, m] of parts) {
+    you.bone(bone).attach(m)
+    m.userData.scale = m.scale.x // attach() folds the bone's scale in: pop relative to it
+    m.visible = false
+  }
+  return { k: 0, parts: parts.map(([, m]) => m) }
 }

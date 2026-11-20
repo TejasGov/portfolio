@@ -475,7 +475,8 @@ export async function createCinema(canvas, { mobile = false, onProgress } = {}) 
 
     // Chapter Three's journey is its own world, drawn instead of the hall.
     const jy = state.journey ? worlds.journey() : state.arcade ? worlds.arcade() : null
-    const walker = jy ? jy.update(state.journey ?? state.arcade, t, camera.aspect).here : null
+    const res = jy ? jy.update(state.journey ?? state.arcade, t, camera.aspect) : null
+    const walker = res?.here ?? null
     // The film: on the screen from the seats, or the whole frame once the camera is inside it.
     const f = jy ? null : state.film
     const inFilm = !!f && f.inside >= 1
@@ -497,7 +498,7 @@ export async function createCinema(canvas, { mobile = false, onProgress } = {}) 
     const mode = away ? ToneMappingMode.NEUTRAL : ToneMappingMode.AGX
     if (toneMap.mode !== mode) toneMap.mode = mode
     bloom.luminanceMaterial.threshold = away ? 0.95 : 0.32
-    if (away) bloom.intensity = 0.55
+    if (away) bloom.intensity = 0.55 + (res?.dream ?? 0) * 0.9 // the arcade dance blooms softer and wider
     // The seams: the world as an ink drawing on the book's paper, and the wave between the two.
     const sk = state.sketch
     const su = sketch.uniforms
