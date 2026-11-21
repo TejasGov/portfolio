@@ -110,7 +110,9 @@ export default function Epilogue() {
             Set in Archivo, Newsreader and Geist Mono. The cinema was modelled and light-baked in Blender, with
             surface textures from Poly Haven (CC0) and a carpet drawn for it; the projector, the recliners, the traveller (a stylised me) and
             the six little worlds of Chapter Three were generated with Meshy. The five films, the ink drawings and the waves between them, the
-            beam, the haze and the dust are all drawn live in WebGL, and the projector you can hear is synthesized in the browser.
+            beam, the haze and the dust are all drawn live in WebGL, and the projector you can hear is synthesized in the browser. The armour in
+            Chapter Five, the coast's buildings, cars and palms in Chapter Four, and some of the traveller's movements were generated with Meshy;
+            the coast's ground textures are from Poly Haven (CC0); the rest of Chapters Four and Five is drawn live in WebGL.
             Photographs in Chapter One come from Wikimedia Commons under the licences below; they were cut out, torn and taped for this book.
           </p>
           {/* The licences are owed, not the last thing to read: folded away under the colophon. */}

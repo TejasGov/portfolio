@@ -1,15 +1,12 @@
-import { useEffect, useMemo, useRef } from 'react'
+import { useMemo, useRef } from 'react'
 import { useBeats } from '../lib/Beats'
 import { useProgress, useRunningHead } from '../lib/chapters'
-import { store } from '../lib/store'
 import Assemble from '../lib/Assemble'
-import { CONTACT } from '../content'
-import { BACK, chapterP } from '../cinema/levels'
+import { chapterP } from '../cinema/levels'
 import '../four.css'
 
 const TITLE = [['Press ', false], ['start', true]]
-const HEAD = 'Chapter Four · Press Start'
-const EXIT = 'Epilogue · House lights' // from BACK (0.93) the camera backs out of the screen into the hall
+const HEAD = 'Chapter Four · Press Start' // through the back-out (0.93) too: Five's own head takes over as it rises
 
 /*
  * Chapter Four, "Press Start": an ode to the games I grew up on, as four game worlds in one walk
@@ -29,23 +26,13 @@ const BEATS = [
   { at: [A(0.74), A(0.865)], kind: 'objective', label: 'New objective', text: 'Get past the creatures.' }, // the blocks, until the clouds roll in
   { at: [V(0.16), V(0.84)], kind: 'objective', label: 'New objective', text: 'Build the village.' }, // between the clouds and the console
   { at: [O(0.2), O(0.6)], kind: 'objective', label: 'New objective', text: 'Reach the helicopter.' },
-  { at: [O(0.68), 0.965], kind: 'objective', label: 'New objective', text: 'Say hello.', contact: true }, // the game's last prompt points to the epilogue
+  { at: [O(0.68), 0.965], kind: 'objective', label: 'New objective', text: 'Next reel.', skip: true }, // the game's last prompt points on to Chapter Five's films
 ].map(b => ({ edge: EDGE, ...b }))
 
 export default function ChapterFour() {
   const ref = useRef(null)
   useProgress(ref, 'four', { start: 'top bottom', end: 'bottom bottom' })
   useRunningHead(ref, HEAD, { start: 'top bottom', end: 'bottom bottom' })
-  useEffect(() => {
-    // Deferred: the running head's own toggle may be mid-broadcast of HEAD when it re-enters from below.
-    const fn = key => {
-      if ((key !== 'four' && key !== 'chapterLabel') || store.four <= 0 || store.four >= 1) return
-      const want = store.four >= BACK ? EXIT : HEAD
-      if ((store.chapterLabel === HEAD || store.chapterLabel === EXIT) && store.chapterLabel !== want) queueMicrotask(() => store.set('chapterLabel', want))
-    }
-    store.listeners.add(fn)
-    return () => store.listeners.delete(fn)
-  }, [])
   const beats = useMemo(() => BEATS, [])
   const bind = useBeats('four', beats)
 
@@ -68,17 +55,11 @@ export default function ChapterFour() {
               </p>
             ) : (
               // A game's objective box: top-left, quiet, legible over neon or daylight.
-              <div key={k} ref={bind(k)} className={`${b.skip || b.contact ? 'pointer-events-auto' : 'pointer-events-none'} col-start-1 row-start-1 max-w-[24rem] self-start rounded-sm bg-[rgb(12_8_24/0.85)] p-5 text-white opacity-0`}>
+              <div key={k} ref={bind(k)} className={`${b.skip ? 'pointer-events-auto' : 'pointer-events-none'} col-start-1 row-start-1 max-w-[24rem] self-start rounded-sm bg-[rgb(12_8_24/0.85)] p-5 text-white opacity-0`}>
                 <p className="kicker text-[#9ff0ff]">{b.label}</p>
                 <p className="mt-2 font-display text-[1.9rem] leading-[1.05]">{b.text}</p>
                 {b.note && <p className="mt-3 text-[1.02rem] leading-relaxed text-white/80">{b.note}</p>}
                 {b.skip && <a href="#epilogue" className="kicker mt-3 inline-flex min-h-11 items-center text-white/85 underline-offset-4 hover:underline">Skip to contact ↓</a>}
-                {b.contact && (
-                  <div className="mt-2 flex flex-wrap gap-x-6">
-                    <a href={`mailto:${CONTACT.email}`} className="kicker pointer-events-auto inline-flex min-h-11 items-center text-[15px] text-[#9ff0ff] underline-offset-4 hover:underline">Email me ↗</a>
-                    <a href="#epilogue" className="kicker pointer-events-auto inline-flex min-h-11 items-center text-[15px] text-white/85 underline-offset-4 hover:underline">Write to me ↓</a>
-                  </div>
-                )}
               </div>
             ),
           )}

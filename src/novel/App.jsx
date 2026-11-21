@@ -6,6 +6,7 @@ import ChapterOne from './chapters/ChapterOne'
 import ChapterTwo from './chapters/ChapterTwo'
 import ChapterThree from './chapters/ChapterThree'
 import ChapterFour from './chapters/ChapterFour'
+import ChapterFive from './chapters/ChapterFive'
 import Epilogue from './chapters/Epilogue'
 import Takeover from './stage/Takeover'
 
@@ -56,6 +57,7 @@ export default function App() {
         <ChapterTwo />
         <ChapterThree />
         <ChapterFour />
+        <ChapterFive />
         <Epilogue />
       </main>
       <div className="grain" aria-hidden="true" />

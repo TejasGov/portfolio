@@ -1,7 +1,8 @@
 import * as THREE from 'three'
 import { PROJECTS } from '../content'
-import { LENS, SCREEN, insideDistance } from './world'
-import { BACK, LAST, levelAt } from './levels'
+import { LENS, SCREEN, insideDistance, CARDS } from './world'
+import { BACK, LAST as FOUR_LAST, levelAt } from './levels'
+import * as five from './movies'
 
 /*
  * Scroll → the cinema. One function maps the store (prologue / work / epilogue progress) to what the
@@ -35,6 +36,8 @@ const WORK_LOOK_PORTRAIT = V(0.2, 3.6, 15)
 // Epilogue: back up the rake as the house lights come up.
 const EPI_POS = new THREE.CatmullRomCurve3([V(0, 4.0, -4.8), V(-1.4, 5.2, -7.4), V(-2.6, 6.4, -9.4)], false, 'centripetal')
 const EPI_LOOK = new THREE.CatmullRomCurve3([V(0.5, 3.2, 15), V(0.2, 3.7, 15), V(0, 4.1, 15)], false, 'centripetal')
+// Your seat, where a game or a film is left on the screen: Four's and Five's back-outs end here, Five's push-in starts here.
+const SEAT_POS = EPI_POS.getPoint(0), SEAT_LOOK = EPI_LOOK.getPoint(0)
 
 export const PROJECT_IDS = PROJECTS.map(p => p.id)
 const BEAM_WHITE = new THREE.Color(0.6, 0.76, 1.0)
@@ -42,6 +45,7 @@ const BEAM_WHITE = new THREE.Color(0.6, 0.76, 1.0)
 /** Which world section is driving: the one whose progress is mid-way. */
 export function section(s) {
   if (s.epilogue > 0 || s.epiIn > 0) return 'epilogue'
+  if (s.five > 0) return 'five'
   if (s.four > 0) return 'four'
   if (s.three > 0) return 'three'
   if (s.work > 0 || s.workIn > 0) return 'work'
@@ -166,7 +170,7 @@ export function stateAt(s, mouse, aspect) {
     // block world is the coast's own (arcade.js), then clouds to the village and a console boot to
     // night ops (levels.js: one world at a time, swapped under a covering transition). It ends as a
     // film does: the game is on the cinema's screen, and the camera backs out of it to your seat in
-    // the hall, where the epilogue begins.
+    // the hall, where Chapter Five begins.
     const p = s.four
     st.game = levelAt(p, s.still) // { level, p (the level's own), kind, phase, cover }
     st.game.still = s.still // reduced motion: the wave and the transitions are cuts
@@ -178,9 +182,44 @@ export function stateAt(s, mouse, aspect) {
       st.game.onScreen = true
       st.game.back = back
       inPos.copy(SCREEN).setZ(SCREEN.z - insideDistance(st.fov, aspect)) // where the screen exactly fills the frame
-      out.pos.copy(inPos).lerp(EPI_POS.getPoint(0), back)
-      out.target.copy(SCREEN).lerp(EPI_LOOK.getPoint(0), back)
+      out.pos.copy(inPos).lerp(SEAT_POS, back)
+      out.target.copy(SCREEN).lerp(SEAT_LOOK, back)
       Object.assign(st, { focus: 15, exposure: 3, lamp: 1.6, density: 0.08 * back, dust: 0.05 * back })
+    }
+  } else if (sec === 'five') {
+    // The Big Screen. It opens where Four left you, in your seat with Four's last world on the screen:
+    // that fades to black, the projector flares white for a new reel and goes dark, the dive comes up on
+    // the screen and the camera pushes into it. Inside, three worlds swap under covering transitions
+    // (movies.js). It ends as a film does: the final plays on the screen and the camera backs out of it
+    // to your seat, where the epilogue begins.
+    const p = s.five
+    const IN = five.LEVELS[0].walk[0] // inside the screen from here
+    inPos.copy(SCREEN).setZ(SCREEN.z - insideDistance(st.fov, aspect))
+    if (p < IN) {
+      const push = ss(0.035, IN, p)
+      // The screen's own light: the lamp dims with Four's world (so the bare screen is dark when it goes),
+      // flares on the white leader, goes dark again, and is back under the dive (lighting only the haze).
+      const flare = ss(0.012, 0.017, p) * (1 - ss(0.019, 0.025, p))
+      st.game = p < 0.0125
+        ? { level: FOUR_LAST, p: 1, onScreen: true, show: 1 - ss(0.002, 0.012, p) }
+        : { level: five.FIRST, p: 0, onScreen: true, show: ss(0.025, 0.035, p), back: 1 - push }
+      st.game.still = s.still
+      st.card = CARDS.leader // Five's new reel: a blank white leader, which the projector flares on
+      out.pos.copy(SEAT_POS).lerp(inPos, push)
+      out.target.copy(SEAT_LOOK).lerp(SCREEN, push)
+      Object.assign(st, {
+        focus: 15, exposure: 3, lamp: 1.6 * (1 - ss(0.002, 0.012, p)) + 9 * flare + 1.6 * ss(0.025, 0.035, p),
+        density: (0.08 + 0.3 * flare) * (1 - push), dust: (0.05 + 0.2 * flare) * (1 - push), bloom: 1 + 1.5 * flare,
+      })
+    } else if (p > five.BACK) {
+      const back = ss(five.BACK, 0.995, p)
+      st.game = { level: five.LAST, p: 1, onScreen: true, back, still: s.still }
+      out.pos.copy(inPos).lerp(SEAT_POS, back)
+      out.target.copy(SCREEN).lerp(SEAT_LOOK, back)
+      Object.assign(st, { focus: 15, exposure: 3, lamp: 1.6, density: 0.08 * back, dust: 0.05 * back })
+    } else {
+      st.game = five.levelAt(p, s.still) // { level, p (the world's own), kind, phase, cover }
+      st.game.still = s.still // reduced motion: the transitions are cuts, the suit-up is shown finished
     }
   } else {
     const e = s.epilogue
@@ -201,11 +240,11 @@ export function stateAt(s, mouse, aspect) {
     st.dust = 0.3 * (1 - 0.8 * lampUp)
     st.density = 0.2 * (1 - lampUp) // a thinner beam than the prologue's, so the card reads through it
     st.bloom = 1 - 0.8 * lampUp
-    st.card = { key: 'end', kicker: 'Thank you for watching', title: 'The End', glow: true, field: ['#04060b', '#19233a'] }
-    // Arriving from Chapter Four's back-out: the game is still on the screen; it fades out as the
+    st.card = CARDS.end
+    // Arriving from Chapter Five's back-out: the final is still on the screen; it fades out as the
     // epilogue rises, and "The End" comes up behind it.
     const fade = 1 - ss(0.08, 0.3, s.epiIn) // off the screen before the title is fully lit
-    if (fade > 0) st.game = { level: LAST, p: 1, onScreen: true, show: fade }
+    if (fade > 0) st.game = { level: five.LAST, p: 1, onScreen: true, show: fade }
   }
 
   // A hand on the camera: gentle parallax from the pointer.

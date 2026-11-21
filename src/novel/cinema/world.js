@@ -13,7 +13,11 @@ import { createJourney } from './journey'
 import { createArcade } from './arcade'
 import { createVillage } from './village'
 import { createOps } from './ops'
-import { GRADE, LAST, LEVELS, SEAMS } from './levels'
+import { createDive } from './dive'
+import { createLanding } from './landing'
+import { createFinal } from './final'
+import { GRADE as FOUR_GRADE, LAST, LEVELS, SEAMS } from './levels'
+import * as five from './movies'
 import { LevelFxPass } from './levelfx'
 import { SketchPass } from './sketch'
 
@@ -27,6 +31,12 @@ import { SketchPass } from './sketch'
 export const LENS = new THREE.Vector3(0.9, 7.58, -12.15)
 export const WINDOW = new THREE.Vector3(0.9, 7.6, -11.5)
 export const SCREEN = new THREE.Vector3(0, 4.15, 15.44)
+// Cards the projector shows at seams that are crossed mid-scroll: painted into textures of their own and
+// uploaded while the reader pauses before them (prepare), so the seam only swaps the spot's map.
+export const CARDS = {
+  leader: { key: 'five-leader', field: ['#aab4c4', '#ffffff'], size: 256 }, // Five's new reel: a blank white leader
+  end: { key: 'end', kicker: 'Thank you for watching', title: 'The End', glow: true, field: ['#04060b', '#19233a'], size: 1024 },
+}
 const SCREEN_W = 18, SCREEN_H = 7.5
 /** Where the camera stands, on the screen's axis, when the screen exactly fills (covers) the frame. */
 export function insideDistance(fovDeg, aspect) {
@@ -295,6 +305,10 @@ export async function createCinema(canvas, { mobile = false, onProgress } = {}) 
     arcade: () => (built.arcade ??= createArcade(renderer, { loader, normalize, mobile })),
     village: () => (built.village ??= createVillage(renderer, { loader, normalize, mobile })),
     ops: () => (built.ops ??= createOps(renderer, { loader, normalize, mobile })),
+    // Chapter Five's worlds (movies.js), on the same terms.
+    dive: () => (built.dive ??= createDive(renderer, { loader, normalize, mobile })),
+    landing: () => (built.landing ??= createLanding(renderer, { loader, normalize, mobile })),
+    final: () => (built.final ??= createFinal(renderer, { loader, normalize, mobile })),
   }
   // Build a chapter's world ahead of its seam, then compile its shaders and upload its textures, so
   // crossing into it doesn't stall. Called on every idle frame: it compiles again whenever the world
@@ -329,6 +343,8 @@ export async function createCinema(canvas, { mobile = false, onProgress } = {}) 
   }
   const prepare = name => {
     const fresh = !built[name]
+    // One world builds at a time: two building at once (Five's three, queued together) share each frame.
+    if (fresh && Object.values(built).some(o => o.built === false)) return
     const w = worlds[name]()
     if (fresh) return void w.update({ p: 0, portrait: camera.aspect < 0.85, mobile }, 0, camera.aspect) // compile on a later frame: two short pauses, not one long one
     if (w.built === false) return // a world that builds in steps (village, ops) is compiled once it is whole
@@ -346,9 +362,11 @@ export async function createCinema(canvas, { mobile = false, onProgress } = {}) 
     let cur = null, added = 0
     for (const o of leaves) {
       const own = [o.material].flat().filter(m => !mats.has(m))
-      if (!cur || cur.size >= 24 || (own.length && added + own.length > 4)) batches.push((cur = new Set())), (added = 0) // and a few dozen meshes at most: their geometry uploads on the draw
+      // A custom shader (or a patched built-in) is a whole frame's worth: one new program of its own (an idle-time compile mid-scroll then stays ~10 ms).
+      const cost = own.reduce((c, m) => c + (m.isShaderMaterial || m.onBeforeCompile !== THREE.Material.prototype.onBeforeCompile ? 4 : 1), 0)
+      if (!cur || cur.size >= 24 || (cost && added + cost > 4)) batches.push((cur = new Set())), (added = 0) // and a few dozen meshes at most: their geometry uploads on the draw
       own.forEach(m => mats.add(m))
-      added += own.length
+      added += cost
       cur.add(o)
     }
     const inTurn = async (fn, list = batches) => {
@@ -390,21 +408,31 @@ export async function createCinema(canvas, { mobile = false, onProgress } = {}) 
         levelFx.render(renderer, composer.inputBuffer, scratch)
         renderer.setRenderTarget(prev)
       }
-      if (name === LAST) {
-        // The game also leaves through the cinema's screen: make its screen target now, not mid-exit.
+      if (SCREENED.has(name)) {
+        // The game also leaves through the cinema's screen (and Five enters and leaves through it): make
+        // its screen target now and draw this world into it once, not mid-seam.
         await nextFrame()
         const prev = renderer.getRenderTarget()
         renderer.setRenderTarget(gameTarget())
         renderer.render(w.scene, w.camera)
         renderer.setRenderTarget(prev)
       }
+      // Start fetching the dive's armour and fall a chapter ahead: they are its biggest files.
+      if (name === 'village') for (const href of DIVE_FILES) if (!document.querySelector(`link[href="${href}"]`)) document.head.append(Object.assign(document.createElement('link'), { rel: 'prefetch', href, as: 'fetch', crossOrigin: 'anonymous' }))
+      // The cards at the seams into Five (the leader) and out of it (the end), their own textures uploaded
+      // now: both with the dive, in the pause at Four's end, each painted in one frame and uploaded in the next.
+      if (name === five.FIRST || name === five.LAST) for (const spec of [CARDS.leader, CARDS.end]) await holdCard(spec)
       if (w.built !== false) warm[name] = true
     })().finally(() => { compiling = null })
   }
   const scratch = new THREE.WebGLRenderTarget(64, 64)
+  const DIVE_FILES = ['/cinema/dive/suit.glb', '/cinema/dive/fall.glb']
   let fxWarm = false
   // The levels a covering transition leads into, and its kind; and what is drawn under a held cover.
-  const INTO = Object.fromEntries(SEAMS.map((s, k) => [LEVELS[k + 1].name, s.kind]))
+  const INTO = Object.fromEntries([[SEAMS, LEVELS], [five.SEAMS, five.LEVELS]].flatMap(([S, L]) => S.map((s, k) => [L[k + 1].name, s.kind])))
+  // Every world's grade, Four's and Five's; and the worlds that are ever drawn on the cinema's screen.
+  const GRADE = { ...FOUR_GRADE, ...five.GRADE }
+  const SCREENED = new Set([LAST, five.FIRST, five.LAST])
   const nothing = new THREE.Scene()
   // Warm each film once it loads, in idle time and never alongside prepare(): its shaders for the screen's
   // target and for the composer's (used once the camera is inside), its textures, and one draw. Without
@@ -490,12 +518,32 @@ export async function createCinema(canvas, { mobile = false, onProgress } = {}) 
   // The spot's projective map is square; the screen fills its full width and a centred band of its height.
   const band = SCREEN_H / SCREEN_W
   let lastCard = ''
-  function card(key, { kicker = '', title = '', field = ['#03060c', '#1a2a46'], ink = '#ffffff', glow = false } = {}) {
+  const held = new Map() // key -> its own uploaded texture (CARDS)
+  const holdCard = async spec => {
+    if (held.has(spec.key)) return
+    held.set(spec.key, null) // (claimed: card() shows the shared frame until it is uploaded)
+    await nextFrame()
+    const c = document.createElement('canvas')
+    c.width = c.height = spec.size ?? frame.width
+    paint(c, spec)
+    const tex = new THREE.CanvasTexture(c)
+    tex.colorSpace = THREE.SRGBColorSpace
+    await nextFrame()
+    renderer.initTexture(tex)
+    held.set(spec.key, tex)
+  }
+  function card(key, spec) {
     if (key === lastCard) return
     lastCard = key
+    lamp.map = held.get(key) ?? frameTex
+    if (held.get(key)) return
+    paint(frame, spec)
+    frameTex.needsUpdate = true
+  }
+  function paint(canvas, { kicker = '', title = '', field = ['#03060c', '#1a2a46'], ink = '#ffffff', glow = false } = {}) {
     // A CPU-backed canvas: uploading a GPU canvas after a redraw read it back and stalled a frame ~50 ms.
-    const g = frame.getContext('2d', { willReadFrequently: true })
-    const S = frame.width
+    const g = canvas.getContext('2d', { willReadFrequently: true })
+    const S = canvas.width
     const h = S * band, y0 = (S - h) / 2
     g.fillStyle = '#000'
     g.fillRect(0, 0, S, S)
@@ -543,7 +591,6 @@ export async function createCinema(canvas, { mobile = false, onProgress } = {}) 
     g.fillStyle = edge
     g.fillRect(0, y0, S, h)
     g.globalCompositeOperation = 'source-over'
-    frameTex.needsUpdate = true
   }
 
   // ------------------------------------------------------------ per-frame state
@@ -638,9 +685,11 @@ export async function createCinema(canvas, { mobile = false, onProgress } = {}) 
     const cold = !!game && ((!!INTO[game.level] && !warm[game.level]) || worlds[game.level]().built === false) // the coast, reached by a jump before its steps are done, is simply black for those frames
     if (cold) prepare(game.level)
     const res = jy && !cold ? jy.update(state.journey ?? game, t, onScreen ? FILM_ASPECT : camera.aspect) : null
-    const fx = !!game && !onScreen && ((cold && !!INTO[game.level]) || !!game.kind)
+    // (The dive, reached cold by a jump or a slow network while its armour still loads, holds the storm.)
+    const coldKind = INTO[game?.level] ?? (game?.level === five.FIRST ? 'storm' : null)
+    const fx = !!game && !onScreen && ((cold && !!coldKind) || !!game.kind)
     levelFx.enabled = fx
-    if (fx) levelFx.set(cold ? INTO[game.level] : game.kind, cold ? 0.5 : game.phase, t)
+    if (fx) levelFx.set(cold ? coldKind : game.kind, cold ? 0.5 : game.phase, t)
     const grade = game ? Object.assign(gradeNow, GRADE[game.level], res?.grade) : null
     const walker = res?.here ?? null
     // The film: on the screen from the seats, or the whole frame once the camera is inside it.
