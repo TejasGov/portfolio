@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="675" viewBox="0 0 1200 675">
+  <rect width="1200" height="675" fill="#f5f2eb"/>
+  <g stroke="#d9d1c3" stroke-width="1"><path d="M0 56H1200"/><path d="M0 100H1200"/><path d="M0 144H1200"/><path d="M0 188H1200"/><path d="M0 232H1200"/><path d="M0 276H1200"/><path d="M0 320H1200"/><path d="M0 364H1200"/><path d="M0 408H1200"/><path d="M0 452H1200"/><path d="M0 496H1200"/><path d="M0 540H1200"/><path d="M0 584H1200"/><path d="M0 628H1200"/><path d="M0 672H1200"/></g>
+  <path d="M60 0V675" stroke="#c8361e" stroke-width="1.5" opacity=".5"/>
+  <g fill="#786f63" font-family="monospace" font-size="15" letter-spacing="3"><text x="84" y="88">IN THE LAB · L-02</text><text x="84" y="618">PYTHON · QWEN2.5 · PRIVATE REPO</text></g>
+  <g fill="#38352f" font-family="Georgia,serif"><text x="80" y="196" font-size="70" letter-spacing="-2">LLM Router</text><text x="84" y="250" font-size="26">Learned routing between cheap and expensive LLMs.</text></g>
+  <g fill="#38352f" font-family="monospace" font-size="21"><text x="112" y="372">Matrix factorization router</text><path d="M84 360h12" stroke="#c8361e" stroke-width="2"/><text x="112" y="416">TF-IDF + logistic regression</text><path d="M84 404h12" stroke="#c8361e" stroke-width="2"/><text x="112" y="460">Accuracy-vs-cost curves</text><path d="M84 448h12" stroke="#c8361e" stroke-width="2"/><text x="112" y="504">Out-of-scope rejection</text><path d="M84 492h12" stroke="#c8361e" stroke-width="2"/></g>
+</svg>

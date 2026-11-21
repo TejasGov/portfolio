@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="675" viewBox="0 0 1200 675">
+  <rect width="1200" height="675" fill="#2a1747"/>
+  <g transform="translate(640 150) scale(2.4)" fill="#8f74c9" stroke="#8f74c9"><rect x="2" y="60" width="16" height="60" stroke="none" opacity=".85"/><rect x="20" y="82" width="16" height="38" stroke="none" opacity=".85"/><rect x="38" y="46" width="16" height="74" stroke="none" opacity=".85"/><rect x="56" y="70" width="16" height="50" stroke="none" opacity=".85"/><rect x="74" y="32" width="16" height="88" stroke="none" opacity=".85"/><rect x="92" y="90" width="16" height="30" stroke="none" opacity=".85"/><rect x="110" y="56" width="16" height="64" stroke="none" opacity=".85"/><rect x="128" y="24" width="16" height="96" stroke="none" opacity=".85"/><rect x="146" y="76" width="16" height="44" stroke="none" opacity=".85"/><rect x="164" y="50" width="16" height="70" stroke="none" opacity=".85"/><rect x="182" y="64" width="16" height="56" stroke="none" opacity=".85"/><rect x="46" y="15" width="12" height="6" fill="#ffcf3f" stroke="none"/><rect x="49" y="12" width="6" height="12" fill="#ffcf3f" stroke="none"/><rect x="100" y="7" width="12" height="6" fill="#ffcf3f" stroke="none"/><rect x="103" y="4" width="6" height="12" fill="#ffcf3f" stroke="none"/><rect x="150" y="19" width="12" height="6" fill="#ffcf3f" stroke="none"/><rect x="153" y="16" width="6" height="12" fill="#ffcf3f" stroke="none"/></g>
+  <g font-family="'Arial Narrow',Arial,sans-serif" fill="#f8ecd2">
+    <text x="80" y="88" font-family="monospace" font-size="16" letter-spacing="4" opacity=".7">TEJAS GOVIND PRESENTS</text>
+    <text x="78" y="330" font-size="96" font-weight="800" letter-spacing="-1">GOTTA</text>
+    <text x="78" y="420" font-size="96" font-weight="800" letter-spacing="-1">GET RICH</text>
+    <text x="82" y="470" font-size="26" font-weight="700" letter-spacing="2" fill="#8f74c9">A RETRO PIXEL LIFE SIM</text>
+    <text x="82" y="600" font-family="monospace" font-size="16" letter-spacing="3" opacity=".75">NEXT.JS · TYPESCRIPT · TAILWIND · SHADCN/UI</text>
+  </g>
+</svg>

@@ -3,7 +3,8 @@ import * as THREE from 'three'
 import { store } from '../lib/store'
 import { createCinema, LENS } from '../cinema/world'
 import { stateAt, PROJECT_IDS, section, workSlot } from '../cinema/timeline'
-import { LAST, LEVELS, levelAt } from '../cinema/levels'
+import { LEVELS, levelAt } from '../cinema/levels'
+import * as five from '../cinema/movies'
 
 const reduced = () => matchMedia('(prefers-reduced-motion: reduce)').matches
 
@@ -62,7 +63,7 @@ export default function Stage() {
     // (on top of Lenis's own smoothing), so waves, walks and camera moves never step with the wheel.
     // A jump (the contents menu) lands at once rather than playing every chapter on the way.
     const view = Object.create(store)
-    const KEYS = ['prologue', 'workIn', 'work', 'three', 'four', 'epilogue', 'epiIn']
+    const KEYS = ['prologue', 'workIn', 'work', 'three', 'four', 'five', 'epilogue', 'epiIn']
     let lastFrame = 0, gliding = false
     const glide = now => {
       const k = reduced() || !lastFrame ? 1 : 1 - Math.exp(-Math.min(0.1, (now - lastFrame) / 1000) * 4.5)
@@ -101,10 +102,13 @@ export default function Stage() {
       if (sec === 'work') world.loadFilm(PROJECT_IDS[workSlot(view.work).i])
       // Build the next chapter's world while the reader is paused, so its seam doesn't stall mid-scroll.
       // In Three, keep the journey's late-loading dioramas warm before the arcade (prepare skips while compiling).
-      // In Four, the level on screen and the one after it (the next is built and compiled a level ahead).
-      const at = sec === 'four' ? levelAt(view.four) : null, lv = at ? at.i : 0
-      // In the epilogue, the last level, which plays on the screen as it rises (for a reader who jumped there).
-      const todo = { work: ['journey'], three: ['journey', 'arcade'], four: LEVELS.slice(lv, lv + 2).map(l => l.name), epilogue: [LAST] }[sec]
+      // In Four, the level on screen and the one after it (the next is built and compiled a level ahead),
+      // and from its last level on, all of Five's worlds (the pause at Four's end warms the dive, the landing and
+      // the final, so none compiles over the push-in or the tower's wide). In Five, every world still ahead.
+      const at = sec === 'four' ? levelAt(view.four) : sec === 'five' ? five.levelAt(view.five) : null, lv = at ? at.i : 0
+      const ahead = (list, then = []) => list.slice(lv, lv + 2).map(l => l.name).concat(lv === list.length - 1 ? then : [])
+      // In the epilogue, Five's last world, which plays on the screen as it rises (for a reader who jumped there).
+      const todo = { work: ['journey'], three: ['journey', 'arcade'], four: ahead(LEVELS, five.LEVELS.map(l => l.name)), five: five.LEVELS.slice(lv).map(l => l.name), epilogue: [five.LAST] }[sec]
       // Paused: the scroll has rested and the picture has glided to a stop, so a prepare step's hitch is not seen on a moving frame.
       if (todo && now - scrolled > 400 && !gliding) for (const name of todo) world.prepare(name)
       // A reader who never pauses in Four: still build and compile the next level, in the browser's idle time, before its seam.

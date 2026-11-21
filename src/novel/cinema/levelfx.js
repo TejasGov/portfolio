@@ -2,7 +2,7 @@ import * as THREE from 'three'
 import { Pass } from 'postprocessing'
 
 /*
- * The covering transitions between Chapter Four's worlds (levels.js): one full-screen pass, enabled
+ * The covering transitions between Chapter Four's worlds (levels.js) and Chapter Five's (movies.js): one full-screen pass, enabled
  * only while a transition is on screen. Each is driven by a phase 0..1; across the plateau around 0.5
  * the frame is fully covered, and the world behind it is swapped there.
  *   CLOUD  three decks of cumulus roll in from the edges of the frame, lit from the upper left, close
@@ -10,6 +10,12 @@ import { Pass } from 'postprocessing'
  *   TECH   the picture breaks into a mosaic of cells from the top down, the cells turn to a console of
  *          glyph rows round a boot dial, and the next world scans back in as a night-vision phosphor
  *          image that settles into its true colours.
+ *   STORM  climbing into a thunderhead: dark masses boil in from below and the edges, rain streaks
+ *          past, lightning forks and lights the cloud from inside; at the middle the frame is dark,
+ *          electric cloud; then it thins and tears open from the middle onto a dusk ridge.
+ *   FLASH  a strike's whiteout: the picture burns out from its highlights to white; the white veil
+ *          thins off the stadium and leaves thousands of soft camera flashes with short cross
+ *          streaks, popping and thinning out until the crowd's own flashes take over.
  * It runs after tone mapping, on display-ready colour, so every colour below is what the screen shows.
  */
 const VERT = /* glsl */ `
@@ -188,10 +194,146 @@ vec3 tech(vec2 uv) {
   return col;
 }
 
+// ---------------------------------------------------------------- storm
+const vec3 BOLT = vec3(0.78, 0.88, 1.0);
+// Billowing cloud: the volume's masses warped by a finer slice, so the edges curl like a thunderhead's.
+float billow(vec2 q, float z) {
+  vec2 w = vec2(n3(vec3(q * 0.7, z + 0.31)), n3(vec3(q * 0.7 + 4.3, z + 0.67))) - 0.5;
+  q += w * 0.9;
+  return n3(vec3(q, z)) * 0.65 + n3(vec3(q * 2.7 + 0.21, z * 1.7 + 0.4)) * 0.25 + n3(vec3(q * 6.1, z * 2.3 + 0.9)) * 0.1;
+}
+// A bolt's trunk: its x at y (0 at its top, 1 at its foot), wandering at two scales of noise.
+float trunkX(float y, float x0, float s) {
+  return x0 + ((n3(vec3(y * 1.4, s, 0.1)) - 0.5) * 0.9 + (n3(vec3(y * 6.0, s, 0.5)) - 0.5) * 0.22) * (0.3 + 0.7 * y);
+}
+// A forked bolt down the frame: the glow at c (frame units, y up). top/bot: its ends' y; s: its seed.
+float bolt(vec2 c, float x0, float top, float bot, float s) {
+  if (c.y > top + 0.1 || c.y < bot - 0.1) return 0.0;
+  float y = (top - c.y) / (top - bot);
+  float d = abs(c.x - trunkX(y, x0, s));
+  float fade = ss(-0.02, 0.06, y) * (1.0 - ss(0.92, 1.03, y));
+  float g = (exp(-d * 500.0 / uScale) * 1.5 + exp(-d * 60.0) * 0.4 + exp(-d * 12.0) * 0.12) * fade;
+  // The fork: off the trunk a third of the way down, thinner, fading toward its tip.
+  float yb = (y - 0.33) / 0.4;
+  if (yb > 0.0 && yb < 1.0) {
+    float side = sign(hash(vec2(s, 1.7)) - 0.5);
+    float xb = trunkX(y, x0, s) + side * (yb * 0.24 + (n3(vec3(yb * 5.0, s + 0.3, 0.7)) - 0.5) * 0.12 * yb);
+    float db = abs(c.x - xb);
+    g += (exp(-db * 800.0 / uScale) + exp(-db * 90.0) * 0.25) * (1.0 - yb) * 0.8;
+  }
+  return g;
+}
+vec3 storm(vec2 uv, vec3 src) {
+  float ph = uPhase;
+  float A = uRes.x / uRes.y;
+  vec2 c = (uv - 0.5) * vec2(A, 1.0);
+  float r = length(c) / length(vec2(A, 1.0) * 0.5);
+  float cov = clamp(min(ph, 1.0 - ph) / 0.44, 0.0, 1.0);
+  // Climbing: the cloud streams down past the lens. In, it closes from below and the edges first; out,
+  // it tears open from the middle.
+  float climb = ph * 2.2 + uTime * 0.03;
+  float lead = cov * (1.0 + 0.9 * ss(0.1, 1.0, r) + 0.5 * ss(0.2, -0.5, c.y) * step(ph, 0.5));
+  float boil = uTime * 0.035;
+  float far = billow(c * 1.1 + vec2(0.0, climb * 0.5), 0.2 + boil);
+  float near = billow(c * 0.55 + vec2(0.3, climb), 0.6 + boil * 1.4);
+  float thF = mix(0.9, 0.1, clamp(lead * 1.1, 0.0, 1.0)), thN = mix(1.0, 0.18, clamp(lead - 0.05, 0.0, 1.0));
+  float aF = ss(thF, thF + 0.16, far), aN = ss(thN, thN + 0.12, near);
+  // Lightning: strikes at fixed moments of the scroll (so a reader who pauses on one sees it hold and
+  // stutter), and unplaced flickers in time, deep in the cloud.
+  float slot = floor(uTime * 1.3), ft = fract(uTime * 1.3);
+  float sh = hash(vec2(slot, 4.1));
+  float flick = step(0.5, sh) * exp(-ft * 7.0) * (0.6 + 0.4 * step(0.5, fract(ft * 9.0)));
+  vec2 at = vec2((hash(vec2(slot, 2.3)) - 0.5) * A * 0.8, (hash(vec2(slot, 7.9)) - 0.5) * 0.6);
+  float strike = 0.0, sx = 0.0, seed = 0.0;
+  for (int k = 0; k < 3; k++) {
+    float m = k == 0 ? 0.28 : k == 1 ? 0.45 : 0.68; // the strikes' moments in the phase: the middle of the cover stays dark
+    float e = exp(-abs(ph - m) * 32.0);
+    if (e > strike) { strike = e; sx = (hash(vec2(float(k), 3.3)) - 0.5) * A * 0.6; seed = float(k) * 1.7 + 0.4; }
+  }
+  strike *= 0.75 + 0.25 * step(0.4, fract(uTime * 11.0));
+  float inner = flick * cov * exp(-length(c - at) * 2.2) + strike * exp(-length(c - vec2(sx, 0.2)) * 1.4);
+  // The cloud: slate in its body, a cold rim where the city's light (and then the dusk's) catches its
+  // edges, lit through from inside where the lightning is.
+  float late = ss(0.5, 0.75, ph);
+  vec3 body = mix(vec3(0.03, 0.035, 0.06), vec3(0.06, 0.04, 0.07), late);
+  vec3 rim = mix(vec3(0.2, 0.26, 0.38), vec3(0.42, 0.3, 0.36), late);
+  vec3 cF = mix(rim * 0.7, body * 1.4, ss(thF + 0.02, thF + 0.3, far)) + BOLT * inner * (0.5 + far) * 1.1;
+  vec3 cN = mix(rim, body, ss(thN + 0.01, thN + 0.22, near)) + BOLT * inner * (0.3 + near) * 0.8;
+  vec3 col = mix(src, src * 0.35 + body, ss(0.0, 0.6, lead) * 0.85); // the world darkens before the masses close
+  col = mix(col, cF, aF);
+  col = mix(col, cN, aN);
+  // Inside, at the middle: dark churning cloud, faintly electric, lit in pulses; never a flat black.
+  float inside = ss(0.4, 0.44, ph) * (1.0 - ss(0.56, 0.6, ph));
+  float deep = billow(c * 0.8 + vec2(0.0, climb * 0.8), 0.9 + boil * 2.0);
+  vec3 dark = body * (0.7 + 1.6 * deep) + BOLT * (0.03 * deep + inner * (0.4 + deep) * 0.8);
+  col = mix(col, dark, inside);
+  // The bolts themselves, in front of all but the nearest wisps.
+  float b = strike * bolt(c, sx, 0.55, -0.45 - 0.3 * hash(vec2(seed, 9.1)), seed);
+  b += flick * cov * step(0.8, sh) * bolt(c, at.x, 0.55, at.y - 0.1, slot * 0.37) * 0.8;
+  col += BOLT * b * (1.0 - aN * 0.6);
+  // Rain: long thin streaks on a slant at two depths, heaviest at the middle.
+  vec2 rp = vec2(c.x + c.y * 0.18, c.y) * vec2(uRes.y / (3.0 * uScale), 1.0);
+  float rain = 0.0;
+  for (int k = 0; k < 2; k++) {
+    vec2 q = rp * vec2(k == 0 ? 1.0 : 0.55, 1.0);
+    float h = hash(vec2(floor(q.x), float(k) + 1.0));
+    float y = fract(q.y * (0.8 + h) * 1.4 + uTime * (2.4 + h * 1.6) * (1.0 + float(k) * 0.5) + h * 7.0);
+    rain += step(0.84, h) * ss(0.0, 0.08, y) * (1.0 - ss(0.12, 0.3, y)) * (1.0 - ss(0.15, 0.5, abs(fract(q.x) - 0.5) * 2.0)) * (k == 0 ? 0.5 : 0.28);
+  }
+  col += mix(vec3(0.5, 0.58, 0.72), BOLT, clamp(inner, 0.0, 1.0)) * rain * ss(0.05, 0.4, cov) * (0.35 + 0.65 * max(aN, inside));
+  // A near strike flashes the whole frame electric blue-white.
+  col += BOLT * 0.12 * strike * cov;
+  return col;
+}
+
+// ---------------------------------------------------------------- flash
+const vec3 STRIKE = vec3(0.92, 0.95, 1.0);
+const vec3 POP = vec3(0.95, 0.97, 1.0); // one colour temperature through the cover: no cream step
+vec3 flash(vec2 uv, vec3 src) {
+  float ph = uPhase;
+  float A = uRes.x / uRes.y;
+  vec2 c = (uv - 0.5) * vec2(A, 1.0);
+  // ---- the whiteout: the picture burns out from its highlights, then a burst from the strike (high in
+  // the middle) spreads to every corner; the frame is white by the plateau.
+  float burn = ss(0.0, 0.4, ph);
+  vec3 hot = vec3(1.0) - exp(-src * (1.0 + 40.0 * burn * burn));
+  float front = ss(0.12, 0.44, ph) * 2.2 - length(c - vec2(0.0, 0.18)) * 1.1;
+  vec3 col = mix(src, hot, ss(0.0, 0.12, ph));
+  col = mix(col, STRIKE, ss(0.0, 0.5, front));
+  if (ph < 0.5) return col;
+  // ---- breaking up: the white veil thins off the stadium and leaves a sea of camera flashes, each a
+  // soft point (a few pixels across) with a short cross streak, at first a steady glare and then
+  // popping on its own clock, fewer and fewer: added light over the picture, never a mask.
+  float b = ss(0.5, 0.95, ph);
+  vec2 px = uv * uRes;
+  float veil = 1.0 - ss(0.0, 0.5, b);
+  float acc = 0.0;
+  for (int L = 0; L < 2; L++) {
+    float cell = (L == 0 ? 26.0 : 12.0) * uScale;
+    vec2 g = px / cell, id = floor(g);
+    for (int j = -1; j <= 1; j++) for (int i = -1; i <= 1; i++) {
+      vec2 n = id + vec2(float(i), float(j));
+      float h = hash(n + float(L) * 17.0), h2 = hash(n * 1.37 + 3.1 + float(L));
+      vec2 d = (g - (n + 0.5 + (vec2(h, h2) - 0.5) * 0.8)) * cell / uScale; // from its centre, in css pixels
+      float live = step(h2, 1.0 - 0.9 * b); // the crowd's flashes thin out
+      float I = live * mix(1.0, exp(-fract(uTime * (0.6 + h2) + h * 9.0) * 4.0), ss(0.1, 0.4, b));
+      float rc = mix(9.0, 1.0 + 3.0 * h2, ss(0.0, 0.35, b)); // its core shrinks to 2-8 px across
+      float core = exp(-dot(d, d) / (rc * rc));
+      float len = L == 0 ? 5.0 + 8.0 * h : 3.0 + 2.0 * h;
+      float streak = exp(-abs(d.x) / len) * exp(-d.y * d.y / 1.2) + exp(-abs(d.y) / len) * exp(-d.x * d.x / 1.2);
+      acc += I * (core + 0.5 * streak * ss(0.05, 0.3, b)) * (L == 0 ? 1.0 : 0.6);
+    }
+  }
+  col = mix(src, STRIKE, veil) + POP * acc * 1.2;
+  return mix(col, src, ss(0.85, 1.0, ph)); // and the last pops give way to the stadium's own
+}
+
 void main() {
   vec3 src = texture2D(inputBuffer, vUv).rgb;
-  gl_FragColor = vec4(uMode < 0.5 ? cloud(vUv, src) : tech(vUv), 1.0);
+  gl_FragColor = vec4(uMode < 0.5 ? cloud(vUv, src) : uMode < 1.5 ? tech(vUv) : uMode < 2.5 ? storm(vUv, src) : flash(vUv, src), 1.0);
 }`
+
+const MODES = { cloud: 0, tech: 1, storm: 2, flash: 3 }
 
 export class LevelFxPass extends Pass {
   constructor(noise) {
@@ -210,9 +352,9 @@ export class LevelFxPass extends Pass {
     this.uniforms = this.fullscreenMaterial.uniforms
   }
 
-  /** kind: 'cloud' | 'tech'; phase 0..1 through the transition (0.5 = full cover). */
+  /** kind: 'cloud' | 'tech' | 'storm' | 'flash'; phase 0..1 through the transition (0.5 = full cover). */
   set(kind, phase, t) {
-    this.uniforms.uMode.value = kind === 'tech' ? 1 : 0
+    this.uniforms.uMode.value = MODES[kind] ?? 0
     this.uniforms.uPhase.value = phase
     this.uniforms.uTime.value = t
   }

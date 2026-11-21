@@ -8,6 +8,7 @@ export const store = {
   workIn: 0, // Chapter Two arriving from below (the seam out of the India chapter)
   three: 0, // the journey (from the moment the chapter rises into view)
   four: 0, // Press Start: the neon coast and the block world
+  five: 0, // The Big Screen: the dive, the landing, the final
   epilogue: 0,
   epiIn: 0, // the epilogue rising into view
   night: true, // is a night (WebGL) chapter on screen?

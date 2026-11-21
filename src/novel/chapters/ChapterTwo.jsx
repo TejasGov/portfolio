@@ -2,7 +2,8 @@ import { Fragment, useEffect, useRef } from 'react'
 import { useBeats } from '../lib/Beats'
 import { store } from '../lib/store'
 import { useProgress, useRunningHead } from '../lib/chapters'
-import { CONTACT, PROJECTS } from '../content'
+import { ScrollTrigger } from '../lib/scroll'
+import { ALSO_SHOWING, CONTACT, LAB, PROJECTS } from '../content'
 import { Jump } from '../Book'
 
 /*
@@ -63,6 +64,7 @@ export default function ChapterTwo() {
   const bindCap = useBeats('work', CAPTIONS)
 
   return (
+    <>
     <section ref={ref} id="two" aria-labelledby="two-title" className="relative" style={{ height: '900svh' }}>
       <div className="sticky top-0 h-svh">
         {/* Fixed, under One (z-20), so it never rides Two's sticky up into a crop or draws over One's paper.
@@ -137,5 +139,147 @@ export default function ChapterTwo() {
         </div>
       </div>
     </section>
+    <Lobby />
+    </>
   )
 }
+
+/*
+ * After the films, the lobby: a paper sheet (z above Three's seam title) rises over the hall's ink drawing,
+ * carrying a wall of posters and the lab's index, then clears through its faded hem onto bare paper, where
+ * Three's title is uncovered and its journey inks in. The stage keeps drawing behind it, so Three still
+ * compiles while the reader pauses here. Until the sheet has covered the screen, Three's seam title (which
+ * keys off Two's end) is held back (index.css [data-lobby-ahead]), so it never announces Three over the lobby.
+ */
+const ART = {
+  // A voice, drawn as a waveform: bars from two sines.
+  echoscribe: (
+    <g fill="currentColor">
+      {Array.from({ length: 34 }, (_, i) => {
+        const h = 8 + Math.abs(Math.sin(i * 0.55) * 46 + Math.sin(i * 1.7) * 16)
+        return <rect key={i} x={6 + i * 5.6} y={60 - h / 2} width="3" height={h} rx="1.5" />
+      })}
+    </g>
+  ),
+  // A wall of films; one is lit.
+  'whattowatch-tonight': (
+    <g>
+      {Array.from({ length: 40 }, (_, i) => (
+        <rect key={i} x={4 + (i % 10) * 19.4} y={4 + Math.floor(i / 10) * 28} width="15" height="23" fill="currentColor" opacity={i === 16 ? 1 : 0.16} />
+      ))}
+      <circle cx="139" cy="43" r="24" fill="none" stroke="currentColor" strokeWidth="1" opacity="0.6" />
+    </g>
+  ),
+  // A notice, read into ticks.
+  'backpack-brain': (
+    <g fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="44" y="6" width="112" height="108" rx="3" />
+      {[30, 54, 78, 102].map((y, i) => (
+        <g key={y} opacity={i === 3 ? 0.4 : 1}>
+          <path d={`M58 ${y - 4}l5 5 9-10`} stroke="var(--ac2)" />
+          <path d={`M82 ${y}h${[58, 44, 52, 34][i]}`} />
+        </g>
+      ))}
+    </g>
+  ),
+  // A pixel skyline under three coins.
+  'gotta-get-rich': (
+    <g shapeRendering="crispEdges">
+      {[[0, 60], [18, 38], [36, 74], [54, 50], [72, 88], [90, 30], [108, 64], [126, 96], [144, 44], [162, 70], [180, 56]].map(([x, h]) => (
+        <rect key={x} x={x + 2} y={120 - h} width="16" height={h} fill="currentColor" opacity="0.85" />
+      ))}
+      {[[46, 12], [100, 4], [150, 16]].map(([x, y]) => (
+        <g key={x} fill="var(--ac2)">
+          <rect x={x} y={y + 3} width="12" height="6" />
+          <rect x={x + 3} y={y} width="6" height="12" />
+        </g>
+      ))}
+    </g>
+  ),
+}
+
+function Lobby() {
+  const ref = useRef(null)
+  useRunningHead(ref, LOBBY_HEAD)
+  useEffect(() => {
+    const el = ref.current, root = document.documentElement
+    // Ahead of the sheet (it has not yet covered the screen): hold Three's seam title back.
+    const hold = s => root.toggleAttribute('data-lobby-ahead', !s.isActive)
+    const st = ScrollTrigger.create({ trigger: el, start: 'top top', end: 'max', onToggle: hold, onRefresh: hold })
+    hold(st)
+    // Posters slide up and settle, the lab fades in: once, as each enters.
+    const io = new IntersectionObserver(es => es.forEach(e => e.isIntersecting && (e.target.classList.add('is-in'), io.unobserve(e.target))), { rootMargin: '0px 0px -12% 0px' })
+    el.querySelectorAll('[data-enter]').forEach(n => io.observe(n))
+    return () => {
+      st.kill()
+      io.disconnect()
+      root.removeAttribute('data-lobby-ahead')
+    }
+  }, [])
+
+  return (
+    <section ref={ref} id="also" aria-labelledby="also-title" className="relative z-[2]">
+      <div className="paper lobby-ground px-4 md:px-[6vw]">
+        <div className="mx-auto max-w-[80rem]">
+          <p className="poster text-stamp" style={{ '--s': 2.2 }}>Chapter Two · Also showing</p>
+          <h2 id="also-title" className="display-title mt-4 block text-[clamp(2.3rem,5.4vw,5.2rem)] leading-[0.92] text-ink"><span>Also</span> <span className="title-heavy">showing</span></h2>
+          <p className="mt-5 max-w-[38ch] font-serif text-lg text-ink/80">Four more projects, on the lobby wall.</p>
+
+          <ul data-enter className="lobby-wall mt-10 md:mt-14" aria-label="Also showing">
+            {ALSO_SHOWING.map((p, i) => (
+              <li key={p.id} id={`also-${p.id}`} className="one-sheet" style={{ '--i': i }} data-art={p.id}>
+                <article aria-labelledby={`also-${p.id}-t`}>
+                  <div className="one-sheet-face">
+                    <p className="kicker one-sheet-top">Tejas Govind presents</p>
+                    <svg className="one-sheet-art" viewBox="0 0 200 120" aria-hidden="true">{ART[p.id]}</svg>
+                    <h3 id={`also-${p.id}-t`} className="one-sheet-title">{p.title}</h3>
+                    {p.tag && <p className="one-sheet-tag">{p.tag}</p>}
+                    <p className="one-sheet-line">{p.line}</p>
+                    <p className="one-sheet-bill">{dots(p.bill)}</p>
+                    <span className="one-sheet-sweep" aria-hidden="true" />
+                  </div>
+                  <div className="mt-3 flex gap-2">
+                    {p.link && <a href={p.link} {...ext} className={LOBBY_BTN} aria-label={`${p.title}: live demo (opens in a new tab)`}>Live ↗</a>}
+                    {p.github && <a href={p.github} {...ext} className={LOBBY_BTN} aria-label={`${p.title}: code (opens in a new tab)`}>Code ↗</a>}
+                  </div>
+                </article>
+              </li>
+            ))}
+          </ul>
+
+          <div id="lab" data-enter className="lab mt-24 md:mt-32">
+            <p className="kicker text-stamp">Machine learning · private repos</p>
+            <h2 className="display-title mt-3 block text-[clamp(1.9rem,3.6vw,3.2rem)] leading-[0.95] text-ink"><span>In the</span> <span className="title-heavy">lab</span></h2>
+            <ol className="mt-8 border-t border-ink/25">
+              {LAB.map((p, i) => (
+                <li key={p.id} id={`lab-${p.id}`} className="lab-row border-b border-ink/15 py-5 md:py-6">
+                  <span className="kicker text-ink/55">L-{String(i + 1).padStart(2, '0')}</span>
+                  <div>
+                    <h3 className="font-display text-[1.35rem] leading-tight text-ink md:text-[1.6rem]">{p.title}</h3>
+                    <p className="mt-1.5 max-w-[60ch] font-serif text-[1.02rem] leading-snug text-ink/85">{p.does}</p>
+                    <p className="mt-2 font-mono text-[12.5px] leading-[1.7] tracking-[0.04em] text-ink/70">{p.how.join(' · ')}</p>
+                    {p.result && (
+                      <p className="mt-2 max-w-[70ch] font-serif text-[0.95rem] leading-snug text-ink/75">
+                        <span className="kicker mr-2 text-[10.5px]! text-ink/50">From the README</span>“{p.result}”
+                      </p>
+                    )}
+                  </div>
+                  <p className="lab-meta kicker text-[11px]! leading-[1.8] text-ink/55">
+                    <span className="block">Private repo</span>
+                    <span className="block normal-case tracking-[0.06em]">{dots(p.stack)}</span>
+                  </p>
+                </li>
+              ))}
+            </ol>
+          </div>
+        </div>
+      </div>
+      {/* Bare paper under the hem, where Three's title is uncovered before its journey inks in. */}
+      <div aria-hidden="true" className="h-[45svh]" />
+    </section>
+  )
+}
+const LOBBY_HEAD = 'Chapter Two · Also showing'
+// A dotted list that only wraps between items.
+const dots = s => s.split(' · ').map((t, k) => <Fragment key={t}>{k > 0 && ' · '}<span className="whitespace-nowrap">{t}</span></Fragment>)
+const LOBBY_BTN = 'inline-flex min-h-11 flex-1 items-center justify-center border border-ink/35 px-3 font-mono text-[12.5px] tracking-[0.14em] uppercase text-ink hover:bg-ink hover:text-paper'

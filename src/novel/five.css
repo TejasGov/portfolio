@@ -1,0 +1,49 @@
+/*
+ * Chapter Five's own styles (ChapterFive.jsx imports this; index.css belongs to the interface track).
+ * The chapter's type uses only the site's classes (font-display, kicker, poster, font-mono): no
+ * handwriting or script faces and no italics here.
+ */
+
+/* The title card sits on a calm ground, as Four's does: a soft dark scrim under it that fades out
+   before its own edges (inside the beats' 60 px wipe margin). */
+.five-title {
+  position: relative;
+  isolation: isolate;
+}
+.five-title::before {
+  content: '';
+  position: absolute;
+  inset: -60px;
+  z-index: -1;
+  pointer-events: none;
+  background: radial-gradient(closest-side, rgb(4 6 12 / 0.7), rgb(4 6 12 / 0.55) 55%, rgb(4 6 12 / 0));
+}
+.five-kicker {
+  text-shadow: 0 4px 50px rgb(3 5 11 / 0.95), 0 1px 3px rgb(3 5 11 / 0.8);
+}
+/* A phone: the title stays low, under the tower's crown and blade; the slates go low too, under him on
+   the roof edge; the caption clears the folio pill. */
+@media (max-width: 760px) and (orientation: portrait) {
+  .five-slate {
+    align-self: end;
+    margin-bottom: 40px;
+  }
+  .five-caption {
+    margin-bottom: 40px;
+  }
+}
+
+/* The "Suit up" prompt: its letters stay solid and only the blue glow round them pulses. */
+.five-pulse {
+  animation: five-pulse 1.1s ease-in-out infinite;
+}
+@keyframes five-pulse {
+  50% {
+    text-shadow: 0 0 4px rgb(111 184 255 / 0.35);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .five-pulse {
+    animation: none;
+  }
+}

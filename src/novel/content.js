@@ -26,6 +26,32 @@ export const PROJECTS = [
   }
 })
 
+/** Chapter Two's lobby wall: one poster each. `bill` is the poster's credit block (its key tech). */
+export const ALSO_SHOWING = [
+  { id: 'echoscribe', line: 'An ambient clinical scribe: a doctor and patient talk, and a structured SOAP note writes itself.', bill: 'FastAPI · React · Whisper · PyAnnote · FHIR R4' },
+  { id: 'whattowatch-tonight', title: 'WhatToWatch Tonight', tag: 'One film. Everyone agrees.', line: 'Movie night for a group: everyone ranks, a Borda count combines the votes, one film wins.', bill: 'React · TypeScript · Vite · Tailwind · OMDb' },
+  { id: 'backpack-brain', tag: 'Snap the notice. Know what to do.', line: 'School flyers, bills and invites, turned into clear action cards for busy families.', bill: 'React · TypeScript · Tailwind · Supabase' },
+  { id: 'gotta-get-rich', line: 'A retro pixel-art life sim: pick a career, buy property, play the stock market.', bill: 'Next.js · TypeScript · Tailwind · shadcn/ui' },
+].map(p => {
+  const d = project(p.id)
+  return { ...p, title: p.title ?? d.title, category: d.category, link: real(d.link), github: real(d.github) }
+})
+
+/**
+ * Chapter Two's lab list: the machine-learning repos (private, so no code link). `does` is from the repo
+ * description, `how` from its README, and `result` (when present) is the README's own words.
+ */
+export const LAB = [
+  { id: 'gpt-from-scratch', does: 'A GPT-style transformer written from scratch in PyTorch and trained on TinyStories.', how: ['BPE tokenizer', 'Attention, implemented by hand', 'Sampling', 'Attention visualiser'] },
+  { id: 'llm-router', does: 'Learned routing between cheap and expensive LLMs (Qwen2.5 0.5B–7B), plus intent routing with out-of-scope rejection.', how: ['Matrix factorization router', 'TF-IDF + logistic regression', 'Accuracy-vs-cost curves', 'Out-of-scope rejection'], result: 'Intent routing (CLINC150, semantic router): 0.884 overall accuracy, 0.834 out-of-scope recall' },
+  { id: 'agent-harness', does: 'An agent harness from scratch: tool calling, permissions, budgets, tracing and replay.', how: ['Tool calling and permissions', 'Tracing and replay', 'Five workflow patterns', 'Deterministic eval suite'], result: 'ToolBench-Lite pass@1 (48 multi-step tasks, T = 0): 25% → 48% → 60% → 69% from 0.5B to 7B.' },
+  { id: 'movie-recommender', does: 'Five movie recommenders on MovieLens, from a popularity baseline to learned embeddings.', how: ['Item-KNN', 'Matrix factorisation, BPR and EASE', 'Ranking metrics', 'Leakage check'], result: 'EASE wins: NDCG@10 0.126 and a 50.6% hit rate, against 0.077 and 32.4% for the popularity baseline.' },
+  { id: 'spam-detector', does: 'An SMS spam detector with honest evaluation, error analysis and a Streamlit demo.', how: ['TF-IDF word and character n-grams', 'Logistic regression', 'Threshold tuning', 'Error analysis'], result: 'Test F1 (spam) 0.977: catches 125 of 128 spam, with 3 false alarms out of 904 ham' },
+].map(p => {
+  const d = project(p.id)
+  return { ...p, title: d.title, stack: d.tech.replace(/, /g, ' · ') }
+})
+
 /** Every role, newest first, for Chapter Three's index. */
 export const ALL_ROLES = workData.map(w => ({ org: w.org, role: w.role, team: w.team, period: w.period, year: w.year, place: w.location, type: w.type, impact: w.impact, bullets: w.bullets, current: w.current, future: w.future }))
 

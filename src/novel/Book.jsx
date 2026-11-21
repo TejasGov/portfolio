@@ -1,28 +1,52 @@
 import { useEffect, useRef, useState } from 'react'
 import { store } from './lib/store'
 import { sound } from './lib/sound'
-import { ALSO_BUILT, CONTACT, JOURNEY, PROJECTS, RESUME } from './content'
+import { reducedMotion } from './lib/scroll'
+import { ALSO_BUILT, ALSO_SHOWING, CONTACT, JOURNEY, LAB, PROJECTS, RESUME } from './content'
 
 export const CONTENTS = [
   { id: 'prologue', n: '—', title: 'Prologue', sub: 'Lights down' },
   { id: 'one', n: 'I', title: 'About me', sub: 'Who I am, where I’m from' },
-  { id: 'two', n: 'II', title: 'Now Showing', sub: 'Five projects' },
+  { id: 'two', n: 'II', title: 'Now Showing', sub: 'Five films, and more' },
   { id: 'three', n: 'III', title: 'Places I Worked', sub: 'Prayagraj to New York' },
   { id: 'four', n: 'IV', title: 'Press Start', sub: 'An ode to games' },
+  { id: 'five', n: 'V', title: 'The Big Screen', sub: 'Heroes, and a final' },
   { id: 'epilogue', n: '—', title: 'Epilogue', sub: 'House lights' },
 ]
 
 // Deep links for the Contents: every film, and every role newest first (Daiwa first).
 const FILMS_TOC = PROJECTS.map((p, i) => ({ key: p.id, label: p.title, chapter: 'two', i }))
+// ...then the lobby after the films: the poster wall and the lab's index.
+const LOBBY_TOC = [['Also showing', ALSO_SHOWING.map(p => ({ id: `also-${p.id}`, label: p.title }))], ['In the lab', LAB.map(p => ({ id: `lab-${p.id}`, label: p.title }))]]
 const ROLES_TOC = [...JOURNEY].reverse().flatMap((s, r) => [...s.roles].reverse().map(x => ({ key: `${x.org}·${x.role}`, label: `${x.role} · ${x.org} · ${x.period}`, chapter: 'three', k: JOURNEY.length - 1 - r })))
 
+// Reduced motion: no long sweep through every world on the way down.
+const glide = () => (reducedMotion() ? 'instant' : 'smooth')
+// Set while we move focus ourselves: a Jump's onFocus (land, or the dialog handing focus back) would re-jump.
+let quiet = false
+const hush = fn => {
+  quiet = true
+  try { fn() } finally { quiet = false }
+}
+const closeContents = () => hush(() => document.querySelector('dialog[open]')?.close())
+// Keyboard and screen-reader users land where they jumped, not back at the top of the tab order.
+function land(el) {
+  if (!el) return
+  if (el.tabIndex < 0 && !el.hasAttribute('tabindex')) el.tabIndex = -1
+  hush(() => el.focus({ preventScroll: true }))
+}
+const jumpKey = ({ chapter, i, k }) => `${chapter}${i ?? k ?? ''}`
+
 export function goToId(id) {
-  document.querySelector('dialog[open]')?.close()
-  document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' })
+  closeContents()
+  const el = document.getElementById(id)
+  el?.scrollIntoView({ behavior: glide() })
+  land(el)
 }
 // The exact scroll where an item's card is opaque, from each chapter's progress range (lib/chapters useProgress).
-export function goTo({ chapter, i, k }, behavior = 'smooth') {
-  document.querySelector('dialog[open]')?.close()
+export function goTo(to, behavior = glide()) {
+  const { chapter, i, k } = to
+  closeContents()
   const el = document.getElementById(chapter)
   if (!el) return
   const h = el.offsetHeight, top = el.getBoundingClientRect().top + scrollY
@@ -30,8 +54,12 @@ export function goTo({ chapter, i, k }, behavior = 'smooth') {
     ? top + innerHeight * 0.3 // the About card at rest (ChapterOne.jsx onFocus)
     : chapter === 'two'
     ? top + (h - innerHeight) * (0.15 + (i + 0.5) * 0.14) // 'top top' → 'bottom bottom'; the middle of film i
+    : chapter === 'five'
+    ? top - innerHeight + h * 0.035 // 'top bottom' → 'bottom bottom'; the title card over the push into the screen, before the tower's wide shot
     : top - innerHeight + h * ((k + (k ? 0.6 : 0.85)) / JOURNEY.length) // 'top bottom' → 'bottom bottom'; inside every stop's opaque window, the last one's too; the first lands after the chapter sticks (a phone's sheet is still rising before)
   scrollTo({ top: y, behavior })
+  // The item's Jump (its next Tab enters the card's links), else the chapter itself.
+  land(document.querySelector(`[data-jump="${jumpKey(to)}"]`) ?? el)
 }
 
 /**
@@ -41,7 +69,8 @@ export function goTo({ chapter, i, k }, behavior = 'smooth') {
 export const Jump = ({ to, children }) => (
   <button
     type="button"
-    onFocus={() => requestAnimationFrame(() => goTo(to, 'instant'))} // after the browser's own focus scroll
+    data-jump={jumpKey(to)}
+    onFocus={() => quiet || requestAnimationFrame(() => goTo(to, 'instant'))} // after the browser's own focus scroll
     onClick={() => goTo(to, 'instant')}
     className="kicker sr-only z-50 rounded-sm bg-[rgb(10_10_14/0.92)] text-white focus-visible:not-sr-only focus-visible:px-3 focus-visible:py-2 focus-visible:fixed focus-visible:top-20 focus-visible:left-5 md:focus-visible:top-24 md:focus-visible:left-7"
   >
@@ -63,7 +92,7 @@ export const SoundIcon = ({ on }) => (
  * bright worlds. Dark over the films, cream over paper, so it never fights the page; the swap crossfades.
  */
 const DARK = 'bg-[rgb(10_10_14/0.92)] text-white' // near opaque, so lit geometry never shows through
-const CREAM = 'bg-[rgb(239_232_218/0.88)] text-ink ring-1 ring-ink/15'
+const CREAM = 'bg-paper text-ink ring-1 ring-ink/15' // opaque: on paper the text scrolling under it is the same colour as the pill's own
 export default function Book() {
   const [label, setLabel] = useState('Prologue · Lights down')
   const [night, setNight] = useState(store.night)
@@ -76,7 +105,8 @@ export default function Book() {
   const page = useRef(null)
   const dialog = useRef(null)
   // Paper: a paper chapter covers the screen (store.night), or Chapter Three's paper-coloured world is up.
-  const paper = !night || label.startsWith('Chapter Three')
+  const sheet = !night || label.endsWith('Also showing') // a paper page in the DOM (the lobby is a paper sheet over a live stage)
+  const paper = sheet || label.startsWith('Chapter Three')
   const PILL = `rounded-sm px-2 whitespace-nowrap backdrop-blur-sm transition-[background-color,color,box-shadow] duration-200 md:px-3 ${paper ? CREAM : DARK}` // px-2 on phones: the four pills fit 390 px on one line
   const TAP = `inline-flex items-center min-h-11 ${PILL}` // 44 px tap target
 
@@ -110,6 +140,8 @@ export default function Book() {
     <>
       {/* Over the night worlds, the screen's lit top rail fades out under the header band. Not over a bright frame: there it reads as a smear. */}
       <div aria-hidden="true" className={`pointer-events-none fixed inset-x-0 top-0 z-[49] h-[104px] bg-gradient-to-b from-[rgb(3_5_11/0.9)] via-[rgb(3_5_11/0.55)] to-transparent transition-opacity duration-200 md:h-[120px] ${paper || landing || bright ? 'opacity-0' : 'opacity-100'}`} />
+      {/* On a paper page, its text fades into paper before it reaches the pills, so nothing reads half-hidden between them. */}
+      <div aria-hidden="true" className={`pointer-events-none fixed inset-x-0 top-0 z-[49] h-[88px] bg-gradient-to-b from-paper from-65% to-transparent transition-opacity duration-200 min-[380px]:h-[104px] md:h-[120px] ${sheet && !landing ? 'opacity-100' : 'opacity-0'}`} />
       <header className={`pointer-events-none fixed inset-x-0 top-0 z-50 flex items-start justify-between p-3 transition-[opacity,visibility] duration-300 min-[380px]:p-5 md:p-7 ${OFF}`}>
         <a href="#prologue" className={`kicker pointer-events-auto ${TAP}`}>Tejas Govind</a>
         <p className={`kicker hidden min-h-11 items-center md:inline-flex ${PILL}`}>{label}</p>
@@ -153,7 +185,7 @@ export default function Book() {
             {CONTENTS.map(c => (
               <li key={c.id}>
                 {/* Under 480px the subtitle stacks under the title instead of squeezing the leader to a stub. */}
-                <button type="button" onClick={() => goToId(c.id)} className="group flex w-full flex-wrap items-baseline gap-x-4 py-2 text-left min-[480px]:flex-nowrap">
+                <button type="button" onClick={() => (c.id === 'five' ? goTo({ chapter: 'five' }) : goToId(c.id))} className="group flex w-full flex-wrap items-baseline gap-x-4 py-2 text-left min-[480px]:flex-nowrap">
                   <span className="kicker w-8 opacity-60">{c.n}</span>
                   <span className="font-display text-xl whitespace-nowrap group-hover:text-stamp">{c.title}</span>
                   <span className="mx-2 hidden flex-1 border-b border-dotted border-ink/30 min-[480px]:block" aria-hidden="true" />
@@ -166,6 +198,16 @@ export default function Book() {
                         <button type="button" onClick={() => goTo(t)} className="flex min-h-11 w-full items-center text-left font-serif text-[15px] leading-snug underline-offset-4 hover:underline">
                           {t.label}
                         </button>
+                      </li>
+                    ))}
+                    {c.id === 'two' && LOBBY_TOC.map(([name, items]) => (
+                      <li key={name} className="flex flex-wrap items-center gap-x-3 font-serif text-[15px] leading-snug">
+                        <span className="basis-full pt-2 opacity-60">{name}</span>
+                        {items.map(t => (
+                          <button key={t.id} type="button" onClick={() => goToId(t.id)} className="inline-flex min-h-11 items-center text-left underline underline-offset-4 hover:opacity-70">
+                            {t.label}
+                          </button>
+                        ))}
                       </li>
                     ))}
                     {c.id === 'two' && (
