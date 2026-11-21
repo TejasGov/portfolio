@@ -27,7 +27,7 @@ export const PROJECTS = [
 })
 
 /** Every role, newest first, for Chapter Three's index. */
-export const ALL_ROLES = workData.map(w => ({ org: w.org, role: w.role, period: w.period, year: w.year, place: w.location, type: w.type, impact: w.impact, bullets: w.bullets, current: w.current, future: w.future }))
+export const ALL_ROLES = workData.map(w => ({ org: w.org, role: w.role, team: w.team, period: w.period, year: w.year, place: w.location, type: w.type, impact: w.impact, bullets: w.bullets, current: w.current, future: w.future }))
 
 /** A shorter list of headline roles. */
 export const ROLES = ['Daiwa Capital Markets America', 'COA', 'UB College of Arts & Sciences', 'MedTourEasy', 'Sunflower Association'].map(org => {
@@ -35,9 +35,19 @@ export const ROLES = ['Daiwa Capital Markets America', 'COA', 'UB College of Art
   return { org: w.org, role: w.role, period: w.period, place: w.location, impact: w.impact }
 })
 
+export const RESUME = '/Tejas_Govind_Resume.pdf' // public/
+
+/** The two résumé projects that are not among the five films. */
+export const ALSO_BUILT = [
+  { title: 'Afim', href: 'https://github.com/TejasGov/Afim' },
+  { title: 'Shadow Cohort', href: 'https://github.com/atshalahmedkhan/Hackathon_UD' },
+]
+
 export const CONTACT = {
   email: 'tejasgov2005@gmail.com',
+  // Résumé first: every contact row (Contents, epilogue, colophon) maps this list.
   links: [
+    { label: 'Résumé', href: RESUME },
     { label: 'GitHub', href: 'https://github.com/TejasGov' },
     { label: 'LinkedIn', href: 'https://www.linkedin.com/in/tejas-govind-29520a2b2/' },
     { label: 'Instagram', href: 'https://www.instagram.com/tejasgovind_' },

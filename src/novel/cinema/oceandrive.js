@@ -56,7 +56,7 @@ function box(w, h, d, tile = 3) {
 export const neonSignTexture = (...a) => neonTexture(...a)
 
 /** Neon lettering on a dark-transparent canvas: a glowing core and a soft halo, for an emissive plane. */
-function neonTexture(text, color, { vertical = false, font = 'Caveat', weight = 700 } = {}) {
+function neonTexture(text, color, { vertical = false, font = 'Archivo Variable', weight = 700 } = {}) {
   const c = document.createElement('canvas')
   const W = vertical ? 256 : 1024, H = vertical ? 1024 : 256
   c.width = W
@@ -73,10 +73,10 @@ function neonTexture(text, color, { vertical = false, font = 'Caveat', weight = 
     if (vertical) {
       const letters = text.toUpperCase().split('') // a space stays a gap between words
       const step = H / (letters.length + 1)
-      g.font = `400 ${Math.min(step * 0.92, 180)}px Anton, Impact, sans-serif`
+      g.font = `800 extra-condensed ${Math.min(step * 0.92, 180)}px "Archivo Variable", Impact, sans-serif`
       letters.forEach((ch, i) => g.fillText(ch, W / 2, step * (i + 1)))
     } else {
-      g.font = `${weight} ${H * 0.62}px "${font}", cursive`
+      g.font = `${weight} semi-expanded ${H * 0.44}px "${font}", sans-serif`
       g.fillText(text, W / 2, H / 2)
     }
   }
@@ -101,10 +101,22 @@ function stripes(a, b, n = 8) {
   return t
 }
 
-export function buildOceanDrive(scene, { wrap = m => m, mobile = false } = {}) {
-  const loader = new THREE.TextureLoader()
+export async function buildOceanDrive(scene, { wrap = m => m, mobile = false } = {}) {
+  // Built in steps of a few milliseconds between frames (arcade.js awaits it), so it never holds one long.
+  let t0 = performance.now()
+  const step = async () => {
+    if (performance.now() - t0 < 4) return
+    await new Promise(r => setTimeout(r))
+    t0 = performance.now()
+  }
+  // Decoded off the main thread into bitmaps: an <img> is decoded inside the upload itself, ~20 ms a
+  // texture, which froze the first stop of Chapter Three while these were prepared. Flipped as a
+  // TextureLoader's would be, and with no colour conversion (normal and roughness maps are data).
+  const loader = new THREE.ImageBitmapLoader().setOptions({ imageOrientation: 'flipY', premultiplyAlpha: 'none', colorSpaceConversion: 'none' })
   const tex = (name, srgb, rep) => {
-    const t = loader.load(TEX + name)
+    const t = new THREE.Texture()
+    t.flipY = false // done in the decode
+    loader.load(TEX + name, bmp => { t.image = bmp; t.needsUpdate = true })
     t.wrapS = t.wrapT = THREE.RepeatWrapping
     t.anisotropy = 8
     if (srgb) t.colorSpace = THREE.SRGBColorSpace
@@ -125,6 +137,7 @@ export function buildOceanDrive(scene, { wrap = m => m, mobile = false } = {}) {
     return o
   }
 
+  await step()
   // ------------------------------------------------------------ ground: sidewalk, road, promenade, lawn, beach
   const X0 = -24, X1 = 170, L = X1 - X0 // past the last hotel (x ~123), so the boulevard runs on into the haze
   const strip = (z0, z1, mat, y = 0) => {
@@ -157,6 +170,7 @@ export function buildOceanDrive(scene, { wrap = m => m, mobile = false } = {}) {
   mergeByMaterial(marks)
   scene.add(marks)
 
+  await step()
   // ------------------------------------------------------------ the hotels
   const FLOOR = 3.1
   function hotel(x, i) {
@@ -277,11 +291,13 @@ export function buildOceanDrive(scene, { wrap = m => m, mobile = false } = {}) {
       hx += CLUB_W + 1.2
     }
     const w = [12, 10, 14, 11, 12, 13, 10, 12, 11][i % 9]
+    await step()
     hotel(hx + w / 2, i)
     hotels.push({ x: hx + w / 2, w, floors: [3, 4, 3, 5, 3, 4, 3, 4, 3][i % 9] })
     hx += w + 1.2
   }
 
+  await step()
   // A city skyline across the water at the end of the boulevard, lit windows and red beacons in the haze.
   const winTex = (() => {
     const c = document.createElement('canvas')
@@ -317,6 +333,7 @@ export function buildOceanDrive(scene, { wrap = m => m, mobile = false } = {}) {
     return l
   })
 
+  await step()
   // ------------------------------------------------------------ the promenade: lamps, palms' places
   const lampMat = std({ color: '#1f3438', roughness: 0.45, metalness: 0.5 }) // dark painted iron: a slim silhouette at dusk, the globe does the glowing
   const lamps = new THREE.Group()

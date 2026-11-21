@@ -64,7 +64,7 @@ function board() {
     g.fillText('RUNS', 34, 62)
     g.fillText('LAST BALL', 290, 62)
     g.fillStyle = '#ffffff'
-    g.font = '400 150px Anton, Impact, sans-serif'
+    g.font = '800 extra-condensed 150px "Archivo Variable", Impact, sans-serif'
     g.fillText(String(runs), 34, 220)
     g.fillStyle = '#7fd0ff'
     g.fillText(String(last), 330, 220)
@@ -138,7 +138,7 @@ export async function smash({ traveller }) {
 
   // The numerals, one per count, and the ball.
   const numerals = Object.fromEntries([1, 2, 3, 4, 6].map(n => {
-    const sp = textSprite(String(n), { font: '400 220px Anton, Impact, sans-serif', color: '#ffffff', glow: '#7fd0ff', size: 0.9 })
+    const sp = textSprite(String(n), { font: '800 extra-condensed 220px "Archivo Variable", Impact, sans-serif', color: '#ffffff', glow: '#7fd0ff', size: 0.9 })
     sp.material.opacity = 0
     scene.add(sp)
     return [n, sp]

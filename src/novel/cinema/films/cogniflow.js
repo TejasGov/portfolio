@@ -145,7 +145,7 @@ export async function cogniflow({ traveller }) {
     scene.add(sp)
     return sp
   })
-  const nudge = textSprite('Take two minutes. Then one small step.', { font: 'italic 400 44px "Instrument Serif", serif', color: '#fff7e6', glow: '#7ff0ff', size: 0.34, width: 1024, height: 120 })
+  const nudge = textSprite('Take two minutes. Then one small step.', { font: '500 40px "Archivo Variable", sans-serif', color: '#fff7e6', glow: '#7ff0ff', size: 0.34, width: 1024, height: 120 })
   scene.add(nudge)
 
   scene.add(new THREE.HemisphereLight('#9a8fd6', '#3a2b2a', 1.1))

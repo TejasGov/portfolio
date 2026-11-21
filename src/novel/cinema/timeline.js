@@ -1,6 +1,7 @@
 import * as THREE from 'three'
 import { PROJECTS } from '../content'
 import { LENS, SCREEN, insideDistance } from './world'
+import { BACK, LAST, levelAt } from './levels'
 
 /*
  * Scroll → the cinema. One function maps the store (prologue / work / epilogue progress) to what the
@@ -162,16 +163,20 @@ export function stateAt(s, mouse, aspect) {
     st.sketch = { follow: true, dir: ALONG, r, band: 1.0, ink: ss(0, 0.02, p) * (1 - 0.65 * ss(0.99, 0.999, p)), grid: 0.3, shimmer: 0.6, tint: '#3b2f22', tint2: '#7a6448' } // an ink crest, not the grass's lime
   } else if (sec === 'four') {
     // Press Start: drawn onto the page around you and blooming into the neon coast; the wave to the
-    // block world is the chapter's own (arcade.js). It ends as a film does: the game is on the cinema's
-    // screen, and the camera backs out of it to your seat in the hall, where the epilogue begins.
+    // block world is the coast's own (arcade.js), then clouds to the village and a console boot to
+    // night ops (levels.js: one world at a time, swapped under a covering transition). It ends as a
+    // film does: the game is on the cinema's screen, and the camera backs out of it to your seat in
+    // the hall, where the epilogue begins.
     const p = s.four
-    st.arcade = { p, still: s.still } // reduced motion: the wave is a cut
-    const bloom = ss(0.012, 0.07, p)
-    if (bloom < 1) st.sketch = { follow: true, r: -4 + bloom * 70, origin: SCREEN, band: 1.4, ink: 0.35 + 0.65 * ss(0, 0.012, p), ...NEON }
-    else if (p > 0.93) {
-      const back = ss(0.93, 0.995, p)
-      st.arcade.onScreen = true
-      st.arcade.back = back
+    st.game = levelAt(p, s.still) // { level, p (the level's own), kind, phase, cover }
+    st.game.still = s.still // reduced motion: the wave and the transitions are cuts
+    const ap = st.game.i === 0 ? st.game.p : 1 // the coast's own progress, for its opening seam
+    const bloom = ss(0.012, 0.07, ap)
+    if (bloom < 1) st.sketch = { follow: true, r: -4 + bloom * 70, origin: SCREEN, band: 1.4, ink: 0.35 + 0.65 * ss(0, 0.012, ap), ...NEON }
+    else if (p > BACK) {
+      const back = ss(BACK, 0.995, p)
+      st.game.onScreen = true
+      st.game.back = back
       inPos.copy(SCREEN).setZ(SCREEN.z - insideDistance(st.fov, aspect)) // where the screen exactly fills the frame
       out.pos.copy(inPos).lerp(EPI_POS.getPoint(0), back)
       out.target.copy(SCREEN).lerp(EPI_LOOK.getPoint(0), back)
@@ -200,7 +205,7 @@ export function stateAt(s, mouse, aspect) {
     // Arriving from Chapter Four's back-out: the game is still on the screen; it fades out as the
     // epilogue rises, and "The End" comes up behind it.
     const fade = 1 - ss(0.08, 0.3, s.epiIn) // off the screen before the title is fully lit
-    if (fade > 0) st.arcade = { p: 1, onScreen: true, show: fade }
+    if (fade > 0) st.game = { level: LAST, p: 1, onScreen: true, show: fade }
   }
 
   // A hand on the camera: gentle parallax from the pointer.

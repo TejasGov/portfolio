@@ -99,17 +99,37 @@ export function paintTexture(base, spots, { size = 512, count = 220, seed = 1 } 
  * The traveller. Each film clones him with its own mixer. `look` restyles him: 'self' keeps his painted
  * texture; 'shadow' makes him a dark double with a glowing outline.
  */
-export async function loadTraveller(loader) {
-  const gltf = await loader.loadAsync('/cinema/traveller.glb') // the rig, his texture and all his clips
-  // Every clip loops in place: take out the hips' net drift across a clip (a dance step that travels),
-  // so a loop never snaps him back to where it started.
-  for (const clip of gltf.animations) {
+// Every clip loops in place: take out the hips' net drift across a clip (a dance step that travels),
+// so a loop never snaps him back to where it started.
+function inPlace(clips) {
+  for (const clip of clips) {
     const tr = clip.tracks.find(k => k.name.endsWith('Hips.position'))
     if (!tr || !clip.duration) continue
     const v = tr.values, n = tr.times.length
     const drift = [0, 1, 2].map(i => v[(n - 1) * 3 + i] - v[i])
     for (let k = 0; k < n; k++) for (let i = 0; i < 3; i++) v[k * 3 + i] -= drift[i] * (tr.times[k] / clip.duration)
   }
+  return clips
+}
+
+/**
+ * Extra animations for the traveller from a clips-only GLB on the same rig (same bone names), made
+ * in-place like his own, without touching traveller.glb. Give them to a made traveller with add().
+ */
+export const loadClips = (loader, url) => loader.loadAsync(url).then(gltf => inPlace(gltf.animations))
+
+// One load and one parse for the whole site: the films, the journey and every game world clone this.
+let shared = null
+export const loadTraveller = loader => (shared ??= parseTraveller(loader))
+
+// His aloha shirt (scripts/cinema/aloha.py) read as painted, with no sRGB decode: one copy on the GPU
+// for the village and night ops, whose frames are shown without an encode (it would turn his skin red).
+let alohaFlat = null
+export const alohaLinear = () => (alohaFlat ??= Object.assign(new THREE.TextureLoader().load('/cinema/traveller_aloha.webp'), { flipY: false, colorSpace: THREE.NoColorSpace }))
+
+async function parseTraveller(loader) {
+  const gltf = await loader.loadAsync('/cinema/traveller.glb') // the rig, his texture and all his clips
+  inPlace(gltf.animations)
   const box = new THREE.Box3().setFromObject(gltf.scene)
   const height = box.max.y - box.min.y
   return {
@@ -157,6 +177,8 @@ export async function loadTraveller(loader) {
           return a
         },
         duration: name => actions[name]?.getClip().duration ?? 1,
+        /** More clips for this one (see loadClips): playable by their names from then on. */
+        add: clips => clips.forEach(c => { actions[c.name] = mixer.clipAction(c) }),
       }
     },
   }
@@ -172,7 +194,7 @@ export function holdIn(bone, obj) {
 }
 
 /** A sprite of text drawn on a canvas (numerals, labels, HUD lines). */
-export function textSprite(text, { font = '400 180px "Instrument Serif", serif', color = '#fff', size = 1, glow = null, width = 512, height = 256, bg = null } = {}) {
+export function textSprite(text, { font = '620 semi-expanded 170px "Archivo Variable", sans-serif', color = '#fff', size = 1, glow = null, width = 512, height = 256, bg = null } = {}) {
   const c = document.createElement('canvas')
   c.width = width
   c.height = height

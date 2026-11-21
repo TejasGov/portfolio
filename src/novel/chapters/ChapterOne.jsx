@@ -5,6 +5,7 @@ import { store } from '../lib/store'
 import { SPREADS, src } from './collage'
 import { ALL_ROLES, CONTACT } from '../content'
 import { SUMMARY } from '@/data/aboutData'
+import { Jump } from '../Book'
 
 // Intrinsic sizes, so each photo reserves its box before it decodes (and decodes off the main thread).
 const SIZE = {
@@ -74,7 +75,7 @@ function AboutCard({ style }) {
       <div className="about-body">
         <p className="about-name" data-line>Tejas Govind</p>
         <ul className="about-facts">
-          <li data-line><span className="kicker">Studying</span> Computer Science, University at Buffalo · class of 2027</li>
+          <li data-line><span className="kicker">Studying</span> B.S. Computer Science, minor in Statistics · University at Buffalo · expected May 2027</li>
           {now.map(r => (
             <li key={r.org} data-line><span className="kicker">Now</span> {r.role}, {r.org} · {r.place}</li>
           ))}
@@ -83,8 +84,10 @@ function AboutCard({ style }) {
         <p className="about-line" data-line>“{HIS_LINE}”</p>
         <p className="about-links" data-line>
           <a href={`mailto:${CONTACT.email}`}>Email</a>
-          <a href={link('GitHub')} target="_blank" rel="noreferrer">GitHub ↗</a>
-          <a href={link('LinkedIn')} target="_blank" rel="noreferrer">LinkedIn ↗</a>
+          {/* The arrows drop out on a phone (index.css), so the four links hold one row. */}
+          {['Résumé', 'GitHub', 'LinkedIn'].map(l => (
+            <a key={l} href={link(l)} target="_blank" rel="noreferrer">{l}<span className="ext" aria-hidden="true">&nbsp;↗</span></a>
+          ))}
         </p>
       </div>
     </div>
@@ -422,7 +425,17 @@ export default function ChapterOne({ spreads = SPREADS }) {
       })
     }, ref)
     onStore('prologue', store.prologue) // the store only reports changes
+    // Keyboard: focus scrolling would land mid-chapter with the card half under the header. Once the
+    // browser has scrolled (after the focus events), take the reader to the card's rest instead: the hold
+    // between 'top top' and the strip's travel (move, +60% of a screen).
+    const card = strip.current.querySelector('.about')
+    const onFocus = () => requestAnimationFrame(() => {
+      const y = Math.round(ref.current.getBoundingClientRect().top + scrollY + innerHeight * 0.3)
+      if (Math.abs(scrollY - y) > innerHeight * 0.25) scrollTo({ top: y })
+    })
+    card?.addEventListener('focusin', onFocus)
     return () => {
+      card?.removeEventListener('focusin', onFocus)
       store.listeners.delete(onStore)
       sticky.style.opacity = sticky.style.visibility = ''
       ctx.revert()
@@ -434,6 +447,8 @@ export default function ChapterOne({ spreads = SPREADS }) {
   return (
     <section ref={ref} id="one" aria-labelledby="one-title" className="relative isolate z-20 text-ink" style={{ height: still ? 'auto' : 'var(--one-height)', marginTop: still ? 0 : 'calc(-1 * var(--one-overlap))' }}>
       <div aria-hidden="true" className="one-ground paper pointer-events-none absolute inset-x-0 -top-[24svh] -bottom-[24svh] -z-10" />
+      {/* The card's links are hidden until the paper has the screen: from the landing, Tab reaches them through this. */}
+      {!still && <Jump to={{ chapter: 'one' }}>About me</Jump>}
       <div className={still ? 'relative' : 'sticky top-0 h-svh overflow-hidden'}>
         <div ref={strip} className={`strip relative flex ${still ? 'flex-col' : 'h-full'}`}>
           {spreads.map((s, i) => (
@@ -442,10 +457,10 @@ export default function ChapterOne({ spreads = SPREADS }) {
               {i === 0 && (
                 <div className="absolute top-[18%] left-[max(16px,calc(7*var(--strip-unit)))] max-w-[calc(60*var(--strip-unit))]">
                   <p className="poster text-stamp" style={{ '--s': 4.2 }}>Chapter One</p>
-                  <h2 id="one-title" className="mt-4 font-display text-[calc(var(--strip-unit)*8.6)] leading-[0.88] tracking-[-0.02em] text-ink" aria-label={TITLE}>
+                  <h2 id="one-title" className="display-title mt-4 text-[calc(var(--strip-unit)*6.4)] leading-[0.92] text-ink" aria-label={TITLE}>
                     {/* Letters fly in individually, but each word stays unbroken across lines. */}
                     {TITLE.split(' ').map((word, w) => (
-                      <span key={w} className="inline-block whitespace-nowrap" aria-hidden="true">
+                      <span key={w} className={`inline-block whitespace-nowrap ${w ? 'title-heavy' : ''}`} aria-hidden="true">
                         {word.split('').map((ch, k) => (
                           <span key={k} className="title-letter inline-block">
                             {ch}

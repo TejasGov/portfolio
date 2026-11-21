@@ -1,8 +1,9 @@
-import { useEffect, useRef } from 'react'
+import { Fragment, useEffect, useRef } from 'react'
 import { useBeats } from '../lib/Beats'
 import { store } from '../lib/store'
 import { useProgress, useRunningHead } from '../lib/chapters'
 import { CONTACT, PROJECTS } from '../content'
+import { Jump } from '../Book'
 
 /*
  * Chapter Two: five films. The hall arrives as an ink drawing and blooms into colour, the camera walks
@@ -44,7 +45,7 @@ export default function ChapterTwo() {
       if (seamEl.current) seamEl.current.style.clipPath = store.workIn < 0.9 ? `inset(calc(${((1 - store.workIn) * innerHeight).toFixed(1)}px + 24svh) -60px -60px)` : ''
       // The title turns from ink to screen-light as the colour bloom (timeline.js w 0 to .065) passes behind it:
       // the floor, then the seats under its last line. A phone's title sits on the seats, which colour last.
-      const [a, b] = innerWidth / innerHeight <= 1 ? [0.05, 0.05] : [0.026, 0.045]
+      const [a, b] = innerWidth / innerHeight <= 1 ? [0.05, 0.05] : [0.034, 0.045] // landscape .034: the title sits low, half on the seats
       const k = [ss(a, a + 0.013, store.work).toFixed(3), ss(b, b + 0.013, store.work).toFixed(3)]
       if (k.join() !== bloom) {
         bloom = k.join()
@@ -69,14 +70,15 @@ export default function ChapterTwo() {
         <div ref={seamEl} className="pointer-events-none fixed inset-0 z-[1] grid px-6 md:px-[6vw]">
           <div
             ref={bindSeam(0)}
-            className="self-end pb-[12svh] max-w-[min(100%,60rem)] opacity-0"
+            className="self-end pb-[12svh] max-w-[min(100%,66rem)] opacity-0 [@media(min-aspect-ratio:1/1)]:pb-[4.5svh]" // landscape: low enough that the kicker clears the screen's lit bottom rail
             style={{
               color: 'color-mix(in oklab, var(--color-ink), var(--color-night-ink) calc(var(--bloom, 0) * 100%))',
               textShadow: '0 4px 60px rgb(3 5 11 / calc(var(--bloom, 0) * 0.95))',
             }}
           >
-            <p className="poster text-stamp" style={{ '--s': 2.6 }}>Chapter Two · Things I built</p>
-            <h2 id="two-title" className="mt-5 block font-display text-[clamp(3.6rem,9vw,8.5rem)] leading-[0.86] tracking-[-0.02em]">Now showing</h2>
+            {/* Stamp red on the paper; a lighter vermilion on the dark curtains. */}
+            <p className="poster" style={{ '--s': 2.6, color: 'color-mix(in oklab, var(--color-stamp), #ff6a4d calc(var(--bloom, 0) * 100%))' }}>Chapter Two · Things I built</p>
+            <h2 id="two-title" className="display-title mt-5 block text-[clamp(2.6rem,6.4vw,6.2rem)] leading-[0.92]"><span>Now</span> <span className="title-heavy">showing</span></h2>
             <p
               className="mt-6 max-w-[34ch] font-serif text-lg leading-relaxed opacity-85"
               style={{
@@ -90,12 +92,14 @@ export default function ChapterTwo() {
         </div>
         <div className="absolute inset-0 grid px-6 md:px-[6vw]">
           {CARDS.map((b, k) => (
-            <article key={b.p.id} ref={bind(k)} className="film-sheet film-copy col-start-1 row-start-1 max-w-[26rem] self-end opacity-0 md:mr-[2vw] md:self-center md:justify-self-end md:pb-0" aria-labelledby={`p-${b.p.id}`}>
+            <Fragment key={b.p.id}>
+            <Jump to={{ chapter: 'two', i: k }}>Film {k + 1} of {PROJECTS.length} · {b.p.title}</Jump>
+            <article ref={bind(k)} className="film-sheet film-copy col-start-1 row-start-1 max-w-[26rem] self-end opacity-0 md:mr-[2vw] md:self-center md:justify-self-end md:pb-0" aria-labelledby={`p-${b.p.id}`}>
               <p className="kicker text-glow">
                 {String(b.i + 1).padStart(2, '0')} / {String(PROJECTS.length).padStart(2, '0')} · {b.p.category}
               </p>
               {/* The film takes the left two thirds of the frame; its title sits in the right third. */}
-              <h3 id={`p-${b.p.id}`} className="mt-3 font-display text-[clamp(2.6rem,4.4vw,4.4rem)] leading-[0.92] [text-shadow:0_4px_40px_rgb(3_5_11/0.8)]">
+              <h3 id={`p-${b.p.id}`} className="mt-3 font-display text-[clamp(2.1rem,3.4vw,3.4rem)] leading-none tracking-[-0.02em] [text-shadow:0_4px_40px_rgb(3_5_11/0.8)]">
                 {b.p.title}
               </h3>
               <p className="mt-5 max-w-[30ch] font-serif text-[clamp(1.05rem,1.4vw,1.3rem)] leading-[1.5] text-night-ink/90 [text-shadow:0_2px_24px_rgb(3_5_11/0.95)]">{b.p.line}</p>
@@ -119,6 +123,7 @@ export default function ChapterTwo() {
                 )}
               </div>
             </article>
+            </Fragment>
           ))}
           {/* The plate only names the film; its card (above, always up) carries the pitch and the links. */}
           {CAPTIONS.map(c => (

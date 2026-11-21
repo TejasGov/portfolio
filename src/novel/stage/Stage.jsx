@@ -3,6 +3,7 @@ import * as THREE from 'three'
 import { store } from '../lib/store'
 import { createCinema, LENS } from '../cinema/world'
 import { stateAt, PROJECT_IDS, section, workSlot } from '../cinema/timeline'
+import { LAST, LEVELS, levelAt } from '../cinema/levels'
 
 const reduced = () => matchMedia('(prefers-reduced-motion: reduce)').matches
 
@@ -62,15 +63,17 @@ export default function Stage() {
     // A jump (the contents menu) lands at once rather than playing every chapter on the way.
     const view = Object.create(store)
     const KEYS = ['prologue', 'workIn', 'work', 'three', 'four', 'epilogue', 'epiIn']
-    let lastFrame = 0
+    let lastFrame = 0, gliding = false
     const glide = now => {
       const k = reduced() || !lastFrame ? 1 : 1 - Math.exp(-Math.min(0.1, (now - lastFrame) / 1000) * 4.5)
       lastFrame = now
+      gliding = false
       for (const key of KEYS) {
         const to = store[key] ?? 0, from = Object.hasOwn(view, key) ? view[key] : to
         // A tiny gap snaps, so a chapter heading back to 0 really reaches 0 and hands the stage back.
         const d = to - from
         view[key] = Math.abs(d) > 0.3 || Math.abs(d) < 1e-4 ? to : from + d * k
+        if (view[key] !== to) gliding = true
       }
     }
 
@@ -98,8 +101,17 @@ export default function Stage() {
       if (sec === 'work') world.loadFilm(PROJECT_IDS[workSlot(view.work).i])
       // Build the next chapter's world while the reader is paused, so its seam doesn't stall mid-scroll.
       // In Three, keep the journey's late-loading dioramas warm before the arcade (prepare skips while compiling).
-      const todo = { work: ['journey'], three: ['journey', 'arcade'], four: ['arcade'] }[sec]
-      if (todo && now - scrolled > 400) for (const name of todo) world.prepare(name)
+      // In Four, the level on screen and the one after it (the next is built and compiled a level ahead).
+      const at = sec === 'four' ? levelAt(view.four) : null, lv = at ? at.i : 0
+      // In the epilogue, the last level, which plays on the screen as it rises (for a reader who jumped there).
+      const todo = { work: ['journey'], three: ['journey', 'arcade'], four: LEVELS.slice(lv, lv + 2).map(l => l.name), epilogue: [LAST] }[sec]
+      // Paused: the scroll has rested and the picture has glided to a stop, so a prepare step's hitch is not seen on a moving frame.
+      if (todo && now - scrolled > 400 && !gliding) for (const name of todo) world.prepare(name)
+      // A reader who never pauses in Four: still build and compile the next level, in the browser's idle time, before its seam.
+      else if (at && !at.kind && todo && now - scrolled <= 400 && !idleAsk && window.requestIdleCallback) { // not during a covering transition: it is the heaviest frame there is
+        idleAsk = true
+        requestIdleCallback(() => { idleAsk = false; if (alive) for (const name of todo) world.prepare(name) }, { timeout: 1500 })
+      }
       world.render(st)
       lens.copy(LENS).project(world.camera)
       store.lens = [(lens.x * 0.5 + 0.5) * 100, (0.5 - lens.y * 0.5) * 100]
@@ -107,7 +119,7 @@ export default function Stage() {
       store.camDist = world.camera.position.distanceTo(LENS)
     }
 
-    let scrolled = 0, warmed = false
+    let scrolled = 0, warmed = false, idleAsk = false
     const onScroll = () => { scrolled = performance.now() }
     addEventListener('scroll', onScroll, { passive: true })
     addEventListener('resize', resize)
