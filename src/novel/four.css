@@ -1,0 +1,31 @@
+/*
+ * Chapter Four's own styles (ChapterFour.jsx imports this; index.css belongs to the interface track).
+ * The chapter's type uses only the site's classes (font-display, kicker, poster, font-mono): no
+ * handwriting or script faces and no italics here.
+ */
+
+/* The title card sits on a calm ground, as every other chapter head does: a soft dark scrim under it
+   (it fades out before its own edges, which stay inside the beats' 60 px wipe margin), and the
+   kicker carries the prologue beats' shadow so it reads over his patterned shirt. */
+.four-title {
+  position: relative;
+  isolation: isolate;
+}
+.four-title::before {
+  content: '';
+  position: absolute;
+  inset: -60px;
+  z-index: -1;
+  pointer-events: none;
+  background: radial-gradient(closest-side, rgb(5 5 6 / 0.7), rgb(5 5 6 / 0.55) 55%, rgb(5 5 6 / 0));
+}
+.four-kicker {
+  text-shadow: 0 4px 50px rgb(3 5 11 / 0.95), 0 1px 3px rgb(3 5 11 / 0.8);
+}
+/* A phone frames him in the middle of a tall picture: the title goes up under the header instead. */
+@media (max-width: 760px) and (orientation: portrait) {
+  .four-title {
+    align-self: start;
+    margin-top: max(12svh, 92px);
+  }
+}

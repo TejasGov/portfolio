@@ -89,7 +89,7 @@ export async function revere({ traveller }) {
   scene.add(you.root)
   const hud = brackets()
   scene.add(hud.g)
-  const name = textSprite('Tejas', { font: '400 104px "Instrument Serif", serif', color: '#ffffff', glow: '#9fd6ff', size: 0.16, width: 512, height: 150, bg: 'rgba(12,22,34,0.55)' })
+  const name = textSprite('Tejas', { font: '620 semi-expanded 92px "Archivo Variable", sans-serif', color: '#ffffff', glow: '#9fd6ff', size: 0.16, width: 512, height: 150, bg: 'rgba(12,22,34,0.55)' })
   const who = textSprite('your grandson · visited on Sunday', { font: '500 30px "Geist Mono Variable", monospace', color: '#e8f4ff', size: 0.085, width: 1024, height: 64, bg: 'rgba(12,22,34,0.55)' })
   for (const sp of [name, who]) {
     sp.material.depthTest = false

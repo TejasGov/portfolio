@@ -16,7 +16,8 @@ const TITLE = [['Write to ', false], ['me.', true]]
 // On one progress, epiIn (0..1) then 1 + epilogue (1..2): the card comes up during the arrival, just after
 // the screen lights "The End" (timeline.js), and holds until the colophon covers it.
 const BEATS = [{ at: [0.4, 2.6], edge: [0.03, 0.03], kind: 'contact' }]
-const epiAll = () => store.set('epiAll', store.epilogue > 0 ? 1 + store.epilogue : store.epiIn)
+// ?? 0: before epiIn is first reported, an unset key gives Beats NaN, which leaves the card focusable
+const epiAll = () => store.set('epiAll', store.epilogue > 0 ? 1 + store.epilogue : (store.epiIn ?? 0))
 const ext = { target: '_blank', rel: 'noreferrer' }
 
 export default function Epilogue() {
@@ -58,12 +59,12 @@ export default function Epilogue() {
         {/* Fixed, not sticky: the card stays put from the arrival on; the colophon (z-10, opaque) rises over it. */}
         <div ref={stage} className="pointer-events-none fixed inset-0 z-[5] grid px-6 md:px-[6vw]">
           {/* Under the screen, clear of its lower frame (compact on a phone, where the frame sits low); mb clears the folio pill. */}
-          <div ref={el => { bind(0)(el); card.current = el }} className="beat-sharp pointer-events-auto col-start-1 row-start-1 mb-[52px] max-w-[40rem] self-end justify-self-center rounded-sm bg-[rgb(10_12_18)] p-4 text-center opacity-0 shadow-[0_30px_80px_rgb(0_0_0/0.5)] md:mb-[3svh] md:max-w-[46rem] md:p-6">
+          <div ref={el => { bind(0)(el); card.current = el }} className="beat-sharp pointer-events-auto col-start-1 row-start-1 mb-[52px] max-w-[40rem] self-end justify-self-center rounded-sm bg-[rgb(10_12_18)] p-4 text-center opacity-0 shadow-[0_30px_80px_rgb(0_0_0/0.5)] md:mb-[3svh] md:max-w-[50rem] md:p-6">
             <p className="kicker hidden text-glow/80 md:block">Epilogue</p>
-            <Assemble as="h2" id="epilogue-title" parts={TITLE} className="block font-display text-[clamp(1.9rem,4.5vw,3.6rem)] leading-[0.9] tracking-[-0.02em] md:mt-2" />
+            <Assemble as="h2" id="epilogue-title" parts={TITLE} className="block text-[clamp(1.45rem,4vw,3.1rem)] leading-[0.95] [--title-light:380] md:mt-2" />
             <a
               href={`mailto:${CONTACT.email}`}
-              className="mt-2 inline-block border-b border-night-ink/40 pb-1 font-serif text-[clamp(1.2rem,5vw,1.9rem)] break-all transition-colors hover:border-glow hover:text-glow md:text-[1.7rem] md:leading-tight"
+              className="mt-2 inline-flex min-h-11 items-center border-b border-night-ink/40 pb-1 font-serif text-[clamp(1.2rem,5vw,1.9rem)] break-all transition-colors hover:border-glow hover:text-glow md:text-[1.7rem] md:leading-tight"
             >
               {CONTACT.email}
             </a>
@@ -72,10 +73,11 @@ export default function Epilogue() {
               <a href={`mailto:${CONTACT.email}`} className="inline-flex min-h-11 items-center bg-glow px-6 font-mono text-[13px] tracking-[0.18em] text-night uppercase hover:opacity-90">
                 Email me
               </a>
-              <ul className="kicker mt-1 flex flex-wrap justify-center gap-x-6 text-[15px] text-night-ink/90 md:mt-0 md:gap-x-6">
+              {/* A phone: 13px and a tighter gap, so the five links take two rows, not three. */}
+              <ul className="kicker mt-1 flex flex-wrap justify-center gap-x-4 text-[13px] text-night-ink/90 md:mt-0 md:gap-x-6 md:text-[15px]">
                 {CONTACT.links.map(l => (
                   <li key={l.label}>
-                    <a href={l.href} {...ext} className="inline-flex min-h-11 items-center underline-offset-4 hover:text-night-ink hover:underline">
+                    <a href={l.href} {...ext} className="inline-flex min-h-11 min-w-11 items-center justify-center underline-offset-4 hover:text-night-ink hover:underline">
                       {l.label} ↗
                     </a>
                   </li>
@@ -92,10 +94,10 @@ export default function Epilogue() {
           <a href={`mailto:${CONTACT.email}`} className="inline-flex min-h-11 items-center bg-glow px-6 font-mono text-[13px] tracking-[0.18em] text-night uppercase hover:opacity-90">
             Email me
           </a>
-          <ul className="kicker flex flex-wrap gap-x-7 text-[15px] text-night-ink/90">
+          <ul className="kicker flex flex-wrap gap-x-4 text-[13px] text-night-ink/90 md:gap-x-7 md:text-[15px]">
             {CONTACT.links.map(l => (
               <li key={l.label}>
-                <a href={l.href} {...ext} className="inline-flex min-h-11 items-center underline-offset-4 hover:text-night-ink hover:underline">
+                <a href={l.href} {...ext} className="inline-flex min-h-11 min-w-11 items-center justify-center underline-offset-4 hover:text-night-ink hover:underline">
                   {l.label} ↗
                 </a>
               </li>
@@ -103,9 +105,9 @@ export default function Epilogue() {
           </ul>
         </div>
         <div className="mx-auto mt-[8svh] max-w-5xl border-t border-night-ink/15 pt-10">
-          <h2 className="font-display text-4xl italic">Colophon</h2>
+          <h2 className="font-display text-3xl tracking-[-0.01em]">Colophon</h2>
           <p className="mt-4 max-w-[62ch] font-serif text-base leading-relaxed text-night-ink/65">
-            Set in Instrument Serif, Newsreader, Geist Mono, Anton and Caveat. The cinema was modelled and light-baked in Blender, with
+            Set in Archivo, Newsreader and Geist Mono. The cinema was modelled and light-baked in Blender, with
             surface textures from Poly Haven (CC0) and a carpet drawn for it; the projector, the recliners, the traveller (a stylised me) and
             the six little worlds of Chapter Three were generated with Meshy. The five films, the ink drawings and the waves between them, the
             beam, the haze and the dust are all drawn live in WebGL, and the projector you can hear is synthesized in the browser.

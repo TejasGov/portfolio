@@ -8,26 +8,37 @@ import { Pass } from 'postprocessing'
 
 // Tileable 3D value-noise fbm baked once on the CPU, so the shaders pay one texture fetch per octave.
 export function noiseVolume(N = 64) {
+  // Value noise in three octaves, trilinear with eased weights. Written as flat loops (one octave at a
+  // time, each axis's cells and weights computed once): with a closure per voxel it took ~370 ms of the
+  // landing's first second.
   const octaves = [[4, 0.5], [8, 0.3], [16, 0.2]]
-  const lattices = octaves.map(([p]) => Float32Array.from({ length: p * p * p }, Math.random))
-  const s = t => t * t * (3 - 2 * t)
-  const data = new Uint8Array(N * N * N)
-  for (let z = 0; z < N; z++)
-    for (let y = 0; y < N; y++)
-      for (let x = 0; x < N; x++) {
-        let v = 0
-        octaves.forEach(([p, w], o) => {
-          const g = lattices[o]
-          const fx = (x / N) * p, fy = (y / N) * p, fz = (z / N) * p
-          const ix = Math.floor(fx), iy = Math.floor(fy), iz = Math.floor(fz)
-          const tx = s(fx - ix), ty = s(fy - iy), tz = s(fz - iz)
-          const at = (a, b, c) => g[(((c % p) * p + (b % p)) * p) + (a % p)]
-          const lx = (b, c) => at(ix, b, c) + (at(ix + 1, b, c) - at(ix, b, c)) * tx
-          const ly = c => lx(iy, c) + (lx(iy + 1, c) - lx(iy, c)) * ty
-          v += w * (ly(iz) + (ly(iz + 1) - ly(iz)) * tz)
-        })
-        data[(z * N + y) * N + x] = Math.min(255, v * 255)
+  const acc = new Float32Array(N * N * N)
+  for (const [p, w] of octaves) {
+    const g = Float32Array.from({ length: p * p * p }, Math.random)
+    const i0 = new Int32Array(N), i1 = new Int32Array(N), e = new Float32Array(N)
+    for (let x = 0; x < N; x++) {
+      const f = (x / N) * p, i = Math.floor(f), u = f - i
+      i0[x] = i % p
+      i1[x] = (i + 1) % p
+      e[x] = u * u * (3 - 2 * u)
+    }
+    let k = 0
+    for (let z = 0; z < N; z++) {
+      const z0 = i0[z] * p * p, z1 = i1[z] * p * p, tz = e[z]
+      for (let y = 0; y < N; y++) {
+        const a0 = z0 + i0[y] * p, a1 = z0 + i1[y] * p, b0 = z1 + i0[y] * p, b1 = z1 + i1[y] * p, ty = e[y]
+        for (let x = 0; x < N; x++, k++) {
+          const x0 = i0[x], x1 = i1[x], tx = e[x]
+          const c00 = g[a0 + x0] + (g[a0 + x1] - g[a0 + x0]) * tx, c10 = g[a1 + x0] + (g[a1 + x1] - g[a1 + x0]) * tx
+          const c01 = g[b0 + x0] + (g[b0 + x1] - g[b0 + x0]) * tx, c11 = g[b1 + x0] + (g[b1 + x1] - g[b1 + x0]) * tx
+          const c0 = c00 + (c10 - c00) * ty, c1 = c01 + (c11 - c01) * ty
+          acc[k] += w * (c0 + (c1 - c0) * tz)
+        }
       }
+    }
+  }
+  const data = new Uint8Array(N * N * N)
+  for (let k = 0; k < acc.length; k++) data[k] = Math.min(255, acc[k] * 255)
   const tex = new THREE.Data3DTexture(data, N, N, N)
   tex.format = THREE.RedFormat
   tex.minFilter = tex.magFilter = THREE.LinearFilter
