@@ -3,30 +3,51 @@ import { useBeats } from '../lib/Beats'
 import { useProgress, useRunningHead } from '../lib/chapters'
 import { store } from '../lib/store'
 import Assemble from '../lib/Assemble'
-import { BACK, chapterP } from '../cinema/movies'
+import { BACK, CLEAR, LEVELS, SVH, UNIT, chapterP } from '../cinema/movies'
 import '../five.css'
 
 const TITLE = [['The big ', false], ['screen', true]]
 const HEAD = 'Chapter Five · The Big Screen'
-const EXIT = 'Epilogue · House lights' // from BACK (0.93) the camera backs out of the screen into the hall
+const EXIT = 'Epilogue · House lights' // from BACK the camera backs out of the screen into the hall
 
 /*
  * Chapter Five, "The Big Screen": after Four's game the projector starts a new reel and the camera
- * pushes back into the screen for three original film homages in one scroll (cinema/movies.js): a dive
- * off a tower into a suit of armour, a landing out of a lightning strike on a highland ridge, and a
- * stadium final. The words live here, set like a film's title cards. Progress starts as the chapter
- * rises into view, so it picks up exactly where Four's back-out leaves the hall.
+ * pushes back into the screen for six fan-tribute scenes in one scroll (cinema/movies.js): Spider-Man
+ * swinging through golden-hour Manhattan, Iron Man's dive and suit-up, Thor's landing with Stormbreaker,
+ * the Dark Knight's bike chase, the 2022 final, and Deadpool's "Bye Bye Bye" fight-dance. The words live
+ * here, set like a film's title cards. Progress starts as the chapter rises into view, so it picks up
+ * exactly where Four's back-out leaves the hall. Every window below is in the chapter's P (movies.js lays
+ * it out in svh; UNIT turns the three-world chapter's P lengths into today's, so edges keep their feel).
  */
-const D = p => chapterP('dive', p), L = p => chapterP('landing', p), F = p => chapterP('final', p)
-// Only the films' own words here, and the final's two factual captions.
+const S = p => chapterP('swing', p), D = p => chapterP('dive', p), L = p => chapterP('landing', p)
+const C = p => chapterP('chase', p), F = p => chapterP('final', p), X = p => chapterP('dance', p)
+// The slates name each scene as a fan's tribute; the final keeps its two factual captions. No lyric
+// lines anywhere: the dance's only words are its title phrase and the scene's sound effects.
+const SLATES = {
+  swing: { at: [S(0.03), S(0.15)], label: 'Scene one', text: 'Spider-Man', skip: true, top: true }, // top: on a phone it stays up, clear of his crouch on the finial
+  dive: { at: [D(0.265), D(0.355)], edge: 0.008 * UNIT, anchor: D(0.075), label: 'Scene two', text: 'Iron Man' }, // from the rim dive to 'Suit up' (both sit low on a phone): Spider-Man owns the pad landing; the ticket still lands on the pad wide
+  landing: { at: [L(0.16), L(0.5)], label: 'Scene three', text: 'Thor' },
+  chase: { at: [C(0.12), C(0.32)], label: 'Scene four', text: 'The Dark Knight' },
+  final: { at: [F(0.14), F(0.42)], label: 'Scene five', text: 'The final' },
+  dance: { at: [X(0.1), X(0.3)], label: 'Scene six', text: 'Deadpool & Wolverine' },
+}
+const EDGE = 0.015 * UNIT
 const BEATS = [
-  { at: [0.006, 0.054], edge: [0.004, 0.012], kind: 'title' }, // over the new reel and the push; gone before the tower's wide
-  { at: [D(0.04), D(0.22)], kind: 'slate', label: 'Scene one', text: 'The dive.', skip: true },
-  { at: [D(0.26), D(0.71)], edge: 0.006, kind: 'prompt', text: 'Suit up' },
-  { at: [L(0.16), L(0.5)], kind: 'slate', label: 'Scene two', text: 'The landing.' },
-  { at: [F(0.14), F(0.42)], kind: 'slate', label: 'Scene three', text: 'The final.' },
-  { at: [F(0.55), 0.965], kind: 'caption', label: '18 December 2022', text: 'Argentina. World champions.' },
-].map(b => ({ edge: 0.015, ...b }))
+  { at: [0.006 * UNIT, 0.054 * UNIT], edge: [0.004 * UNIT, 0.012 * UNIT], kind: 'title' }, // over the new reel and the push; gone before the perch
+  ...LEVELS.map(l => ({ kind: 'slate', ...SLATES[l.name] })),
+  { at: [D(0.355), D(0.75)], edge: 0.006 * UNIT, kind: 'prompt', text: 'Suit up' }, // with the first plates, gone at the visor,
+  { at: [F(0.55), F(0.88)], kind: 'caption', label: '18 December 2022', text: 'Argentina. World champions.' },
+].map(b => ({ edge: EDGE, ...b }))
+/*
+ * Scene anchors (the box office jumps with goToId('scene-<world>')): an empty marker per world, placed so
+ * that scrolling it to the top of the viewport puts the chapter's P where that world is clear of its
+ * transition and its slate has just come fully in. Five's progress runs 'top bottom' -> 'bottom bottom',
+ * so a marker at y within the section is at P = (y + 100svh) / SVH svh.
+ */
+const ANCHORS = LEVELS.map(l => {
+  const P = Math.max(chapterP(l.name, CLEAR[l.name][0]), SLATES[l.name].anchor ?? SLATES[l.name].at[0]) + EDGE + 2 / SVH
+  return { id: `scene-${l.name}`, label: `${SLATES[l.name].label}: ${SLATES[l.name].text}`, top: `calc(${(P * SVH).toFixed(2)}svh - 100svh)` }
+})
 
 export default function ChapterFive() {
   const ref = useRef(null)
@@ -46,13 +67,15 @@ export default function ChapterFive() {
   const bind = useBeats('five', beats)
 
   return (
-    <section ref={ref} id="five" aria-labelledby="five-title" className="relative" style={{ height: '1100svh' }}>
+    <section ref={ref} id="five" aria-labelledby="five-title" className="relative" style={{ height: `${SVH}svh` }}>
+      {ANCHORS.map(a => <div key={a.id} id={a.id} role="group" aria-label={a.label} tabIndex={-1} className="pointer-events-none absolute left-0 h-px w-px" style={{ top: a.top }} />)}
       <div className="sticky top-0 h-svh">
         {/* Fixed, so the title is whole and in frame over the hall, before this sticky sticks (its ~0.09). */}
         <div className="pointer-events-none fixed inset-0 z-[1] grid px-6 pb-[max(12svh,72px)] md:px-[6vw]">
           <div ref={bind(0)} className="five-title self-end opacity-0">
             <p className="five-kicker poster text-[#8fc8ff]" style={{ '--s': 2.6 }}>Chapter Five</p>
             <Assemble as="h2" id="five-title" parts={TITLE} className="mt-4 block font-display text-[clamp(3.6rem,9vw,8.5rem)] leading-[0.86] tracking-[-0.02em] [text-shadow:0_4px_50px_rgb(5_10_30/0.8)]" />
+            <p className="five-fan mt-5 max-w-[30ch] font-serif text-[clamp(1.1rem,1.7vw,1.4rem)] leading-snug text-white/90">I'm a Marvel fan. These are the scenes I'd jump into.</p>
           </div>
         </div>
         <div className="absolute inset-0 grid px-6 pt-[13svh] pb-[12svh] md:px-[6vw]">
@@ -70,7 +93,7 @@ export default function ChapterFive() {
               </div>
             ) : (
               // A title card: top-left, quiet, legible over a night city, a dusk ridge or floodlight.
-              <div key={k} ref={bind(k)} className={`five-slate ${b.skip ? 'pointer-events-auto' : 'pointer-events-none'} col-start-1 row-start-1 max-w-[24rem] self-start rounded-sm bg-[rgb(6_10_20/0.85)] p-5 text-white opacity-0`}>
+              <div key={k} ref={bind(k)} className={`five-slate ${b.top ? 'five-top' : ''} ${b.skip ? 'pointer-events-auto' : 'pointer-events-none'} col-start-1 row-start-1 max-w-[24rem] self-start rounded-sm bg-[rgb(6_10_20/0.85)] p-5 text-white opacity-0`}>
                 <p className="kicker text-[#8fc8ff]">{b.label}</p>
                 <p className="mt-2 font-display text-[1.9rem] leading-[1.05]">{b.text}</p>
                 {b.skip && <a href="#epilogue" className="kicker mt-3 inline-flex min-h-11 items-center text-white/85 underline-offset-4 hover:underline">Skip to contact ↓</a>}

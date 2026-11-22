@@ -1,11 +1,15 @@
 import * as THREE from 'three'
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js'
-import { loadTraveller, loadClips, alohaLinear, sky } from './films/kit'
+import { loadTraveller, loadClips, alohaLinear, sky, wearSuit } from './films/kit'
 
 /*
- * Chapter Five, world 1: the dive. A night skyline of original glass towers over wet streets, searchlights
- * and city haze. He stands on the roof edge of the tallest tower (a flared glass crown, a landing pad
- * and a tall blade: no letters, logos or signs), steps off and falls, the camera falling with him;
+ * Chapter Five, world 2: the dive (Iron Man). A night skyline of original glass towers over wet streets,
+ * searchlights and city haze. The tallest tower has a flared glass crown, a round landing pad (the dais)
+ * and a tall blade: no letters, logos or signs. He web-zips up out of the street canyon in the spider suit
+ * (public/cinema/suits/spider.glb, worn on his own bones), lets go over the pad's rim, flips and lands in
+ * a three-point landing (the landing world's own clip, landing/land.glb); the spider suit recedes off him
+ * into his chest (a ragged, lit front: the mask first); he runs to the rim and dives off the pad, the
+ * camera falling with him;
  * mid-fall a red-and-gold armour suit with a lit chest reactor flies in piece by piece and locks on, the
  * faceplate swings shut and the eyes light, thrusters at palms and feet ignite, he pulls out just above
  * the street and flies up between the towers into the storm (levelfx.js STORM).
@@ -19,18 +23,19 @@ import { loadTraveller, loadClips, alohaLinear, sky } from './films/kit'
  *     loader: the shared GLTFLoader (Meshopt + Draco). normalize(root, size, yaw): a model's meshes as
  *     one centred group scaled to `size` metres. mobile: phone-sized screen, build lighter.
  *   update(state, t, aspect) is called once per rendered frame while this world is drawn.
- *     state.p         0..1, this world's own progress (movies.js: Five's P 0.06..0.40), driven by scroll:
- *                     it scrubs both ways and can jump, so derive everything from p and t and keep no
- *                     one-way state. p 0..0.926 is seen clear; the STORM cover rolls in over
- *                     p 0.926..1 (whole at p = 1), so the climb into cloud should be under way by then.
- *                     The suit-up must be scroll-driven and reversible: each piece's place is a pure
- *                     function of p.
- *     state.onScreen  true while this world is drawn onto the cinema's screen: Five's push-in, at p = 0
- *                     (and aspect is then the screen's 2.4). The p = 0 shot on the screen and full-frame
- *                     must be the same picture, or the hand-over at the end of the push jumps: no DOM-only
- *                     or frame-locked HUD.
- *     state.still     reduced motion: no camera flourishes or shake; the suit-up shows its finished state
- *                     (the fall and the flight still follow p).
+ *     state.p         0..1, this world's own progress (movies.js: Five's P 0.2458..0.4381), driven by
+ *                     scroll: it scrubs both ways and can jump, so derive everything from p and t and keep
+ *                     no one-way state. The WHIP cover parts over p 0..0.06; p 0.06..0.94 is seen clear;
+ *                     the STORM cover rolls in over p 0.94..1 (whole at p = 1), so the climb into cloud
+ *                     should be under way by then. The opening (zip, landing, recede, run, leap) is p 0..A
+ *                     (0.3); the old fall, suit-up and climb play on from there in their own clock q
+ *                     (qOf). The recede and the suit-up must be scroll-driven and reversible: each piece's
+ *                     place is a pure function of p.
+ *     state.onScreen  true while this world is drawn onto the cinema's screen (no longer: the swing is
+ *                     Five's first world). Were it again, the p = 0 shot must match full-frame.
+ *     state.still     reduced motion: no camera flourishes or shake; the spider suit is on until it cuts
+ *                     off at p 0.22, the armour shows finished from the leap (p = A) on (the zip, the
+ *                     landing, the fall and the flight still follow p).
  *     state.portrait  the frame is a phone's (aspect < 0.85): frame for it. Decide framing from this,
  *                     not from `aspect`: on the cinema's screen `aspect` is 2.4 and a phone sees only
  *                     the middle of that picture.
@@ -42,7 +47,7 @@ import { loadTraveller, loadClips, alohaLinear, sky } from './films/kit'
  *     every frame is fine); dream = 0..1 extra bloom for a held beat (0 otherwise); grade = optional
  *     overrides of GRADE.dive in movies.js ({ bloom, threshold, vignette, grain, scan }).
  *   Units: metres, y up, the street at y = 0, the traveller 1.72 m tall. The tower's roof is at ROOF;
- *   he starts on its +x edge facing +x and flies on along +x between the towers. Camera: a
+ *   he lands on the pad (padC, its deck at ROOF - 13.75), dives off its rim and flies on along +x between the towers. Camera: a
  *   PerspectiveCamera with a 40 degree vertical fov (the hall's lens, so the push-in does not jump).
  *   Colour: the frame has no sRGB encode after tone mapping, so a hex colour reads darker and richer
  *   than on a page, and a painted canvas texture reads as painted with colorSpace NoColorSpace.
@@ -93,52 +98,117 @@ function keyed(keys) {
   }
 }
 
+// ---------------------------------------------------------------- his tower's crown and pad (the set below builds them)
+const CROWN = 36, ROWS = 12, N = 28, SLOPE = 9, Y0 = ROOF - CROWN
+// A crown ring at t (0 its foot, 1 the roof): a superellipse, square at the foot where it grows out of
+// the chamfered shaft, rounder and wider toward -x and the sides as it rises.
+const ring = t => {
+  const rx = 8.1 + 5.8 * t ** 0.8
+  return { cx: 8 - rx, rx, rz: 8.1 + 3.6 * Math.sin(t * PI * 0.5), e: 4 - 1.6 * t }
+}
+const ringAt = (t, k) => {
+  const { cx, rx, rz, e } = ring(t), a = (k / N) * PI * 2, c = Math.cos(a), s = Math.sin(a)
+  return [cx + rx * Math.sign(c) * Math.abs(c) ** (2 / e), rz * Math.sign(s) * Math.abs(s) ** (2 / e)]
+}
+const rise = x => SLOPE * clamp01((8 - x) / (2 * ring(1).rx)) ** 1.3 // the cap's sloped cut
+// How far out from the axis the building's skin is along a horizontal direction (dx, dz) at height y.
+function reach(y, dx, dz) {
+  if (y < Y0) return Math.min(8 / Math.abs(dx || 1e-9), 8 / Math.abs(dz || 1e-9), 13.8 / (Math.abs(dx) + Math.abs(dz)))
+  const { cx, rx, rz, e } = ring(Math.min(1, (y - Y0) / CROWN))
+  let lo = 0, hi = 40
+  for (let i = 0; i < 30; i++) {
+    const u = (lo + hi) / 2
+    if (Math.abs((u * dx - cx) / rx) ** e + Math.abs((u * dz) / rz) ** e < 1) lo = u
+    else hi = u
+  }
+  return lo
+}
+// The round landing pad (the dais), cantilevered out of the crown on the +x+z side, its deck at PY + 0.25.
+const npx = 0.55, npz = 0.835, PY = ROOF - 14, PR = 5.8
+const pr = reach(PY, npx, npz), pd = pr + 3.2 + PR, padC = new THREE.Vector3(npx * pd, PY, npz * pd)
+
 // ---------------------------------------------------------------- the choreography, in the dive's own p
-// His hips through the air: on the roof's +x edge; the step; the fall beside the tower's face; the
-// pull-out just above the street; up the avenue (+x) between the towers and into the storm.
+// The opening (p 0..A) is new: he web-zips up out of the street canyon onto the pad in the spider suit,
+// flips, lands, the suit recedes off him, he runs to the pad's rim and dives. From A on, the old fall,
+// suit-up and climb play as they always did, in their own clock q (q = Q0 at p = A, 1 at p = 1).
+const A = 0.3, Q0 = 0.19, S = (1 - A) / (1 - Q0)
+const T = q => A + (q - Q0) * S // the old clock's q in the dive's p
+const qOf = p => Q0 + (p - A) / S
+// The opening's frame: r, the way he runs to the rim (between the pad's own outward line and +x), s across it.
+const YR = 0.9, YIN = YR + PI // he runs facing r; he lands facing back along it, toward the crown
+const R = new THREE.Vector3(Math.sin(YR), 0, Math.cos(YR)), SIDE = new THREE.Vector3(Math.cos(YR), 0, -Math.sin(YR))
+const LAND = padC.clone().addScaledVector(R, 2.6).setY(PY + 0.25 + 0.91) // his hips, standing where he lands
+const loc = (u, v, h, o = LAND) => new THREE.Vector3().copy(o).addScaledVector(R, u).addScaledVector(SIDE, v).add(new THREE.Vector3(0, h, 0)).toArray()
+const off = (u, v, h) => loc(u, v, h, new THREE.Vector3())
+// The web's anchor: the crown's glass lip above the pad.
+const WEB = (() => { const d = Math.hypot(padC.x, padC.z), r = reach(ROOF - 1.5, padC.x / d, padC.z / d) - 0.25; return new THREE.Vector3((padC.x / d) * r, ROOF - 1.5, (padC.z / d) * r) })()
+const ZIP = 0.13, TOUCH = 0.15, RECEDE = [0.19, 0.245], RUN = [0.252, 0.277] // web let go; feet down; the suit off; the run to the leap
+// His hips: zipping up the web out of the canyon; let go over the rim, the flip, down on the pad; the run;
+// off the rim; then the old fall (drifting in toward the face it used to fall past), the pull-out just
+// above the street, up the avenue (+x) between the towers and into the storm.
 const PATH = keyed([
-  [0, 7.75, ROOF + 0.91, 0], [0.1, 7.75, ROOF + 0.91, 0], [0.125, 8.7, ROOF + 1.1, 0], [0.155, 10.6, ROOF - 1, 0.1],
-  [0.2, 13, ROOF - 11, 0.3], [0.28, 15, ROOF - 34, 0.8], [0.38, 16.4, ROOF - 64, 1], [0.5, 17.8, ROOF - 96, 1],
-  [0.62, 19.2, ROOF - 127, 1], [0.72, 21.2, ROOF - 151, 1], [0.775, 25.5, 16, 1], [0.82, 34, 8.5, 0.8],
-  [0.88, 56, 10, 0.4], [0.94, 84, 22, 0], [1, 110, 47, 0],
+  [0, ...loc(30, 9, -16)], [0.06, ...loc(21, 6.5, -11)], [0.09, ...loc(11.5, 3.5, -5.5)], [0.115, ...loc(3.7, 1, 0.3)],
+  [ZIP, ...loc(1.9, 0.5, 2.2)], [0.14, ...loc(0.8, 0.15, 2.6)], [TOUCH, ...loc(0, 0, 0)], [RUN[0], ...loc(0, 0, 0)],
+  [0.262, ...loc(0.4, 0, 0)], [0.27, ...loc(1.7, 0, 0.05)], [RUN[1], ...loc(3, 0, 0.1)], [0.283, ...loc(4.2, 0, 0.6)],
+  [0.291, ...loc(5.4, 0, -0.6)], [A, ...loc(6.3, 0, -3.2)],
+  ...[[0.28, 15, ROOF - 34, 11.8], [0.38, 16.4, ROOF - 64, 5.5], [0.5, 17.8, ROOF - 96, 2], [0.62, 19.2, ROOF - 127, 1], [0.72, 21.2, ROOF - 151, 1],
+    [0.775, 25.5, 16, 1], [0.82, 34, 8.5, 0.8], [0.88, 56, 10, 0.4], [0.94, 84, 22, 0], [1, 110, 47, 0]].map(([q, ...v]) => [T(q), ...v]),
 ])
-// His body: pitch (0 upright; PI/2 belly-down, head along +x; more is head-first) and roll about his length.
+// His body: pitch (0 upright; PI/2 belly-down, head forward; more is head-first), roll about his length,
+// and his heading (yaw: PI/2 faces +x). Stretched along the web; upright on the pad (the flip is added
+// in update); the turn to the rim; head-first off it; then the old tumble, turning to +x.
 const BODY = keyed([
-  [0, 0, 0], [0.1, 0, 0], [0.125, 0.3, 0], [0.16, 1.4, 0.15], [0.195, 2.3, 1.2], [0.225, 2.15, 3.2], [0.25, 1.8, 5],
-  [0.27, 1.57, 6.283], [0.72, 1.57, 6.283], [0.77, 1.42, 6.283], [0.84, 1.5, 6.283], [0.92, 1.32, 6.283], [1, 0.98, 6.283],
+  [0, 0.95, 0, YIN], [0.125, 0.95, 0, YIN], [TOUCH, 0, 0, YIN], [0.246, 0, 0, YIN], [0.258, 0, 0, YR], [0.265, 0.18, 0, YR],
+  [RUN[1], 0.25, 0, YR], [0.281, 0.9, 0, YR], [0.289, 1.5, 0.1, YR],
+  ...[[0.195, 2.3, 1.2, 0.25], [0.225, 2.15, 3.2, 0.6], [0.25, 1.8, 5, 0.9], [0.27, 1.57, 6.283, 1], [0.72, 1.57, 6.283, 1], [0.77, 1.42, 6.283, 1],
+    [0.84, 1.5, 6.283, 1], [0.92, 1.32, 6.283, 1], [1, 0.98, 6.283, 1]].map(([q, a, b, k]) => [T(q), a, b, YR + (PI / 2 - YR) * k]),
 ])
-// The camera from his hips: its offset (x, y, z), where it looks (offset from him) and its roll. A wide
-// of him on the edge; over his shoulder; dropping with him, tumbling; under him for the suit-up (his front
-// faces the street), piece by piece up his body to the visor; a held three-quarter front of the finished
-// suit as the eyes light and the thrusters ignite; then round behind him for the climb, him low and central.
+// The camera: its offset, where it looks (offset from its anchor) and its roll. In the opening the anchor
+// is the spot he lands on (so the wide and the landing hold still in the world); from the run it is him.
+// A wide of the crown and pad as he zips up out of the canyon; on the pad's edge as he comes over the rim
+// and flips; low in front of the three-point landing; close round him as the spider suit recedes; behind
+// him on the run; over his shoulder off the rim and down. Then the old shots: tumbling; under him for the
+// suit-up (his front faces the street), piece by piece up his body to the visor; a held three-quarter
+// front of the finished suit as the eyes light and the thrusters ignite; round behind him for the climb.
 const CAM = keyed([
-  [0, 104, 8, -110, 6.3, -27, 17, 0], // the landmark, three-quarter from up the avenue, crown to blade tip in the frame's right third
-  [0.015, 104, 8, -110, 6.3, -27, 17, 0], // held clear of the title
-  [0.03, 22, 2, -26, -6, -4, 0, 0],
-  [0.058, -4, 1.6, -2.4, 6, -5, -1, 0],
-  [0.07, -3, 2.2, -3.2, 2.5, -3, 1, 0],
-  [0.11, -2.8, 1.4, -3.4, 2.5, -2.5, 1, 0],
-  [0.15, -2.4, 3.6, -2.6, 0.6, -1.2, 0.4, 0],
-  [0.185, -1.6, 4.6, -2.2, 0.5, -1.2, 0.3, 0.25],
-  [0.215, 0.8, 4.6, -0.6, 0.4, -1, 0, 0.9],
-  [0.24, 3.5, 1, 4.4, 0.2, 0.1, 0, -0.3],
-  [0.27, -0.3, -1.75, 2.15, -0.5, -0.25, 0, 0], // close: his body fills the frame for the leg and torso locks
-  [0.34, -0.5, -1.5, 1.8, -0.45, -0.2, 0, 0],
-  [0.43, 0.25, -1.6, 1.5, 0.15, -0.1, 0, 0],
-  [0.55, 0.5, -2.1, 2.4, 0.2, -0.1, 0.1, 0],
-  [0.65, 1.9, -1.25, 1.45, 0.6, -0.05, 0, 0],
-  [0.715, 1.5, -2.3, 1.25, 0.5, 0, 0, 0], // the finished suit, three-quarter front from below at his chest: held
-  [0.76, 1.7, -2.2, 1.55, 0.5, 0.05, 0, 0],
-  [0.8, -3.2, 0.9, 1.6, 3, -0.3, 0.2, 0],
-  [0.85, -4.6, 1.6, 1, 5, -0.4, 0, 0],
-  [0.9, -5.4, 1.4, 0.8, 7, 0.8, 0, 0],
-  [1, -6, -0.5, 0.8, 8, 4, 0, 0],
+  [0, ...off(58, 31, 7), ...off(1, 0, 1.5), 0], // the landmark wide: crown, pad and blade over the canyon he zips up out of
+  [0.06, ...off(54, 29, 6), ...off(2, 0, 0.5), 0],
+  [0.086, ...off(44, 23, 4), ...off(5, 1, -3), 0],
+  [0.103, ...off(-1, 2.5, 3.2), ...off(9.5, 2.6, -4), 0], // up on the pad, looking down the web at him coming up out of the canyon
+  [0.114, ...off(-1.6, 2.5, 3), ...off(5, 1.3, -1), 0],
+  [0.125, ...off(-2.2, 2.4, 2.6), ...off(4.5, 0.6, 0.8), 0],
+  [0.138, ...off(-3, 2.2, 2.2), ...off(1.4, 0.2, 1.2), 0], // the flip over the pad
+  [TOUCH, ...off(-3, 1.2, 0.9), ...off(0.8, 0, -0.75), 0], // above, in front of the three-point landing: the drop and the city behind him
+  [0.18, ...off(-2.7, 1, 0.8), ...off(0.7, 0, -0.7), 0],
+  [0.2, ...off(-2.6, 1.3, 0.9), ...off(0.6, 0, -0.3), 0], // he rises
+  [0.225, ...off(-1.95, 0.85, 0.8), ...off(0.4, 0, -0.05), 0], // close as the suit recedes
+  [0.244, ...off(-2.2, -0.7, 0.85), ...off(0.4, 0, -0.15), 0],
+  [0.26, ...off(-2.9, -0.8, 1.4), ...off(3, 0, -0.8), 0], // behind him as he turns and runs
+  [0.272, ...off(-2.7, -0.5, 1.5), ...off(4, 0, -1.4), 0],
+  [0.286, ...off(-1.8, -0.3, 2), ...off(3, 0, -3.5), 0], // off the rim: over his shoulder, the drop below
+  [A, ...off(-2.1, 0.3, 3.4), ...off(1.4, 0, -1.2), 0.1],
+  ...[
+    [0.215, 0.8, 4.6, -0.6, 0.4, -1, 0, 0.9],
+    [0.24, 3.5, 1, 4.4, 0.2, 0.1, 0, -0.3],
+    [0.27, -0.3, -1.75, 2.15, -0.5, -0.25, 0, 0], // close: his body fills the frame for the leg and torso locks
+    [0.34, -0.5, -1.5, 1.8, -0.45, -0.2, 0, 0],
+    [0.43, 0.25, -1.6, 1.5, 0.15, -0.1, 0, 0],
+    [0.55, 0.5, -2.1, 2.4, 0.2, -0.1, 0.1, 0],
+    [0.65, 1.9, -1.25, 1.45, 0.6, -0.05, 0, 0],
+    [0.715, 1.5, -2.3, 1.25, 0.5, 0, 0, 0], // the finished suit, three-quarter front from below at his chest: held
+    [0.76, 1.7, -2.2, 1.55, 0.5, 0.05, 0, 0],
+    [0.8, -3.2, 0.9, 1.6, 3, -0.3, 0.2, 0],
+    [0.85, -4.6, 1.6, 1, 5, -0.4, 0, 0],
+    [0.9, -5.4, 1.4, 0.8, 7, 0.8, 0, 0],
+    [1, -6, -0.5, 0.8, 8, 4, 0, 0],
+  ].map(([q, ...v]) => [T(q), ...v]),
 ])
-// Where a phone looks in the opening wide (the dive's world space): the crown and blade high in the frame.
-const TOWER_PHONE = new THREE.Vector3(-5, ROOF - 24, -6)
+// Where a phone looks in the opening wide: between the crown and the pad, the canyon below.
+const PADKEY = new THREE.Vector3().fromArray(loc(-3.5, 2.5, 1.6)) // a key light for him on the pad
+const TOWER_PHONE = new THREE.Vector3(padC.x * 0.3 - 2, ROOF - 9, padC.z * 0.3)
 const PHONE_ROLL = -PI / 2 // the suit-up on a phone: his body (head along +x) stood up the frame
-const FLY = 0.09 // how much of p each plate spends in the air
-const VISOR = [0.68, 0.71] // the faceplate swings down, then the eyes light
+const FLY = 0.09 // how much of q each plate spends in the air
+const VISOR = [0.68, 0.71] // the faceplate swings down, then the eyes light (in q)
 
 // ---------------------------------------------------------------- the armour
 // Its pieces in dive/suit.glb, by the bone each rides on, and the p at which each locks: boots and legs,
@@ -197,6 +267,60 @@ const turn = (x, y, z) => new THREE.Quaternion().setFromEuler(new THREE.Euler(x,
 const FLIGHT = {
   Spine01: turn(-0.08, 0, 0), neck: turn(-0.3, 0, 0), Head: turn(-0.85, 0, 0),
   LeftArm: turn(0, 0, -1.32), RightArm: turn(0, 0, 1.32), LeftHand: turn(0, 0, -0.3), RightHand: turn(0, 0, 0.3),
+}
+// On the web: the right arm reaching up along it, the left swept back, the legs trailing, head up.
+const ZIPPED = {
+  neck: turn(-0.25, 0, 0), Head: turn(-0.55, 0, 0),
+  RightArm: turn(-0.2, 0, -1.42), LeftArm: turn(0.55, 0, -0.95), LeftForeArm: turn(0.15, 0, -1.1),
+  LeftUpLeg: turn(-0.35, 0, 0), LeftLeg: turn(0.5, 0, 0), RightUpLeg: turn(0.15, 0, 0), RightLeg: turn(0.95, 0, 0),
+}
+// Tucked for the flip: knees to his chest, hands at his shins, curled.
+const TUCKED = {
+  Spine: turn(0.3, 0, 0), Spine01: turn(0.55, 0, 0), Head: turn(0.7, 0, 0),
+  LeftArm: turn(-0.9, 0, -1.25), RightArm: turn(-0.9, 0, 1.25), LeftForeArm: turn(-1.9, 0, -1.25), RightForeArm: turn(-1.9, 0, 1.25),
+  LeftUpLeg: turn(-1.95, 0, 0), RightUpLeg: turn(-1.95, 0, 0), LeftLeg: turn(0.35, 0, 0), RightLeg: turn(0.35, 0, 0),
+}
+// A run, sampled at STRIDES phases of one cycle (two steps, RUN_LEN metres): thighs swinging, the knee
+// most bent as the leg comes through, elbows bent and pumping against the legs.
+const STRIDES = 8, RUN_LEN = 2.9
+const runPose = f => {
+  const leg = a => ({ thigh: -0.8 * Math.sin(a) - 0.08, bend: 0.25 + 1.35 * Math.max(0, Math.cos(a)) ** 1.5 })
+  const l = leg(f), r = leg(f + PI), al = -0.65 * Math.sin(f), ar = -al
+  return {
+    Head: turn(-0.12, 0, 0),
+    LeftUpLeg: turn(l.thigh, 0, 0), LeftLeg: turn(l.thigh + l.bend, 0, 0), RightUpLeg: turn(r.thigh, 0, 0), RightLeg: turn(r.thigh + r.bend, 0, 0),
+    LeftArm: turn(al + 0.1, 0, -1.28), LeftForeArm: turn(al - 1.35, 0, -1.28), RightArm: turn(ar + 0.1, 0, 1.28), RightForeArm: turn(ar - 1.35, 0, 1.28),
+  }
+}
+
+// The spider suit recedes off him into his chest (a nanotech dissolve): the mask peels up off his head
+// from the neck, then the suit draws in from his hands and feet. The order is a distance in his rest pose
+// (bind space, metres), broken into small cells so the front is ragged; the suit is drawn where it is under
+// uSpider and his own body where it is over, so the two always meet on the same front.
+const SPIDER_D = /* glsl */ `
+  float spiderD(vec3 b) {
+    float n = fract(sin(dot(floor(b * 55.0), vec3(12.9898, 78.233, 37.719))) * 43758.5453);
+    float d = b.y > 1.4 && abs(b.x) < 0.15 ? 1.5 + (1.79 - b.y) * 1.2 : length(b - vec3(0.0, 1.25, 0.1));
+    return d + 0.025 * n;
+  }`
+// The suit's own reveal: R from fully on (2) to gone (-0.1) through the recede, the mask first.
+const spiderR = x => (x <= 0 ? 2 : x >= 1 ? -0.1 : x < 0.3 ? 2.0 - (x / 0.3) * 0.5 : 1.34 - ((x - 0.3) / 0.7) * 1.44)
+function spiderMaterial(src, U) {
+  const m = src.clone()
+  for (const k of ['map', 'emissiveMap']) if (m[k]) m[k].colorSpace = THREE.NoColorSpace // read as painted: the frame has no sRGB encode
+  m.envMapIntensity = 1.1
+  m.onBeforeCompile = sh => {
+    sh.uniforms.uSpider = U.uSpider
+    sh.vertexShader = sh.vertexShader
+      .replace('#include <common>', '#include <common>\nvarying vec3 vSp;')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvSp = position;')
+    sh.fragmentShader = sh.fragmentShader
+      .replace('#include <common>', `#include <common>\nvarying vec3 vSp; uniform float uSpider;${SPIDER_D}`)
+      .replace('#include <map_fragment>', '#include <map_fragment>\nfloat spD = spiderD(vSp);\nif (spD > uSpider) discard;')
+      .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\ntotalEmissiveRadiance += vec3(0.75, 0.88, 1.0) * (1.0 - smoothstep(0.0, 0.018, uSpider - spD)) * step(uSpider, 1.995) * 2.2;')
+  }
+  m.customProgramCacheKey = () => 'dive-spider'
+  return m
 }
 
 /**
@@ -625,6 +749,7 @@ function jetMaterial(U) {
 function undersuit(material, U, lock) {
   material.onBeforeCompile = sh => {
     sh.uniforms.uSuit = U.uSuit
+    sh.uniforms.uSpider = U.uSpider
     sh.uniforms.uLock = { value: lock }
     sh.vertexShader = sh.vertexShader
       .replace('#include <common>', `#include <common>\nvarying vec3 vBind; varying float vGone; uniform float uSuit; uniform float uLock[${lock.length}];`)
@@ -637,7 +762,7 @@ function undersuit(material, U, lock) {
         vGone = step(uLock[int(bi + 0.5)], uSuit);`)
     sh.fragmentShader = sh.fragmentShader
       .replace('#include <common>', /* glsl */ `#include <common>
-        varying vec3 vBind; varying float vGone; uniform float uSuit;
+        varying vec3 vBind; varying float vGone; uniform float uSuit; uniform float uSpider;${SPIDER_D}
         float suitOrder(vec3 b) {
           float ax = abs(b.x);
           if (b.y > 1.38 && ax < 0.16) return (b.z > 0.05 && b.y > 1.44 && b.y < 1.69) ? 9.0 : 0.6 + (b.y - 1.38) * 0.1; // the face waits for the visor
@@ -646,7 +771,7 @@ function undersuit(material, U, lock) {
           return 0.335 + (b.y - 0.95) * 0.2;
         }`)
       .replace('#include <map_fragment>', /* glsl */ `#include <map_fragment>
-        if (vGone > 0.5) discard;
+        if (vGone > 0.5 || spiderD(vBind) < uSpider) discard; // under a locked plate, or still under the spider suit
         float sOrd = suitOrder(vBind);
         float sOn = smoothstep(sOrd, sOrd + 0.006, uSuit);
         float sEdge = smoothstep(sOrd - 0.005, sOrd, uSuit) * (1.0 - sOn);
@@ -668,18 +793,22 @@ export function createDive(renderer, { loader, mobile = false }) {
   const K3 = [0, 0, 0], K7 = [0, 0, 0, 0, 0, 0, 0]
   const out = { here: at, dream: 0 }
   // The camera alone, before the world is whole: the first shot, so prepare's draw is the real one.
+  const anchor = new THREE.Vector3()
   const place = (p, portrait, aspect, still) => {
     CAM(p, K7)
-    // A phone sees only the middle of the frame. On the roof and through the suit-up it stands further
+    const q = qOf(p)
+    // The anchor the camera's keys hang from: the spot he lands on, then him from the run on.
+    anchor.copy(LAND).lerp(at, ss(0.246, 0.292, p))
+    // A phone sees only the middle of the frame. From the zip up the web to the suit-up it stands further
     // back and looks right at him, and while he lies flat for the suit-up the frame turns a quarter so
     // his length runs up the tall frame.
-    const roof = portrait ? ss(0.03, 0.05, p) * (1 - ss(0.12, 0.15, p)) : 0, flat = portrait ? ss(0.235, 0.265, p) * (1 - ss(0.715, 0.76, p)) : 0
-    const k = portrait ? 1.35 + 0.35 * Math.max(roof, flat) : 1
-    cam.set(K7[0], K7[1], K7[2]).multiplyScalar(k).add(at)
+    const near = portrait ? ss(0.088, 0.105, p) : 0, flat = portrait ? ss(0.235, 0.265, q) * (1 - ss(0.715, 0.76, q)) : 0
+    const k = portrait ? 1.35 + 0.35 * Math.max(near * (1 - ss(0.27, 0.31, p)), flat) : 1
+    cam.set(K7[0], K7[1], K7[2]).multiplyScalar(k).add(anchor)
     cam.y = Math.max(1.5, cam.y)
-    look.set(K7[3], K7[4], K7[5]).add(at)
-    if (portrait) look.lerp(at, 0.8 + 0.2 * Math.max(roof, flat))
-    if (portrait && p < 0.05) look.lerp(TOWER_PHONE, 1 - ss(0.015, 0.05, p)) // or, in the wide, his tower: crown and blade over the title
+    look.set(K7[3], K7[4], K7[5]).add(anchor)
+    if (portrait) look.lerp(at, (0.8 + 0.2 * flat) * near)
+    if (portrait && p < 0.1) look.lerp(TOWER_PHONE, 1 - near) // or, in the wide, his tower: crown and pad, the canyon below
     camera.aspect = aspect
     camera.updateProjectionMatrix()
     camera.up.set(0, 1, 0)
@@ -700,6 +829,8 @@ export function createDive(renderer, { loader, mobile = false }) {
       t0 = performance.now()
     }
     const traveller = loadTraveller(loader), clips = loadClips(loader, '/cinema/dive/fall.glb'), suitFile = loader.loadAsync('/cinema/dive/suit.glb')
+    // The opening: the spider suit (scripts/cinema/suit_skin.py) and the three-point landing (the landing's own clip, as recorded).
+    const spiderFile = loader.loadAsync('/cinema/suits/spider.glb'), landFile = loader.loadAsync('/cinema/landing/land.glb')
     // Pixels per metre at one metre away, for lights sized in metres (set each frame from the drawing size).
     const pxScale = { value: 900 }, size = new THREE.Vector2()
     scene.fog = new THREE.FogExp2('#0c1527', mobile ? 0.0024 : 0.002)
@@ -807,30 +938,6 @@ export function createDive(renderer, { loader, mobile = false }) {
     }
     const prism = (w, c, h, x, y) => new THREE.ExtrudeGeometry(chamfer(w, c), { depth: h, bevelEnabled: false }).rotateX(-PI / 2).translate(x, y, 0)
     const heroGlass = towerMaterial({ seed: 0.3, top: ROOF, hero: true })
-    const CROWN = 36, ROWS = 12, N = 28, SLOPE = 9, Y0 = ROOF - CROWN
-    // A crown ring at t (0 its foot, 1 the roof): a superellipse, square at the foot where it grows out of
-    // the chamfered shaft, rounder and wider toward -x and the sides as it rises.
-    const ring = t => {
-      const rx = 8.1 + 5.8 * t ** 0.8
-      return { cx: 8 - rx, rx, rz: 8.1 + 3.6 * Math.sin(t * PI * 0.5), e: 4 - 1.6 * t }
-    }
-    const ringAt = (t, k) => {
-      const { cx, rx, rz, e } = ring(t), a = (k / N) * PI * 2, c = Math.cos(a), s = Math.sin(a)
-      return [cx + rx * Math.sign(c) * Math.abs(c) ** (2 / e), rz * Math.sign(s) * Math.abs(s) ** (2 / e)]
-    }
-    const rise = x => SLOPE * clamp01((8 - x) / (2 * ring(1).rx)) ** 1.3 // the cap's sloped cut
-    // How far out from the axis the building's skin is along a horizontal direction (dx, dz) at height y.
-    const reach = (y, dx, dz) => {
-      if (y < Y0) return Math.min(8 / Math.abs(dx || 1e-9), 8 / Math.abs(dz || 1e-9), 13.8 / (Math.abs(dx) + Math.abs(dz)))
-      const { cx, rx, rz, e } = ring(Math.min(1, (y - Y0) / CROWN))
-      let lo = 0, hi = 40
-      for (let i = 0; i < 30; i++) {
-        const u = (lo + hi) / 2
-        if (Math.abs((u * dx - cx) / rx) ** e + Math.abs((u * dz) / rz) ** e < 1) lo = u
-        else hi = u
-      }
-      return lo
-    }
     // The crown's skin: rings a floor apart, faceted, the last one the parapet's sloped top.
     const rows = []
     for (let j = 0; j <= ROWS + 1; j++) rows.push(Array.from({ length: N }, (_, k) => {
@@ -861,9 +968,7 @@ export function createDive(renderer, { loader, mobile = false }) {
     const bladeGeo = new THREE.ExtrudeGeometry(new THREE.Shape([...bOut, ...[...bIn].reverse()]), { depth: 1.2, bevelEnabled: false }).translate(0, 0, -0.6).rotateY(PI - BETA)
     // The pad, near the crown's lower lip, cantilevered out across the avenue's line of sight (so it breaks
     // the crown's outline in the opening wide) on a deep tapered arm with a lit underside.
-    const npx = 0.55, npz = 0.835, PY = ROOF - 14, PR = 5.8
-    const pr = reach(PY, npx, npz), pd = pr + 3.2 + PR, padC = new THREE.Vector3(npx * pd, PY, npz * pd)
-    const arm = new THREE.Shape([new THREE.Vector2(pr - 1, PY + 0.25), new THREE.Vector2(pd - PR + 1, PY + 0.25), new THREE.Vector2(pd - PR + 1, PY - 0.9), new THREE.Vector2(pr - 1, PY - 5.2)])
+    const arm =new THREE.Shape([new THREE.Vector2(pr - 1, PY + 0.25), new THREE.Vector2(pd - PR + 1, PY + 0.25), new THREE.Vector2(pd - PR + 1, PY - 0.9), new THREE.Vector2(pr - 1, PY - 5.2)])
     const metal = new THREE.MeshStandardMaterial({ color: '#3a414d', metalness: 0.8, roughness: 0.3, emissive: '#141a26' })
     // The blade's own satin metal, lit by the city so its face reads against the night.
     scene.add(new THREE.Mesh(bladeGeo, new THREE.MeshStandardMaterial({ color: '#66728a', metalness: 0.5, roughness: 0.36, emissive: '#34476a' })))
@@ -992,8 +1097,9 @@ export function createDive(renderer, { loader, mobile = false }) {
     // ------------------------------------------------------------ the traveller and his suit
     const you = (await traveller).make({ look: 'pbr' })
     you.add(await clips)
+    you.add((await landFile).animations)
     const root = you.root
-    const suitU = { uSuit: { value: 0 } }
+    const suitU = { uSuit: { value: 0 }, uSpider: { value: 2 } }
     const skin = []
     // Each skeleton bone's lock: its own plate's, a toe its foot's, the neck and head the visor's.
     const lockOf = n => n.endsWith('ToeBase') ? lockOf(n.replace('ToeBase', 'Foot')) : /^(neck|Head|head_end|headfront)$/.test(n) ? VISOR[1] - 0.004 : SUIT.find(s => s.name === n)?.lock ?? 9
@@ -1016,17 +1122,18 @@ export function createDive(renderer, { loader, mobile = false }) {
     const fallClip = you.actions.Skydive.getClip()
     const hipTrack = fallClip.tracks.find(k => k.name === 'Hips.quaternion')
     const untilt = restQ.get(hips).clone().multiply(new THREE.Quaternion().fromArray(hipTrack.values, 0).invert())
-    const idle = you.actions.Idle, falling = you.actions.Skydive
-    for (const a of [idle, falling]) a.play()
+    const idle = you.actions.Idle, falling = you.actions.Skydive, kneel = you.actions.Land_Kneel
+    for (const a of [idle, falling, kneel]) a.play()
+    kneel.setEffectiveTimeScale(0) // scrubbed by p
+    const zipQ = makePose(bones, restQ, ZIPPED), tuckQ = makePose(bones, restQ, TUCKED)
+    const runQ = Array.from({ length: STRIDES }, (_, i) => makePose(bones, restQ, runPose((i / STRIDES) * PI * 2)))
     await step()
 
-    // The suit's pieces (dive/suit.glb: scripts/cinema/suit_fit.py cut it per bone round his rest pose),
-    // parented to their bones. The reactor and the eyes glow; the rest is painted metal.
-    const suitScene = (await suitFile).scene
-    // A phone takes the suit's 2048 px maps at 1024: a quarter of the memory, and it never sees them closer.
-    if (mobile) {
+    // A phone takes a suit's 2048 px maps at 1024: a quarter of the memory, and it never sees them closer.
+    const shrink = async model => {
+      if (!mobile) return
       const maps = new Set()
-      suitScene.traverse(o => { for (const v of Object.values(o.material ?? {})) if (v?.isTexture && v.image?.width > 1024) maps.add(v) })
+      model.traverse(o => { for (const v of Object.values(o.material ?? {})) if (v?.isTexture && v.image?.width > 1024) maps.add(v) })
       for (const tex of maps) {
         const c = document.createElement('canvas')
         c.width = c.height = 1024
@@ -1036,6 +1143,26 @@ export function createDive(renderer, { loader, mobile = false }) {
       }
       await step()
     }
+    // The spider suit, on his own bones: on through the opening, then it recedes into his chest.
+    const spiderScene = (await spiderFile).scene
+    await shrink(spiderScene)
+    const spider = wearSuit(root, spiderScene)
+    for (const m of spider.meshes) m.material = spiderMaterial(m.material, suitU)
+    // The web: a fine line from his right hand up to the crown's lip, while he zips up it.
+    const web = new THREE.Mesh(new THREE.CylinderGeometry(1, 1, 1, 6, 1, true).translate(0, 0.5, 0), new THREE.MeshBasicMaterial({ color: new THREE.Color(0.62, 0.66, 0.74) }))
+    web.frustumCulled = false
+    scene.add(web)
+    const webR = mobile ? 0.035 : 0.022, palm = new THREE.Vector3(0.69, 1.25, 0.02) // the right palm in his rest pose (mirrored x below)
+    const webHand = new THREE.Group()
+    webHand.position.set(-palm.x, palm.y, palm.z)
+    root.add(webHand)
+    you.bone('RightHand').attach(webHand)
+    await step()
+
+    // The suit's pieces (dive/suit.glb: scripts/cinema/suit_fit.py cut it per bone round his rest pose),
+    // parented to their bones. The reactor and the eyes glow; the rest is painted metal.
+    const suitScene = (await suitFile).scene
+    await shrink(suitScene)
     const pieces = []
     seed = 31
     for (const spec of SUIT) {
@@ -1134,11 +1261,12 @@ export function createDive(renderer, { loader, mobile = false }) {
     const vel = new THREE.Vector3(), off = new THREE.Vector3(), tmp = new THREE.Vector3(), feet = new THREE.Vector3()
     const qa = new THREE.Quaternion(), qb = new THREE.Quaternion(), qc = new THREE.Quaternion()
     const X = new THREE.Vector3(1, 0, 0), Y = new THREE.Vector3(0, 1, 0)
-    const K3b = [0, 0, 0], K2 = [0, 0]
+    const K3b = [0, 0, 0], K2 = [0, 0, 0], qr = new THREE.Quaternion(), hand = new THREE.Vector3()
     const cometPos = comet.geometry.attributes.position, cometOn = comet.geometry.attributes.aOn
+    const slerpAll = (pose, w) => { if (w > 0) for (let i = 0; i < bones.length; i++) bones[i].quaternion.slerp(pose[i], Math.min(1, w)) }
     let lastT = null
     run = (state, t, aspect) => {
-      const p = state.p, still = !!state.still
+      const p = state.p, still = !!state.still, q = qOf(p)
       const dt = lastT === null ? 0 : Math.min(0.1, Math.max(0, t - lastT))
       lastT = t
       renderer.getDrawingBufferSize(size)
@@ -1153,18 +1281,24 @@ export function createDive(renderer, { loader, mobile = false }) {
       if (speed > 1e-5) vel.multiplyScalar(1 / speed)
       else vel.set(0, -1, 0)
 
-      // His body: turned whole (yaw to +x, pitch, a roll through the dive), hips on the line.
+      // His body: turned whole (heading, pitch with the flip over the pad, a roll through the dive), hips on the line.
       BODY(p, K2)
-      qa.setFromAxisAngle(Y, PI / 2)
-      qb.setFromAxisAngle(X, K2[0])
+      qa.setFromAxisAngle(Y, K2[2])
+      qb.setFromAxisAngle(X, K2[0] + (still ? 0 : 2 * PI * ss(0.127, TOUCH, p)))
       qc.setFromAxisAngle(Y, still ? 0 : K2[1])
       root.quaternion.copy(qa).multiply(qb).multiply(qc)
       off.copy(hipsAt).applyQuaternion(root.quaternion)
       root.position.copy(at).sub(off)
-      // His limbs: standing, the free-fall clip (spread for the suit-up), the streamlined pose for the
-      // dive and the flight.
-      const wFall = ss(0.1, 0.16, p), wPose = Math.min(1, ss(0.13, 0.2, p) - ss(0.21, 0.26, p) + ss(0.72, 0.8, p))
-      idle.setEffectiveWeight(1 - wFall)
+      // His limbs: up the web, tucked for the flip, the three-point landing (its clip scrubbed by p) and up,
+      // standing, the run, then the free-fall clip (spread for the suit-up) and the streamlined pose for
+      // the dive and the flight.
+      const wKneel = ss(0.141, 0.148, p) * (1 - ss(0.222, 0.236, p))
+      const wFall = p < A ? ss(0.279, A, p) : ss(0.1, 0.16, q)
+      const wPose = p < A ? ss(0.272, 0.29, p) : Math.min(1, ss(0.13, 0.2, q) - ss(0.21, 0.26, q) + ss(0.72, 0.8, q))
+      const kt = p < TOUCH ? 0.58 - 0.12 * (1 - ss(0.141, TOUCH, p)) : p < 0.185 ? 0.58 + 0.84 * ((p - TOUCH) / (0.185 - TOUCH)) : 1.42 + 1.62 * ss(0.185, 0.226, p)
+      kneel.time = Math.min(kt, kneel.getClip().duration - 1e-3)
+      kneel.setEffectiveWeight(wKneel)
+      idle.setEffectiveWeight(Math.max(0, 1 - wFall - wKneel))
       falling.setEffectiveWeight(wFall)
       you.mixer.update(dt)
       if (wFall > 0) {
@@ -1172,32 +1306,45 @@ export function createDive(renderer, { loader, mobile = false }) {
         hips.quaternion.premultiply(qa)
         hips.position.lerp(hipsRest, wFall)
       }
-      if (wPose > 0) for (let i = 0; i < bones.length; i++) bones[i].quaternion.slerp(flightQ[i], wPose)
+      if (p < 0.2) {
+        slerpAll(zipQ, 1 - ss(0.125, 0.133, p))
+        slerpAll(tuckQ, ss(0.127, 0.134, p) - ss(0.141, 0.149, p))
+      }
+      const wRun = ss(0.247, 0.257, p) - ss(RUN[1] - 0.004, 0.285, p)
+      if (wRun > 0) {
+        // The stride follows the ground he covers, so his feet never slide.
+        const c = (Math.max(0, tmp.copy(at).sub(LAND).dot(R)) / RUN_LEN + 0.25) * STRIDES
+        const i = Math.floor(c), f = c - i, a = runQ[i % STRIDES], b = runQ[(i + 1) % STRIDES]
+        for (let j = 0; j < bones.length; j++) bones[j].quaternion.slerp(qr.slerpQuaternions(a[j], b[j], f), wRun)
+      }
+      slerpAll(flightQ, wPose)
 
-      // The suit: each plate a pure function of p.
-      suitU.uSuit.value = still ? 2 : p
-      for (const o of skin) o.visible = !still && p < VISOR[1] // sealed in: only the suit, nothing of him poking through
+      // The spider suit, receding off him (cut, with reduced motion); the iron suit, each plate a pure function of q.
+      suitU.uSpider.value = still ? (p < 0.22 ? 2 : -0.1) : spiderR((p - RECEDE[0]) / (RECEDE[1] - RECEDE[0]))
+      for (const m of spider.meshes) m.visible = suitU.uSpider.value > -0.1
+      suitU.uSuit.value = still ? (p < A ? 0 : 2) : q
+      for (const o of skin) o.visible = still ? p < A : q < VISOR[1] // sealed in: only the suit, nothing of him poking through
+      const suited = still ? (p < A ? 0 : 1) : -1
       for (let i = 0; i < pieces.length; i++) {
         const pc = pieces[i], g = pc.g
-        const f = still ? 1 : clamp01((p - (pc.lock - FLY)) / FLY)
+        const f = suited >= 0 ? suited : clamp01((q - (pc.lock - FLY)) / FLY)
         const e = 1 - (1 - f) ** 3
         g.position.copy(pc.home).addScaledVector(pc.dir, 1 - e).addScaledVector(pc.side, Math.sin(PI * e))
         qa.setFromAxisAngle(pc.axis, (1 - e) * pc.spin)
         g.quaternion.copy(pc.homeQ).multiply(qa)
         g.scale.setScalar(pc.homeS * Math.min(1, f * 5))
-        const since = p - pc.lock
+        const since = q - pc.lock
         // Each plate flares as it locks; the whole suit powers up as the visor seals.
-        pc.glow.value = still ? 1.6 : f <= 0 ? 1 : f < 1 ? 1.9 : 1 + 4 * Math.exp(-since / 0.016) + 0.6 * ss(VISOR[1], VISOR[1] + 0.025, p)
+        pc.glow.value = still ? 1.6 : f <= 0 ? 1 : f < 1 ? 1.9 : 1 + 4 * Math.exp(-since / 0.016) + 0.6 * ss(VISOR[1], VISOR[1] + 0.025, q)
         burst.U.uAge.value[i] = still ? -1 : since / 0.04
         cometOn.array[i] = !still && f > 0 && f < 1 ? Math.min(1, f * 6) * (1 - f) : 0
         if (pc.visor) {
-          const close = still ? 1 : ss(VISOR[0], VISOR[1], p)
+          const close = still ? 1 : ss(VISOR[0], VISOR[1], q)
           pc.visor.pivot.rotation.x = -1.75 * (1 - close)
-          pc.visor.eyes.value = still ? 1.2 : close < 1 ? 0.15 : 1.2 + 4 * Math.exp(-(p - VISOR[1]) / 0.014)
+          pc.visor.eyes.value = still ? 1.2 : close < 1 ? 0.15 : 1.2 + 4 * Math.exp(-(q - VISOR[1]) / 0.014)
         }
       }
-      // The thrusters light, he pulls out of the fall and flies.
-      const heat = ss(0.722, 0.758, p)
+      const heat = ss(0.722, 0.758, q)
       jetU.uHeat.value = heat
       jetU.uT.value = t
       for (const j of jets) {
@@ -1211,10 +1358,21 @@ export function createDive(renderer, { loader, mobile = false }) {
         burst.U.uAt.value[i].toArray(cometPos.array, i * 3)
       }
       cometPos.needsUpdate = cometOn.needsUpdate = true
+      // The web, from his palm to the crown's lip, until he lets go.
+      webHand.getWorldPosition(hand)
+      tmp.copy(WEB).sub(hand)
+      const webLen = tmp.length(), webOn = 1 - ss(ZIP - 0.003, ZIP + 0.002, p)
+      web.position.copy(hand)
+      web.quaternion.setFromUnitVectors(Y, tmp.multiplyScalar(1 / webLen))
+      web.scale.set(webR * webOn + 1e-4, webLen * (0.02 + 0.98 * webOn), webR * webOn + 1e-4)
       jets[2].g.getWorldPosition(feet).add(jets[3].g.getWorldPosition(tmp)).multiplyScalar(0.5)
       thrustLight.position.copy(feet)
       thrustLight.intensity = heat * 9
       cityGlow.position.set(at.x + 2, Math.max(2, at.y - 26), at.z + 5)
+      // On the pad, the city's glow comes up over its rim in front of him instead: his key there.
+      const onPad = 1 - ss(0.268, 0.3, p)
+      cityGlow.position.lerp(PADKEY, onPad)
+      cityGlow.intensity = 380 - 340 * onPad
 
       // The wind past him.
       wind.U.uC.value.copy(at)
@@ -1225,7 +1383,7 @@ export function createDive(renderer, { loader, mobile = false }) {
       wind.U.uUp.value.crossVectors(vel, wind.U.uSide.value)
       wind.U.uLen.value = Math.min(6, speed * 2.2)
       wind.U.uRun.value = (at.x - at.y) / 50 + t * 0.15
-      wind.U.uA.value = still ? 0 : 0.55 * ss(0.25, 1.0, speed) * ss(0.12, 0.2, p)
+      wind.U.uA.value = still ? 0 : 0.55 * ss(0.25, 1.0, speed) * Math.max(ss(0.12, 0.2, q), 1 - ss(ZIP - 0.02, ZIP, p))
 
       // The city lives on its own clock.
       cars.material.uniforms.uT.value = t
@@ -1241,14 +1399,14 @@ export function createDive(renderer, { loader, mobile = false }) {
       place(p, !!state.portrait, aspect, still)
       if (!still) {
         let push = 0
-        for (let i = 0; i < SUIT.length; i++) push += Math.exp(-(((p - SUIT[i].lock) / 0.005) ** 2))
+        for (let i = 0; i < SUIT.length; i++) push += Math.exp(-(((q - SUIT[i].lock) / 0.005) ** 2))
         camera.position.lerp(look, 0.03 * Math.min(1, push))
-        const shake = 0.012 * ss(0.722, 0.74, p) * (1 - ss(0.78, 0.86, p))
+        const shake = 0.012 * ss(0.722, 0.74, q) * (1 - ss(0.78, 0.86, q))
         camera.rotateX(Math.sin(t * 41) * shake)
         camera.rotateY(Math.sin(t * 33 + 1.3) * shake)
       }
       dome.position.copy(camera.position)
-      out.dream = still ? 0 : 0.35 * Math.exp(-(((p - VISOR[1] - 0.004) / 0.012) ** 2))
+      out.dream = still ? 0 : 0.35 * Math.exp(-(((q - VISOR[1] - 0.004) / 0.012) ** 2))
       return out
     }
   })()

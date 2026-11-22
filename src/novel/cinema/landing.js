@@ -1,40 +1,38 @@
 import * as THREE from 'three'
-import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js'
-import { loadTraveller, alohaLinear } from './films/kit'
+import { loadTraveller, alohaLinear, wearSuit, sky } from './films/kit'
 
 /*
  * Chapter Five, world 2: the landing. Dusk on a misty highland ridge above a valley: grass, scattered
  * stones, distant mountains, a storm sky. A pillar of lightning strikes; he drops out of it and lands on
  * one knee, a shockwave ring flattening the grass and lifting dust, sparks crawling over the ground; he
- * rises holding an original weapon of his own design (a short flanged maul with faint glowing grooves).
- * Slow, heavy camera; a low hero angle on the landing.
+ * rises in Thor's armour and crimson cape (his own head and hair, no helmet) holding Stormbreaker, faint
+ * lightning crawling over its blade. Slow, heavy camera; a low hero angle on the landing.
  * Beats in p (all derived from p and t, so it scrubs both ways):
  *   0     .13  out of the storm cloud: the ridge at dusk under a boiling overcast, lightning in it
  *   .135  .16  the leader feels down from the vortex; .16 the return stroke: a sustained pillar
  *   .15   .30  he drops out of it (the landing clip, public/cinema/landing/land.glb), lands at .30
  *   .30   .56  the impact, slowed by the scroll: shockwave ring through the grass, dust, sparks,
  *              arcs crawling over the scorched ground; the camera low on the one-knee landing
- *   .56   .80  he rises with the hammer; the storm breaks, god-rays through the gaps
- *   .835  1    he raises the hammer and a last bolt strikes it: the FLASH burns out from that
- * The weapon is his own design: a short steel-hafted flanged maul, symmetric, with bronze fittings
- * and faint glowing grooves (makeHammer).
+ *   .56   .80  he rises with the axe; the storm breaks, god-rays through the gaps
+ *   .835  1    he raises the axe and a last bolt strikes it: the BATS sweep in over that
+ * The armour and the cape (armour, headOnly) and Stormbreaker (makeAxe) are at the end of the file.
  *
  * CONTRACT (world.js, timeline.js and movies.js rely on it; do not change the export or its signature)
  *   export function createLanding(renderer, { loader, normalize, mobile }) -> { scene, camera, update, built }
  *     loader: the shared GLTFLoader (Meshopt + Draco). normalize(root, size, yaw): a model's meshes as
  *     one centred group scaled to `size` metres. mobile: phone-sized screen, build lighter.
  *   update(state, t, aspect) is called once per rendered frame while this world is drawn.
- *     state.p         0..1, this world's own progress (movies.js: Five's P 0.42..0.66), driven by scroll:
+ *     state.p         0..1, this world's own progress (movies.js: Five's P 0.4473..0.5577), driven by scroll:
  *                     it scrubs both ways and can jump, so derive everything from p and t and keep no
  *                     one-way state. The STORM cover parts over p 0..0.104 (come out of the cloud there);
- *                     p 0.104..0.896 is seen clear; the FLASH whiteout burns in over p 0.896..1, so a
- *                     raised weapon or a last strike there is what it burns out from.
+ *                     p 0.104..0.896 is seen clear; the BATS sweep in over p 0.896..1, so a
+ *                     raised weapon or a last strike there is what they cover.
  *     state.onScreen  never true for this world (only the dive and the final are drawn on the screen).
  *     state.still     reduced motion: no camera flourishes or shake; the strike, the drop and the
  *                     landing still follow p.
  *     state.portrait  the frame is a phone's (aspect < 0.85): frame for it. Decide framing from this.
  *     state.mobile    same as the option. state.cover: 0..1, how much a transition hides the frame
- *                     (kind 'storm' | 'flash' | null, phase 0..1): skip work the cover hides.
+ *                     (kind 'storm' | 'bats' | null, phase 0..1): skip work the cover hides.
  *     t               seconds, monotonic. aspect: width / height of what is being drawn; set
  *                     camera.aspect from it.
  *     Returns { here, dream, grade? }: here = a Vector3 at the traveller (world space; the same object
@@ -107,11 +105,12 @@ export function createLanding(renderer, { loader, mobile = false }) {
     scene.fog = new THREE.Fog(FOG, 30, 360)
     const SUN_DIR = new THREE.Vector3(-0.32, 0.2, -1).normalize() // low, behind the far mountains: he is rimmed against it
     const time = { value: 0 }, flash = { value: 0 }, flashPos = { value: new THREE.Vector3(0, 2, 0) }, sunK = { value: 0.3 }
+    const lift = { value: 1 } // the frame's exposure: half a stop up once he has landed (the lights and the painted shaders)
 
     // ------------------------------------------------------------ the storm sky
     const skyU = {
       uTime: time, uSunDir: { value: SUN_DIR }, uCover: { value: 1 }, uFlash: { value: 0 }, uFlashDir: { value: new THREE.Vector3(0, 1, 0) },
-      uBolt: { value: 0 }, uSwirl: { value: 0 }, uRays: { value: 0 },
+      uBolt: { value: 0 }, uSwirl: { value: 0 }, uRays: { value: 0 }, uLift: lift,
     }
     const dome = new THREE.Mesh(
       new THREE.SphereGeometry(400, 48, 24),
@@ -119,7 +118,7 @@ export function createLanding(renderer, { loader, mobile = false }) {
         uniforms: skyU,
         vertexShader: 'varying vec3 vDir; void main() { vDir = position; gl_Position = (projectionMatrix * viewMatrix * modelMatrix * vec4(position, 1.0)).xyww; }',
         fragmentShader: /* glsl */ `
-          uniform float uTime, uCover, uFlash, uBolt, uSwirl, uRays; uniform vec3 uSunDir, uFlashDir; varying vec3 vDir;
+          uniform float uTime, uCover, uFlash, uBolt, uSwirl, uRays, uLift; uniform vec3 uSunDir, uFlashDir; varying vec3 vDir;
           ${NOISE}
           void main() {
             vec3 d = normalize(vDir);
@@ -154,7 +153,7 @@ export function createLanding(renderer, { loader, mobile = false }) {
             float a = atan(dot(d, t2), dot(d, t1));
             float st = vnoise(vec2(a * 14., 3.1)) * vnoise(vec2(a * 31., 7.7));
             col += vec3(1., .66, .36) * st * pow(sunA, 3.) * (1. - dens * .7) * uRays * 1.2;
-            gl_FragColor = vec4(col, 1.);
+            gl_FragColor = vec4(col * sqrt(uLift), 1.); // the sky lifts half as much: its break is bright already
           }`,
         side: THREE.BackSide,
         depthWrite: false,
@@ -200,15 +199,19 @@ export function createLanding(renderer, { loader, mobile = false }) {
       g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3))
       g.setIndex(idx)
       const mts = new THREE.Mesh(g, new THREE.ShaderMaterial({
-        uniforms: { uFlash: flash, uSun: sunK },
+        uniforms: { uFlash: flash, uSun: sunK, uLift: lift, uSunDir: { value: SUN_DIR } },
         vertexShader: 'attribute vec3 color; varying vec3 vC; varying vec3 vP; void main() { vC = color; vP = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.); }',
-        fragmentShader: `uniform float uFlash, uSun; varying vec3 vC; varying vec3 vP;
+        fragmentShader: `uniform float uFlash, uSun, uLift; uniform vec3 uSunDir; varying vec3 vC; varying vec3 vP;
           ${NOISE}
           void main() {
             float a = atan(vP.z, vP.x) * length(vP.xz);
             float rock = vnoise(vec2(a * .08, vP.y * .012)) * .6 + vnoise(vec2(a * .3, vP.y * .05)) * .4; // gullies down the faces
             vec3 c = vC * (.8 + .4 * rock) * (1. + uSun * .15) + vec3(.5, .58, .8) * uFlash * .08 * smoothstep(-60., 80., vP.y);
-            gl_FragColor = vec4(c, 1.);
+            // Deep in the dusk's haze, more the further and the lower, so the ranges read as air, not facets.
+            float toSun = pow(max(dot(normalize(vP.xz), normalize(uSunDir.xz)), 0.), 6.);
+            vec3 haze = vec3(.3, .22, .28) * (1. + uSun * .4) + vec3(.9, .5, .3) * toSun * .25 * (.3 + uSun);
+            float k = .25 + .45 * smoothstep(160., 360., length(vP.xz)) + .25 * (1. - smoothstep(-40., 60., vP.y));
+            gl_FragColor = vec4(mix(c, haze, min(k, .85)) * uLift, 1.);
           }`,
         fog: false,
         side: THREE.DoubleSide,
@@ -228,7 +231,7 @@ export function createLanding(renderer, { loader, mobile = false }) {
         const x = warp(P.getX(i)), z = warp(P.getZ(i)), y = ground(x, z)
         P.setXYZ(i, x, y, z)
         // Dusky olive turf, darker in hollows, bare rock down the valley side.
-        const rock = Math.min(1, Math.max(0, (-z - 25) / 60)), k = 0.8 + 0.35 * rnd()
+        const rock = Math.min(1, Math.max(0, (-z - 25) / 60)), k = (0.8 + 0.35 * rnd()) * 1.4 // turf under the blades, not black between them
         col[i * 3] = (0.075 + 0.05 * rock) * k
         col[i * 3 + 1] = (0.085 + 0.02 * rock) * k
         col[i * 3 + 2] = (0.045 + 0.05 * rock) * k
@@ -245,16 +248,24 @@ export function createLanding(renderer, { loader, mobile = false }) {
     {
       const rock = (detail, sx, sy, sz, rough) => {
         const g = new THREE.IcosahedronGeometry(1, detail)
-        const p = g.attributes.position, v = new THREE.Vector3()
+        const p = g.attributes.position, v = new THREE.Vector3(), col = new Float32Array(p.count * 3)
         for (let i = 0; i < p.count; i++) {
           v.fromBufferAttribute(p, i)
           const n = 1 + rough * (Math.sin(v.x * 3.1 + v.y * 1.7) * Math.cos(v.z * 2.3 - v.y * 2.9) + 0.5 * Math.sin(v.x * 7 + v.z * 5))
           p.setXYZ(i, v.x * sx * n, v.y * sy * n, v.z * sz * n)
+          // Weathered stone, warm enough that the storm's blue light leaves it grey: darker toward the turf,
+          // lichen in patches.
+          const lichen = Math.max(0, Math.sin(v.x * 5.3 - v.z * 4.1) * Math.sin(v.y * 6.7 + v.x * 2.2))
+          const k = (0.75 + 0.25 * Math.abs((Math.sin(i * 12.9898) * 43758.5453) % 1)) * (0.55 + 0.45 * Math.min(1, (v.y + 1) * 0.8))
+          col[i * 3] = (0.36 + 0.06 * lichen) * k
+          col[i * 3 + 1] = (0.27 + 0.1 * lichen) * k
+          col[i * 3 + 2] = (0.17 + 0.01 * lichen) * k
         }
+        g.setAttribute('color', new THREE.BufferAttribute(col, 3))
         g.computeVertexNormals()
         return g
       }
-      const mat = new THREE.MeshStandardMaterial({ color: '#8b8790', roughness: 0.95, flatShading: true })
+      const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, flatShading: true })
       const COUNT = mobile ? 40 : 70
       const stones = new THREE.InstancedMesh(rock(1, 1.2, 0.7, 1, 0.16), mat, COUNT)
       const m = new THREE.Matrix4(), q = new THREE.Quaternion(), v = new THREE.Vector3(), s = new THREE.Vector3(), axis = new THREE.Vector3()
@@ -266,7 +277,7 @@ export function createLanding(renderer, { loader, mobile = false }) {
       }
       stones.castShadow = stones.receiveShadow = true
       scene.add(stones)
-      const tall = new THREE.InstancedMesh(rock(2, 0.55, 2.2, 0.4, 0.09), mat, 3)
+      const tall = new THREE.InstancedMesh(rock(2, 0.55, 2.2, 0.4, 0.17), mat, 3)
       ;[[-11, -7, 1.6, 0.2], [8.5, -10, 1.25, -0.15], [17, -4, 0.9, 0.1]].forEach(([x, z, k, tilt], i) => {
         tall.setMatrixAt(i, m.compose(v.set(x, ground(x, z) + 1.4 * k, z), q.setFromAxisAngle(axis.set(0.3, 0, 1).normalize(), tilt), s.setScalar(k)))
       })
@@ -278,7 +289,7 @@ export function createLanding(renderer, { loader, mobile = false }) {
     // ------------------------------------------------------------ grass: instanced blades in one draw
     const shock = { uRing: { value: 0 }, uShock: { value: 0 }, uCrater: { value: 0 } }
     const grassU = {
-      uTime: time, ...shock, uWind: { value: 1 }, uFlash: flash, uFlashPos: flashPos, uSun: sunK,
+      uTime: time, ...shock, uWind: { value: 1 }, uFlash: flash, uFlashPos: flashPos, uSun: sunK, uLift: lift,
       uSunDir: { value: SUN_DIR }, uFogCol: { value: FOG }, uFogNear: { value: 30 }, uFogFar: { value: 360 },
     }
     {
@@ -333,7 +344,7 @@ export function createLanding(renderer, { loader, mobile = false }) {
             gl_Position = projectionMatrix * viewMatrix * vec4(p, 1.);
           }`,
         fragmentShader: /* glsl */ `
-          uniform float uFlash, uSun, uFogNear, uFogFar; uniform vec3 uSunDir, uFogCol, uFlashPos;
+          uniform float uFlash, uSun, uFogNear, uFogFar, uLift; uniform vec3 uSunDir, uFogCol, uFlashPos;
           varying float vY, vTint, vFlat; varying vec3 vW;
           void main() {
             vec3 base = mix(vec3(.025, .035, .02), vec3(.11, .12, .055), vY) * (.75 + .5 * vTint);
@@ -345,7 +356,7 @@ export function createLanding(renderer, { loader, mobile = false }) {
             c += vec3(.62, .74, 1.) * uFlash * (.1 + vY) * .45 / (1. + dF * dF * .08);
             c *= mix(1., .55, vFlat * (1. - vY));
             float fog = smoothstep(uFogNear, uFogFar, length(vW - cameraPosition));
-            gl_FragColor = vec4(mix(c, uFogCol, fog), 1.);
+            gl_FragColor = vec4(mix(c, uFogCol, fog) * uLift, 1.);
           }`,
         side: THREE.DoubleSide,
       }))
@@ -742,26 +753,68 @@ export function createLanding(renderer, { loader, mobile = false }) {
     const strike = new THREE.PointLight('#dfe6ff', 0, 0, 2)
     strike.position.set(0, 3, 0)
     // A weak front fill on him from the camera's side, reaching little past him.
-    const front = new THREE.PointLight('#c4cbef', 5, 9, 2)
+    const front = new THREE.PointLight('#d6d2ea', 24, 9, 2)
     front.position.set(-1.4, 1.6, 3.2)
-    scene.add(hemi, sun, sun.target, fill, fill.target, strike, front)
+    // The storm's cold top-key: steep from above, a little in front, so the discs and the cape's folds catch it; flares with the lightning.
+    const top = new THREE.DirectionalLight('#c4d2ff', 0)
+    top.position.set(3, 30, 9)
+    scene.add(hemi, sun, sun.target, fill, fill.target, strike, front, top, top.target)
     await step()
 
-    // ------------------------------------------------------------ the traveller and his hammer
-    let you = null, land = null, stance = null, hammer = null
+    // ------------------------------------------------------------ the traveller, his armour and Stormbreaker
+    let you = null, land = null, stance = null, axe = null
     const bones = {}
+    const charge = { value: 0 }
+    const capeU = { uCapeT: { value: 0 }, uWind: { value: 1 }, uFall: { value: 0 }, uFloor: { value: 0 }, uScale: { value: 1 }, uRimDir: { value: new THREE.Vector3() }, uRimCol: { value: new THREE.Color() } }
     try {
-      const [t, clips] = await Promise.all([loadTraveller(loader), loader.loadAsync('/cinema/landing/land.glb').then(g => g.animations)])
+      const [t, clips, suit, axeGltf] = await Promise.all([
+        loadTraveller(loader),
+        loader.loadAsync('/cinema/landing/land.glb').then(g => g.animations),
+        loader.loadAsync('/cinema/suits/thor.glb'),
+        loader.loadAsync('/cinema/landing/axe.glb'),
+      ])
       you = t.make({ look: 'pbr' })
-      you.root.traverse(o => { if (o.isSkinnedMesh) o.material.map = alohaLinear() })
+      you.root.traverse(o => {
+        if (!o.isSkinnedMesh) return
+        o.material.map = alohaLinear()
+        o.castShadow = false // the armour casts his shadow
+        headOnly(o.material, o.skeleton.bones.map(b => (['neck', 'Head', 'head_end', 'headfront'].includes(b.name) ? 1 : 0)))
+      })
+      // The dusk for the metal to reflect (the armour's discs and mail, the axe): the storm deck above, the
+      // soft band toward the low sun, the dark ridge below. Only theirs, not the scene's.
+      await new Promise(r => setTimeout(r))
+      const envScene = new THREE.Scene()
+      envScene.add(sky({ top: '#2c2c3a', mid: '#4c4858', low: '#6a5e66', sunDir: SUN_DIR, sun: '#b08870' }))
+      const pm = new THREE.PMREMGenerator(renderer)
+      const env = pm.fromScene(envScene, 0, 0.1, 400, { size: 64 }).texture
+      pm.dispose()
+      envScene.traverse(o => { o.geometry?.dispose(); o.material?.dispose() })
+      await new Promise(r => setTimeout(r))
+      // A phone takes the suit's 2048 px maps at 1024 (as dive.js does the spider's): a quarter of the memory.
+      if (mobile) {
+        const maps = new Set()
+        suit.scene.traverse(o => { for (const v of Object.values(o.material ?? {})) if (v?.isTexture && v.image?.width > 1024) maps.add(v) })
+        for (const tex of maps) {
+          const c = document.createElement('canvas')
+          c.width = c.height = 1024
+          c.getContext('2d').drawImage(tex.image, 0, 0, 1024, 1024)
+          tex.image = c
+          tex.needsUpdate = true
+        }
+        await new Promise(r => setTimeout(r))
+      }
+      t0 = performance.now()
+      const worn = wearSuit(you.root, suit.scene)
+      for (const m of worn.meshes) armour(m.material, capeU, m.skeleton.bones.findIndex(b => b.name === 'Spine'), m.skeleton.bones.map(b => (/UpLeg|Leg|Foot|Toe/.test(b.name) ? 1 : 0)), env)
+      capeU.uScale.value = you.root.scale.x
       you.root.rotation.y = -0.38 // three-quarters to the camera
-      hammer = makeHammer()
-      // Built about the fist in his rest pose (fist at x -0.7, y 1.26; its grip runs front to back), then
+      axe = makeAxe(axeGltf.scene.getObjectByName('stormbreaker') ?? axeGltf.scene, charge, capeU.uCapeT, env, capeU) // its crawl holds still under reduced motion, as the cape does
+      // Laid about the fist in his rest pose (fist at x -0.7, y 1.26; its grip runs front to back), then
       // parented to the hand, as the other worlds' gear is.
-      hammer.group.position.set(-0.7, 1.26, 0)
-      you.root.add(hammer.group)
+      axe.group.position.set(-0.7, 1.26, 0)
+      you.root.add(axe.group)
       you.root.updateMatrixWorld(true)
-      you.bone('RightHand').attach(hammer.group)
+      you.bone('RightHand').attach(axe.group)
       for (const n of ['RightArm', 'RightForeArm', 'RightHand']) bones[n] = you.bone(n)
       land = you.mixer.clipAction(clips[0])
       stance = you.actions.Axe_Breathe_and_Look_Around
@@ -779,7 +832,7 @@ export function createLanding(renderer, { loader, mobile = false }) {
 
     // ------------------------------------------------------------ the camera's path
     // Keys: [p, camera, target]. Wide on the storm; up the pillar; down with the drop; low on the landing;
-    // round as he rises; back for the storm breaking; up at the raised hammer.
+    // round as he rises; back for the storm breaking; up at the raised axe.
     const KEYS = [
       [0, [-15, 4.5, 32], [0, 9, -30]],
       [0.12, [-12, 3, 26], [0, 11, -6]],
@@ -789,8 +842,8 @@ export function createLanding(renderer, { loader, mobile = false }) {
       [0.3, [-3.4, 0.4, 4.9], [0, 1.7, -1]], // the impact: low in the grass, looking up past him into the pillar
       [0.43, [-2.5, 0.38, 4.7], [0, 1.5, -1]], // held low for the shockwave; up to the old height only as he rises
       [0.56, [-1.6, 0.45, 4.2], [0, 1, 0]], // the rise: a low hero angle, half a metre up, looking up at him
-      [0.7, [1, 0.5, 4.8], [0, 1.6, 0]],
-      [0.82, [2.4, 0.55, 5.4], [0, 1.9, -1.5]],
+      [0.7, [0.8, 0.55, 3.7], [0, 1.25, 0]], // close on him as he stands: about 60% of the frame's height
+      [0.82, [1.2, 0.6, 3.8], [0, 1.35, -0.6]], // not far round: the blade stays in profile
       [0.92, [2.3, 0.45, 5.6], [0, 2.7, -1]],
       [1, [2.1, 0.4, 5.9], [0, 3.6, -1]],
     ]
@@ -802,15 +855,20 @@ export function createLanding(renderer, { loader, mobile = false }) {
       return (i + Math.min(1, Math.max(0, (p - KP[i]) / (KP[i + 1] - KP[i])))) / (KP.length - 1)
     }
 
-    const at = new THREE.Vector3(), cam = new THREE.Vector3(), look = new THREE.Vector3(), tip = new THREE.Vector3()
+    const at = new THREE.Vector3(), cam = new THREE.Vector3(), look = new THREE.Vector3(), tip = new THREE.Vector3(), rimQ = new THREE.Quaternion()
+    const head = new THREE.Vector3(), near = new THREE.Vector3()
+    let rimK = 0
     const UP = new THREE.Vector3(0.12, 1, 0.18).normalize()
-    // The hammer's head laid on the turf at his right as his fist meets the ground; hanging as he rises.
-    const PLANT = new THREE.Vector3(-0.9, -0.13, -0.3).normalize(), HANG = new THREE.Vector3(-0.15, -1, 0.2).normalize()
+    // The axe head laid on the turf at his right as his fist meets the ground; carried head-up at his side as
+    // he rises, so it stands against the sky rather than in the grass.
+    const PLANT = new THREE.Vector3(-0.9, -0.13, -0.3).normalize(), HANG = new THREE.Vector3(-0.3, 0.8, 0.5).normalize()
     const out = { here: at, dream: 0, grade: { bloom: 0.6, threshold: 0.8, vignette: 0.5, grain: 0.35, scan: 0 } }
     const hash = n => { const s = Math.sin(n * 127.1 + 311.7) * 43758.5453; return s - Math.floor(s) }
     run = (state, t, aspect) => {
       const p = state.p, portrait = !!state.portrait, still = !!state.still
       time.value = t
+      // The insert: a push-in on Stormbreaker's head as he stands, lightning crawling over its runes.
+      const ins = axe ? ss(0.6, 0.64, p) * (1 - ss(0.69, 0.72, p)) : 0
 
       // ---- the strike, the pillar and the last bolt
       const leader = ss(LEADER[0], LEADER[1], p)
@@ -832,9 +890,9 @@ export function createLanding(renderer, { loader, mobile = false }) {
       boltU.uWidth.value = 0.6 + 0.6 * pillar
       pillarU.uOn.value = pillar * (0.7 + 0.3 * flick) + burst * 0.4 + last * 0.6
       pillarU.uHalf.value = 7 + 3 * burst
-      // The last bolt comes down onto the hammer's head; the others onto the ridge.
-      if (last > 0 && hammer) {
-        hammer.head.getWorldPosition(tip)
+      // The last bolt comes down onto the axe's head; the others onto the ridge.
+      if (last > 0 && axe) {
+        axe.head.getWorldPosition(tip)
         bolts.position.copy(tip)
         bolts.scale.set(1, (160 - tip.y) / 160, 1)
       } else {
@@ -846,7 +904,11 @@ export function createLanding(renderer, { loader, mobile = false }) {
       flashPos.value.set(0, last > 0 ? 2.6 : 1.5, 0)
       strike.intensity = 320 * (pillar * flick + burst * 0.7 + last * flick * 1.4)
       strike.position.set(0, last > 0 ? 3 : 2.5, 0)
-      hemi.intensity = 1.9 + 0.9 * far + 0.6 * lightK
+      const L = (lift.value = 1 + 0.41 * ss(0.33, 0.42, p)) // half a stop up once the pillar is gone
+      hemi.intensity = (1.9 + 0.9 * far + 0.6 * lightK) * L
+      fill.intensity = 2.4 * L
+      front.intensity = 24 * L
+      top.intensity = (1.4 + 3 * flash.value) * ss(0.3, 0.4, p)
       skyU.uFlash.value = Math.max(far, lightK * 0.6)
       skyU.uBolt.value = Math.max(pillar * flick, last)
       skyU.uSwirl.value = ss(0.05, 0.2, p) * (1 - ss(0.5, 0.85, p)) + ss(0.84, 0.95, p) * 0.6
@@ -856,7 +918,8 @@ export function createLanding(renderer, { loader, mobile = false }) {
       skyU.uRays.value = breakK
       raysU.uRays.value = breakK
       sunK.value = 0.25 + 1.6 * breakK
-      sun.intensity = 0.5 + 3.2 * breakK
+      sun.intensity = (0.5 + 3.2 * breakK) * L
+      rimK = 0.15 + 0.85 * breakK
       grassU.uWind.value = still ? 0.15 : 0.6 + 0.5 * storm
 
       // ---- the impact: ring, wall, dust, sparks, scorch, arcs
@@ -889,17 +952,23 @@ export function createLanding(renderer, { loader, mobile = false }) {
         land.setEffectiveWeight(1 - ws)
         stance.setEffectiveWeight(ws)
         you.mixer.update(0)
-        // The raise: the right arm straight up, the hammer to the sky.
+        // The raise: the right arm straight up, the axe to the sky.
         const k = ss(RAISE[0], RAISE[1], p), kp = ss(0.25, 0.3, p) * (1 - ss(0.6, 0.7, p)), kh = ss(0.6, 0.68, p) * (1 - ss(0.76, 0.83, p))
         if (k > 0 || kp > 0 || kh > 0) you.root.updateMatrixWorld(true)
-        if (kp > 0) aim(bones.RightHand, hammer.end, PLANT, kp)
-        if (kh > 0) aim(bones.RightHand, hammer.end, HANG, kh)
+        if (kp > 0) aim(bones.RightHand, axe.end, PLANT, kp)
+        if (kh > 0) aim(bones.RightHand, axe.end, HANG, kh)
         if (k > 0) {
           aim(bones.RightArm, bones.RightForeArm, UP, k)
           aim(bones.RightForeArm, bones.RightHand, UP, k)
-          aim(bones.RightHand, hammer.end, UP, k)
+          aim(bones.RightHand, axe.end, UP, k)
         }
-        hammer.glow(0.25 + 0.5 * pillar + 1.6 * burst + 1.4 * ss(0.56, 0.8, p) + 2.5 * ss(RAISE[0], LAST, p) + 3 * last) // its grooves charge as he rises
+        // Lightning crawls over the blade as he rises with it, and blazes when the last bolt takes it.
+        charge.value = 0.15 * pillar + 0.5 * burst + 0.35 * ss(0.56, 0.8, p) + 0.6 * ss(RAISE[0], LAST, p) + 1.4 * last + 0.7 * ins
+        // The cape: the storm's wind in it (calm under reduced motion), streaming up behind him as he falls.
+        capeU.uCapeT.value = still ? 1.3 : t
+        capeU.uWind.value = (still ? 0.4 : 0.7 + 0.5 * storm) + 1.2 * burst
+        capeU.uFall.value = ss(0.15, 0.17, p) * (1 - ss(0.205, 0.235, p))
+        capeU.uFloor.value = (0.03 - you.root.position.y) / capeU.uScale.value
         at.copy(you.root.position)
       }
       at.y += 0.9
@@ -911,9 +980,16 @@ export function createLanding(renderer, { loader, mobile = false }) {
       if (portrait) {
         // A phone sees a narrow slice: stand back along the same line, and keep him above the text.
         const y = cam.y
-        cam.sub(look).multiplyScalar(1.7).add(look)
+        cam.sub(look).multiplyScalar(1.7 - 0.45 * ss(0.56, 0.66, p) * (1 - ss(0.82, 0.88, p))).add(look) // closer as he stands, as on a desktop
         cam.y = Math.max(cam.y, y) + 0.3
         look.y -= 0.35 * ss(0.25, 0.4, p)
+      }
+      if (ins > 0) {
+        axe.end.getWorldPosition(head)
+        near.subVectors(cam, head).setLength(portrait ? 2 : 1.25).add(head) // the head about a third of the frame (a phone's narrow width)
+        near.y += 0.08
+        cam.lerp(near, ins)
+        look.lerp(head, ins)
       }
       if (!still) {
         const jolt = landed ? 0.11 * Math.exp(-clock * 3.5) : 0
@@ -931,6 +1007,9 @@ export function createLanding(renderer, { loader, mobile = false }) {
       camera.position.copy(cam)
       camera.lookAt(look)
       dome.position.copy(camera.position)
+      // The rim on the armour and the axe head: from the low sun behind him (camera space), warming as the storm breaks.
+      capeU.uRimDir.value.copy(SUN_DIR).applyQuaternion(rimQ.copy(camera.quaternion).invert())
+      capeU.uRimCol.value.setRGB(0.07 + 0.75 * rimK, 0.09 + 0.48 * rimK, 0.15 + 0.3 * rimK)
 
       out.dream = Math.min(1, lightK * 0.35)
       out.grade.bloom = 0.6 + 0.5 * Math.min(1, lightK)
@@ -956,60 +1035,129 @@ function aim(bone, child, dir, k) {
 }
 
 /*
- * His weapon, of his own design: a short flanged maul. A blued-steel haft (about 0.9 m) wrapped in
- * leather at the grip, bronze collars and a pommel spike; a round steel head on the haft's end with four
- * short flanges round it, symmetric, and a spike past it; faint glowing grooves along the flanges and a
- * ring round the head. Built in its own frame: the haft along +z from the grip (origin).
+ * Stormbreaker (public/cinema/landing/axe.glb, scripts/cinema/props.py): its origin at the grip, the haft
+ * along +y, the blade toward +x. Laid in a frame like the old maul's (the haft along +z from the grip, so
+ * the hand's aims still work), unrolled, so the low front camera sees the crescent blade in profile, not
+ * edge-on as a hammer block. Faint lightning crawls over its head as it charges: lines of noise in the
+ * metal's own space, lit by `charge` (a uniform, 0 off).
  */
-function makeHammer() {
-  const group = new THREE.Group()
-  const L = 0.62 // the head's centre along the haft
-  const parts = { steel: [], bronze: [], leather: [], edge: [], glow: [] }
-  const add = (k, g) => parts[k].push(g)
-  const alongZ = g => g.rotateX(Math.PI / 2)
-  // Haft, grip wrap (raised bands), pommel.
-  add('steel', alongZ(new THREE.CylinderGeometry(0.019, 0.022, 0.9, 10)).translate(0, 0, 0.2))
-  add('leather', alongZ(new THREE.CylinderGeometry(0.026, 0.026, 0.3, 10)).translate(0, 0, -0.02))
-  for (let i = 0; i < 5; i++) add('leather', alongZ(new THREE.TorusGeometry(0.026, 0.005, 5, 12).rotateX(Math.PI / 2)).translate(0, 0, -0.15 + i * 0.065))
-  add('bronze', alongZ(new THREE.CylinderGeometry(0.03, 0.026, 0.05, 10)).translate(0, 0, 0.15))
-  add('bronze', alongZ(new THREE.CylinderGeometry(0.026, 0.032, 0.05, 10)).translate(0, 0, -0.19))
-  add('bronze', alongZ(new THREE.ConeGeometry(0.028, 0.09, 8)).rotateX(Math.PI).translate(0, 0, -0.26))
-  // The collar under the head.
-  add('bronze', alongZ(new THREE.CylinderGeometry(0.036, 0.028, 0.06, 10)).translate(0, 0, L - 0.13))
-  // The head: a round steel body along the haft, a bronze band at each end.
-  add('steel', alongZ(new THREE.CylinderGeometry(0.06, 0.06, 0.2, 12)).translate(0, 0, L))
-  add('steel', new THREE.SphereGeometry(0.06, 12, 6, 0, Math.PI * 2, 0, Math.PI / 2).rotateX(Math.PI / 2).translate(0, 0, L + 0.1))
-  for (const z of [-0.1, 0.1]) add('bronze', alongZ(new THREE.CylinderGeometry(0.066, 0.066, 0.022, 12)).translate(0, 0, L + z))
-  // Four short flanges round it, each a tapered plate, deepest at the middle of the head.
-  const fl = new THREE.Shape([new THREE.Vector2(-0.1, 0), new THREE.Vector2(-0.07, 0.06), new THREE.Vector2(0.05, 0.065), new THREE.Vector2(0.1, 0)])
-  const flange = new THREE.ExtrudeGeometry(fl, { depth: 0.016, bevelEnabled: true, bevelThickness: 0.004, bevelSize: 0.004, bevelSegments: 1 }).translate(0, 0.055, -0.008).rotateY(-Math.PI / 2)
-  for (let k = 0; k < 4; k++) add('edge', flange.clone().rotateZ((k * Math.PI) / 2).translate(0, 0, L))
-  // The spike past the head: where the last bolt lands.
-  add('steel', alongZ(new THREE.ConeGeometry(0.03, 0.14, 8)).translate(0, 0, L + 0.19))
-  // Glowing grooves: along each flange's flank, and a ring round the head.
-  for (let k = 0; k < 4; k++) for (const sx of [-1, 1]) add('glow', new THREE.BoxGeometry(0.003, 0.004, 0.13).translate(sx * 0.0125, 0.085, -0.005).rotateZ((k * Math.PI) / 2).translate(0, 0, L))
-  add('glow', new THREE.TorusGeometry(0.0615, 0.0035, 4, 16).translate(0, 0, L - 0.06))
-  add('glow', alongZ(new THREE.CylinderGeometry(0.0205, 0.0205, 0.3, 3, 1, true, 0, 0.35)).translate(0, 0, 0.36))
-
-  const glowMat = new THREE.MeshBasicMaterial({ color: '#9fd4ff', toneMapped: false })
-  const mats = {
-    steel: new THREE.MeshStandardMaterial({ color: '#4a5260', metalness: 0.55, roughness: 0.34 }),
-    bronze: new THREE.MeshStandardMaterial({ color: '#b08a52', metalness: 0.6, roughness: 0.38 }),
-    leather: new THREE.MeshStandardMaterial({ color: '#4a3326', roughness: 0.75 }),
-    edge: new THREE.MeshStandardMaterial({ color: '#b8c2cc', metalness: 0.6, roughness: 0.22 }),
-    glow: glowMat,
-  }
-  for (const k in parts) {
-    const geo = mergeGeometries(parts[k].map(g => (g.index ? g.toNonIndexed() : g)).map(g => { for (const n of Object.keys(g.attributes)) if (n !== 'position' && n !== 'normal') g.deleteAttribute(n); return g }))
-    const m = new THREE.Mesh(geo, mats[k])
-    m.castShadow = k !== 'glow'
-    group.add(m)
-  }
+const AXE_ROLL = 0
+// A rim from behind (uRimDir: toward the sun, camera space): glancing edges facing it catch uRimCol.
+const RIM = k => /* glsl */ `totalEmissiveRadiance += uRimCol * (${k}) * pow(1. - clamp(dot(normal, normalize(vViewPosition)), 0., 1.), 2.5) * clamp(dot(normal, uRimDir) * .8 + .35, 0., 1.);`
+function makeAxe(src, charge, time, env, rim) {
+  const group = new THREE.Group(), spin = new THREE.Group()
+  spin.rotation.z = AXE_ROLL
+  src.rotation.set(Math.PI / 2, 0, 0)
+  src.position.set(0, 0, 0)
+  spin.add(src)
+  group.add(spin)
+  src.traverse(o => {
+    if (!o.isMesh) return
+    o.castShadow = true
+    const m = o.material
+    if (m.map) m.map.colorSpace = THREE.NoColorSpace
+    m.envMap = env
+    m.envMapIntensity = 1
+    if (!/metal/.test(m.name) && o.name !== 'stormbreaker_1') return
+    m.onBeforeCompile = sh => {
+      sh.uniforms.uCharge = charge
+      sh.uniforms.uTime = time
+      sh.uniforms.uRimDir = rim.uRimDir
+      sh.uniforms.uRimCol = rim.uRimCol
+      sh.vertexShader = sh.vertexShader
+        .replace('#include <common>', '#include <common>\nvarying vec3 vAxe;')
+        .replace('#include <begin_vertex>', '#include <begin_vertex>\nvAxe = position;')
+      sh.fragmentShader = sh.fragmentShader
+        .replace('#include <common>', `#include <common>\nuniform float uCharge, uTime; uniform vec3 uRimDir, uRimCol; varying vec3 vAxe;\n${NOISE}`)
+        .replace('#include <emissivemap_fragment>', /* glsl */ `#include <emissivemap_fragment>
+          ${RIM('1.')}
+          if (uCharge > .01) {
+            float tt = floor(uTime * 14.) * .37;
+            vec2 q = vAxe.xy * 16. + vec2(tt, -tt * .6);
+            float line = 1. - smoothstep(0., .035, abs(fbm3(q) - .5));
+            line *= smoothstep(.35, .6, vnoise(vAxe.xy * 9. - tt * 1.7));
+            float head = smoothstep(.5, .62, vAxe.y);
+            totalEmissiveRadiance += vec3(.55, .74, 1.) * line * head * uCharge * 2.6 + vec3(.3, .42, .7) * head * uCharge * .04;
+          }`)
+    }
+    m.customProgramCacheKey = () => 'landing-axe'
+  })
   const head = new THREE.Object3D()
-  head.position.set(0, 0, L + 0.26) // the spike's tip: where the last bolt lands
+  head.position.set(0, 0, 0.87) // the forged cap on the haft's end: where the last bolt lands
   const end = new THREE.Object3D()
-  end.position.set(0, 0, L) // the head's centre on the haft: aimed by the wrist
+  end.position.set(0, 0, 0.7) // the head's centre on the haft: aimed by the wrist
   group.add(head, end)
-  const base = new THREE.Color('#9fd4ff')
-  return { group, head, end, glow: k => glowMat.color.copy(base).multiplyScalar(0.4 + k) }
+  return { group, head, end }
+}
+
+/*
+ * The armour (public/cinema/suits/thor.glb via wearSuit): its paint read as painted, both faces drawn
+ * (the cape is one sheet). The cape is skinned to his torso alone, so it gets its motion here, in his
+ * root's space after skinning: a ripple travelling down it in the storm's wind, streaming up behind him
+ * as he falls, and its hem held above the turf when he kneels. Which vertices are cape: those the rig
+ * gave the fixed Spine mix (Spine near 0.55), behind him, more the further below the shoulders.
+ */
+function armour(m, U, spine, legs, env) {
+  if (m.map) m.map.colorSpace = THREE.NoColorSpace
+  m.side = THREE.DoubleSide
+  m.envMap = env
+  m.envMapIntensity = 0.9
+  m.onBeforeCompile = sh => {
+    Object.assign(sh.uniforms, U, { uLegB: { value: legs } })
+    sh.vertexShader = sh.vertexShader
+      .replace('#include <common>', `#include <common>\nuniform float uCapeT, uWind, uFall, uFloor, uScale; uniform float uLegB[${legs.length}]; varying float vLeg;`)
+      .replace('#include <skinning_vertex>', /* glsl */ `#include <skinning_vertex>
+        vLeg = dot(skinWeight, vec4(uLegB[int(skinIndex.x + .5)], uLegB[int(skinIndex.y + .5)], uLegB[int(skinIndex.z + .5)], uLegB[int(skinIndex.w + .5)]));
+        float wS = dot(skinWeight, vec4(lessThan(abs(skinIndex - ${spine}.), vec4(.5))));
+        float hang = clamp((1.3 - position.y) / 1.2, 0., 1.);
+        float cape = smoothstep(.4, .5, wS) * smoothstep(-.02, -.1, position.z) * hang * hang;
+        if (cape > 0.) {
+          float ph = uCapeT * 2.4 - position.y * 5.5 + position.x * 3.;
+          vec3 d = vec3(.05 * sin(ph * .7 + 1.3), 0., -.07 - .05 * sin(ph)) * uWind;
+          d += vec3(0., .9 * hang, -.3) * uFall;
+          transformed += d * cape / uScale;
+          transformed.y = max(transformed.y, uFloor);
+        }
+        // and the cloth below the belt in front (the rig gave some of it the cape's Spine mix): only the cape behind stays red
+        vLeg = max(vLeg, smoothstep(.9, .84, position.y) * (1. - smoothstep(.4, .5, wS) * smoothstep(.02, -.06, position.z)));`)
+    // The paint: the cape stays crimson; the plate (Meshy's slate blue, which the storm light pushed to royal
+    // blue) goes to near-black gunmetal, a little metallic; the trousers (red in the paint) to dark leather.
+    sh.fragmentShader = sh.fragmentShader
+      .replace('#include <common>', '#include <common>\nuniform vec3 uRimDir, uRimCol; varying float vLeg;')
+      .replace('#include <map_fragment>', /* glsl */ `#include <map_fragment>
+        float legK = smoothstep(.3, .7, vLeg);
+        float plateK = (1. - smoothstep(.06, .18, diffuseColor.r - max(diffuseColor.g, diffuseColor.b))) * (1. - legK);
+        float lum = dot(diffuseColor.rgb, vec3(.3, .59, .11));
+        // the cape: crimson, including the paint's stray skin-coloured patches in it
+        float cr = min(diffuseColor.r, .42);
+        diffuseColor.rgb = mix(vec3(cr, min(diffuseColor.g, cr * .12), min(diffuseColor.b, cr * .16)), vec3(lum) * vec3(1.03, 1., .95), plateK);
+        diffuseColor.rgb = mix(diffuseColor.rgb, vec3(.06, .058, .056) * (.6 + lum), legK); // the paint's stray skin patches too
+        if (!gl_FrontFacing) diffuseColor.rgb *= .3; // the cape's lining (and any inside face) in its own shade, not glaring in the low sun`)
+      .replace('#include <metalnessmap_fragment>', `#include <metalnessmap_fragment>
+        metalnessFactor = mix(metalnessFactor, .55, plateK);
+        roughnessFactor = mix(roughnessFactor, .45, plateK);`)
+      .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
+        ${RIM('1. - .7 * legK')}`)
+  }
+  m.customProgramCacheKey = () => 'landing-armour'
+}
+
+/* His own body under the armour: only his head and neck are drawn (each vertex follows its strongest
+ * bone, as dive.js's undersuit does), so no shirt or shoe shows through it. */
+function headOnly(m, keep) {
+  m.onBeforeCompile = sh => {
+    sh.uniforms.uKeep = { value: keep }
+    sh.vertexShader = sh.vertexShader
+      .replace('#include <common>', `#include <common>\nvarying float vGone; uniform float uKeep[${keep.length}];`)
+      .replace('#include <begin_vertex>', /* glsl */ `#include <begin_vertex>
+        float bi = skinIndex.x, bw = skinWeight.x;
+        if (skinWeight.y > bw) { bw = skinWeight.y; bi = skinIndex.y; }
+        if (skinWeight.z > bw) { bw = skinWeight.z; bi = skinIndex.z; }
+        if (skinWeight.w > bw) bi = skinIndex.w;
+        vGone = 1. - uKeep[int(bi + .5)];`)
+    sh.fragmentShader = sh.fragmentShader
+      .replace('#include <common>', '#include <common>\nvarying float vGone;')
+      .replace('#include <clipping_planes_fragment>', '#include <clipping_planes_fragment>\nif (vGone > .5) discard;')
+  }
+  m.customProgramCacheKey = () => 'landing-head'
 }

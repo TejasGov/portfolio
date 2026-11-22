@@ -5,6 +5,7 @@ import { sound } from '../lib/sound'
 import { startTrail } from '../hero/trail'
 import { CONTACT, JOURNEY, RESUME, ROLES } from '../content'
 import { goTo, SoundIcon } from '../Book'
+import { DOOR, FrontDoor, openBoxOffice } from '../boxoffice/BoxOffice'
 
 /*
  * Prologue: the projection booth. The camera leaves the projector, flies out through the window down
@@ -15,10 +16,13 @@ import { goTo, SoundIcon } from '../Book'
  * title, a billing block to the title's measure, five actions, and the pointer's trail (hero/trail.js).
  * Styles: index.css, "the one-sheet". Book.jsx keeps its own chrome off this frame.
  */
+// After the poster, the front door: the box office (boxoffice/, which owns its window DOOR and the
+// once-a-visit catch that stops a first flick on it), then the booth's own lines for whoever keeps scrolling.
 const BEATS = [
   { at: [-0.1, 0.1], kind: 'title' },
-  { at: [0.13, 0.4], text: 'From Prayagraj to New York, by way of Buffalo.' }, // facts only (collage.js home, JOURNEY); Tejas's own lines replace these
-  { at: [0.48, 0.76], text: 'Roll the flashback.' },
+  { at: DOOR, edge: [0.03, 0.04], kind: 'door' },
+  { at: [0.45, 0.6], text: 'From Prayagraj to New York, by way of Buffalo.' }, // facts only (collage.js home, JOURNEY); Tejas's own lines replace these
+  { at: [0.63, 0.79], text: 'Roll the flashback.' },
 ]
 
 // The billing block, from the same data Chapter Three uses, newest job first: a recruiter needn't scroll for it.
@@ -60,7 +64,7 @@ export default function Prologue() {
             </div>
             <div className="hero-tools" data-quiet>
               {/* Book.jsx owns the dialog; its header button opens it. */}
-              <button type="button" onClick={() => document.querySelector('[data-contents]')?.click()}>Contents</button>
+              <button type="button" aria-haspopup="dialog" onClick={openBoxOffice}>Box office</button>
               <button type="button" aria-pressed={audible} aria-label="Sound" onClick={() => sound.toggle()}>
                 <SoundIcon on={audible} />
               </button>
@@ -88,6 +92,10 @@ export default function Prologue() {
             </ul>
           </div>
           <p className="hero-cue kicker" aria-hidden="true" data-quiet>Scroll</p>
+        </div>
+        {/* The front door: the box office, the next thing a visitor meets after the poster. */}
+        <div ref={bind(1)} className="absolute inset-0 opacity-0">
+          <FrontDoor section={ref} />
         </div>
         <div className="pointer-events-none absolute inset-0 grid px-6 md:px-[6vw]">
           {BEATS.map((b, i) =>

@@ -28,6 +28,10 @@ const BEATS = [
   { at: [O(0.2), O(0.6)], kind: 'objective', label: 'New objective', text: 'Reach the helicopter.' },
   { at: [O(0.68), 0.965], kind: 'objective', label: 'New objective', text: 'Next reel.', skip: true }, // the game's last prompt points on to Chapter Five's films
 ].map(b => ({ edge: EDGE, ...b }))
+// The box office's scene anchors (content.js PROGRAMME): where each world is clear of its transition,
+// with its objective whole. Progress runs 'top bottom' → 'bottom bottom', so P sits P × height − one screen down.
+const HEIGHT = 1400 // svh
+const SCENES = [['arcade', 'Neon coast', A(0.27)], ['blocks', 'Block world', A(0.79)], ['village', 'The village', V(0.27)], ['ops', 'Night ops', O(0.33)]]
 
 export default function ChapterFour() {
   const ref = useRef(null)
@@ -37,7 +41,10 @@ export default function ChapterFour() {
   const bind = useBeats('four', beats)
 
   return (
-    <section ref={ref} id="four" aria-labelledby="four-title" className="relative" style={{ height: '1400svh' }}>
+    <section ref={ref} id="four" aria-labelledby="four-title" className="relative" style={{ height: `${HEIGHT}svh` }}>
+      {SCENES.map(([name, label, P]) => (
+        <div key={name} id={`scene-${name}`} aria-label={label} className="pointer-events-none absolute inset-x-0 h-px" style={{ top: `${(P * HEIGHT - 100).toFixed(2)}svh` }} />
+      ))}
       <div className="sticky top-0 h-svh">
         {/* Fixed, so the title is whole and in frame from the coast's 0.035, before this sticky sticks (its ~0.13). */}
         <div className="pointer-events-none fixed inset-0 z-[1] grid px-6 pb-[max(12svh,72px)] md:px-[6vw]">
