@@ -19,6 +19,7 @@ import { createFinal } from './final'
 import { createSwing } from './swing'
 import { createChase } from './chase'
 import { createDance } from './dance'
+import { createVault } from './vault'
 import { GRADE as FOUR_GRADE, LAST, LEVELS, SEAMS } from './levels'
 import * as five from './movies'
 import { LevelFxPass } from './levelfx'
@@ -140,6 +141,22 @@ export async function createCinema(canvas, { mobile = false, onProgress } = {}) 
   renderer.shadowMap.type = THREE.PCFShadowMap
   renderer.debug.checkShaderErrors = import.meta.env.DEV // the check reads each program's log synchronously on its first use
   RectAreaLightUniformsLib.init()
+  // renderer.compileAsync, but a material disposed while its program links (a shared traveller material a
+  // world swaps out as it builds) is dropped from the wait: three's own poll throws on it and its promise
+  // never settles, which left prepare() compiling forever and every later world held under its cover.
+  // And it gives up waiting after 3 s: on a page reloaded part-way down, a program's parallel-compile status
+  // was seen never to report done (the hall's own compile, so the cinema never started); the draw then links it.
+  const compileAsync = (root, cam) => {
+    const mats = renderer.compile(root, cam), t0 = performance.now()
+    return new Promise(res => {
+      const check = () => {
+        for (const m of mats) { const prog = renderer.properties.get(m).currentProgram; if (!prog || prog.isReady()) mats.delete(m) }
+        if (mats.size && performance.now() - t0 < 3000) setTimeout(check, 10)
+        else res(root)
+      }
+      check()
+    })
+  }
 
   const scene = new THREE.Scene()
   scene.background = new THREE.Color('#010205')
@@ -148,7 +165,7 @@ export async function createCinema(canvas, { mobile = false, onProgress } = {}) 
   const noise = noiseVolume(64)
   const tex = new THREE.TextureLoader()
   // The bakes decode off the main thread into bitmaps (an <img> decodes inside its upload: ~200 ms for each
-  // 4096 px bake, in the landing's first frame). A phone gets the 2048 px set: a quarter of the memory.
+  // bake, in the landing's first frame).
   const bitmaps = new THREE.ImageBitmapLoader().setOptions({ premultiplyAlpha: 'none', colorSpaceConversion: 'none' }) // unflipped, as glTF UVs want
   const loadTex = url => bitmaps.loadAsync(url).then(bmp => {
     const t = new THREE.Texture(bmp)
@@ -158,7 +175,9 @@ export async function createCinema(canvas, { mobile = false, onProgress } = {}) 
     t.needsUpdate = true
     return t
   })
-  const bake = mobile ? '_2k' : ''
+  // Both get the 2048 px set: side by side with the 4096 px one (booth, hall, Two's seam, epilogue) no
+  // difference shows in the dark hall, and it saves ~134 MB of GPU memory and ~200 ms of upload frames.
+  const bake = '_2k'
 
   // ------------------------------------------------------------ the baked hall
   const detailTex = tex.loadAsync('/cinema/hall_detail.webp').then(t => {
@@ -297,7 +316,7 @@ export async function createCinema(canvas, { mobile = false, onProgress } = {}) 
       // Compile and first-draw the screen now (compile skips hidden meshes; the driver finishes a shader
       // on its first draw), not on Two's first frame (~75 ms).
       const withScreen = fn => { filmScreen.visible = true; const out = offscreen(fn, composer.inputBuffer); filmScreen.visible = false; return out }
-      withScreen(() => renderer.compileAsync(scene, camera)).then(() => withScreen(() => renderer.render(scene, camera))).catch(() => {})
+      withScreen(() => compileAsync(scene, camera)).then(() => withScreen(() => renderer.render(scene, camera))).catch(() => {})
     }
     return film
   }
@@ -313,6 +332,7 @@ export async function createCinema(canvas, { mobile = false, onProgress } = {}) 
     dive: () => (built.dive ??= createDive(renderer, { loader, normalize, mobile })),
     landing: () => (built.landing ??= createLanding(renderer, { loader, normalize, mobile })),
     chase: () => (built.chase ??= createChase(renderer, { loader, normalize, mobile })),
+    vault: () => (built.vault ??= createVault(renderer, { loader, normalize, mobile })),
     final: () => (built.final ??= createFinal(renderer, { loader, normalize, mobile })),
     dance: () => (built.dance ??= createDance(renderer, { loader, normalize, mobile })),
   }
@@ -322,6 +342,10 @@ export async function createCinema(canvas, { mobile = false, onProgress } = {}) 
   // has grown (its models load after it is built), and otherwise costs one traversal.
   const seen = {}, warm = {}, born = {} // warm: compiled, uploaded and drawn once, whole; born: when each began to build
   let compiling = null, compilingName = null // the world prepare() is compiling (null for a film)
+  // A world reached cold (render() holds its cover) is urgent: another world's compile stops at its next
+  // slice and starts over later (what it compiled stays cached), so the reader isn't kept waiting on it.
+  let urgent = null, urgentAt = 0 // (only while render() keeps asking: a reader who left for a paper chapter no longer waits on it)
+  const ABORT = Symbol('urgent')
   // Compile against a render target: the composer draws worlds into one, which takes a different
   // shader variant (no tone mapping, linear output) from drawing to the screen.
   const offscreen = (fn, target = scratch) => {
@@ -333,10 +357,13 @@ export async function createCinema(canvas, { mobile = false, onProgress } = {}) 
   }
   // A prepare step waits for a calm frame: after one that ran long (gap, set by Stage's loop each frame)
   // it lets the next go by, so a step never lands on a frame that is already late (at most 8 in a row).
-  let gap = 0, still = true
+  // Late against the device's own pace: a phone that draws Four at 30-40 fps found every frame "late"
+  // at a fixed 24 ms, so each step waited 8 frames and the arcade took 10 s to prepare, the village later still.
+  let gap = 0, pace = 16.7, still = true
+  const calm = () => gap <= Math.max(24, pace * 1.4)
   const nextFrame = () => new Promise(res => {
     let late = 0
-    const go = () => (gap > 24 && ++late < 8 ? requestAnimationFrame(go) : res())
+    const go = () => (!calm() && ++late < 8 ? requestAnimationFrame(go) : res())
     requestAnimationFrame(go)
   })
   // The heaviest single steps (a whole draw, a draw into the screen's target) wait for a still reader:
@@ -360,6 +387,26 @@ export async function createCinema(canvas, { mobile = false, onProgress } = {}) 
       texels += px
     }
   }
+  // three's shadow pass draws every caster with one shared depth (or distance) material, so a scene that
+  // mixes plain, instanced, skinned or morphed casters switches that material's program on every such draw,
+  // every frame (getProgram's parameters and cache key each time: ~5-8 MB/s of garbage while paused).
+  // Each of those variants gets its own pair instead; plain casters keep three's. Not for a caster whose
+  // material three already copies per material (an alpha cutout, a displacement map).
+  const shadowMats = new Map()
+  const ownShadow = o => {
+    if (!o.castShadow || o.customDepthMaterial || o.customDistanceMaterial || !(o.isInstancedMesh || o.isSkinnedMesh || o.morphTargetInfluences)) return
+    if ([o.material].flat().some(m => !m || m.alphaToCoverage || (m.alphaTest > 0 && (m.map || m.alphaMap)) || (m.displacementMap && m.displacementScale !== 0))) return
+    const morphs = o.geometry?.morphAttributes, key = `${o.isInstancedMesh ? 'i' : ''}${o.instanceColor ? 'c' : ''}${o.isSkinnedMesh ? 's' : ''}${o.morphTexture ? 't' : ''}|${morphs?.position?.length ?? 0},${morphs?.normal?.length ?? 0},${morphs?.color?.length ?? 0}`
+    let pair = shadowMats.get(key)
+    if (!pair) shadowMats.set(key, (pair = [new THREE.MeshDepthMaterial(), new THREE.MeshDistanceMaterial()]))
+    ;[o.customDepthMaterial, o.customDistanceMaterial] = pair
+  }
+  // A stand-in for three's program cache key, for counting new programs: what tells programs apart (the
+  // type, a patch's source, which is three's own default customProgramCacheKey, defines, which maps are
+  // set, a few flags), not a material's colours or uniform values. '!' marks a custom or patched shader.
+  // A custom ShaderMaterial counts as its own program.
+  const progKey = (m, variant) => m.isShaderMaterial ? `!${m.uuid}${variant}`
+    : `${m.onBeforeCompile !== THREE.Material.prototype.onBeforeCompile ? '!' : ''}${m.type}|${variant}|${m.customProgramCacheKey()}|${JSON.stringify(m.defines ?? null)}|${m.side}${+!!m.vertexColors}${+!!m.flatShading}${+!!m.fog}${+(m.alphaTest > 0)}${+!!m.alphaHash}${+!!m.alphaToCoverage}${+!!m.dithering}${+!!m.wireframe}|${Object.keys(m).filter(k => m[k]?.isTexture).join()}`
   const prepare = name => {
     const fresh = !built[name]
     // One world builds at a time: two building at once (Five's three, queued together) share each frame.
@@ -380,18 +427,24 @@ export async function createCinema(canvas, { mobile = false, onProgress } = {}) 
     // Every drawable, hidden ones too: compile() gathers materials with traverse (not traverseVisible),
     // and what appears later (a shockwave, a bolt) must compile and draw here, not on its first frame.
     const leaves = []
-    w.scene.traverse(o => { if (o.material && (o.isMesh || o.isPoints || o.isLine || o.isSprite)) leaves.push(o) })
-    const batches = [], progs = new Set()
-    let cur = null, added = 0
+    w.scene.traverse(o => { if (o.material && (o.isMesh || o.isPoints || o.isLine || o.isSprite)) leaves.push(o), ownShadow(o) })
+    const batches = [], progs = new Set(), geos = new Set()
+    let cur = null, added = 0, bytes = 0
     for (const o of leaves) {
+      // And at most ~1.5 MB of new geometry: 24 of the arcade's meshes drawn at once uploaded for ~120 ms.
+      const geo = o.geometry && !geos.has(o.geometry) ? geoBytes(o.geometry) + (o.instanceMatrix?.array.byteLength ?? 0) : 0
+      if (o.geometry) geos.add(o.geometry)
       // Count programs, not materials: one material on a skinned, instanced or instance-coloured mesh is another program.
       const variant = `${o.isSkinnedMesh ? 's' : ''}${o.isInstancedMesh ? 'i' : ''}${o.instanceColor ? 'c' : ''}${o.morphTargetInfluences ? 'm' : ''}${o.geometry?.attributes.tangent ? 't' : ''}`
-      const own = [o.material].flat().filter(m => !progs.has(m.uuid + variant))
+      // And materials that differ only in their colours or uniforms share one program (the arcade's 287
+      // patched materials make about 15): counted once, not each as a frame of its own (which took ~13 s).
+      const own = [...new Set([o.material].flat().map(m => progKey(m, variant)))].filter(k => !progs.has(k))
       // A custom shader (or a patched built-in) is a whole frame's worth: one new program of its own (an idle-time compile mid-scroll then stays ~10 ms).
-      const cost = own.reduce((c, m) => c + (m.isShaderMaterial || m.onBeforeCompile !== THREE.Material.prototype.onBeforeCompile ? 4 : 1), 0)
-      if (!cur || cur.size >= 24 || (cost && added + cost > 4)) batches.push((cur = new Set())), (added = 0) // and a few dozen meshes at most: their geometry uploads on the draw
-      own.forEach(m => progs.add(m.uuid + variant))
+      const cost = own.reduce((c, k) => c + (k[0] === '!' ? 4 : 1), 0)
+      if (!cur || cur.size >= 24 || (cost && added + cost > 4) || (bytes && bytes + geo > 1.5e6)) batches.push((cur = new Set())), (added = 0), (bytes = 0) // and a few dozen meshes at most: their geometry uploads on the draw
+      own.forEach(k => progs.add(k))
       added += cost
+      bytes += geo
       cur.add(o)
     }
     // One batch a frame. Compiling, every other drawable has its material taken away for the call
@@ -400,6 +453,7 @@ export async function createCinema(canvas, { mobile = false, onProgress } = {}) 
     const inTurn = async (fn, list = batches, compile = false) => {
       for (const b of list) {
         await nextFrame()
+        if (urgent && urgent !== name && performance.now() - urgentAt < 250) throw ABORT
         const off = [], mats = [], shown = []
         w.scene.traverse(o => {
           if (!o.material) return
@@ -417,7 +471,7 @@ export async function createCinema(canvas, { mobile = false, onProgress } = {}) 
     compilingName = name
     compiling = (async () => {
       const compiled = []
-      await inTurn(() => compiled.push(offscreen(() => renderer.compileAsync(w.scene, w.camera))), batches, true)
+      await inTurn(() => compiled.push(offscreen(() => compileAsync(w.scene, w.camera))), batches, true)
       await Promise.all(compiled)
       await uploadTextures(w.scene)
       // Real draws: geometry and shadow map. The first draws nothing but allocates the shadow map (a 2048 px depth texture).
@@ -446,7 +500,7 @@ export async function createCinema(canvas, { mobile = false, onProgress } = {}) 
       // coast, so it is ready even for a level reached by a jump (render() holds its cover then).
       if (!fxWarm && name !== 'journey') {
         fxWarm = true
-        await offscreen(() => renderer.compileAsync(levelFx.scene, levelFx.camera))
+        await offscreen(() => compileAsync(levelFx.scene, levelFx.camera))
         await nextFrame()
         const prev = renderer.getRenderTarget()
         levelFx.render(renderer, composer.inputBuffer, scratch)
@@ -472,7 +526,7 @@ export async function createCinema(canvas, { mobile = false, onProgress } = {}) 
       // now: both with the dive, in the pause at Four's end, each painted in one frame and uploaded in the next.
       if (name === five.FIRST || name === five.LAST) for (const spec of [CARDS.leader, CARDS.end]) await holdCard(spec)
       if (w.built !== false) warm[name] = true
-    })().finally(() => { compiling = compilingName = null })
+    })().catch(e => { if (e !== ABORT) throw e; delete seen[name] }).finally(() => { compiling = compilingName = null })
   }
   const scratch = new THREE.WebGLRenderTarget(64, 64)
 
@@ -561,8 +615,9 @@ export async function createCinema(canvas, { mobile = false, onProgress } = {}) 
     const run = async () => {
       while (compiling) await compiling.catch(() => {})
       compiling = (async () => {
-        await offscreen(() => renderer.compileAsync(s.scene, s.camera), film.rt)
-        await offscreen(() => renderer.compileAsync(s.scene, s.camera))
+        s.scene.traverse(ownShadow)
+        await offscreen(() => compileAsync(s.scene, s.camera), claim(film.rt))
+        await offscreen(() => compileAsync(s.scene, s.camera))
         await uploadTextures(s.scene)
         await nextFrame()
         s.update(0)
@@ -575,7 +630,12 @@ export async function createCinema(canvas, { mobile = false, onProgress } = {}) 
   const filmScenes = new Set() // the films' scenes: they share the traveller's geometry and textures with the worlds (release)
   const loadFilm = id => getFilm().load(id).then(s => (s && filmScenes.add(s.scene), warmFilm(id, s), s))
   let gameRT = null
-  const gameTarget = () => (gameRT ??= new THREE.WebGLRenderTarget(mobile ? 1152 : 2048, Math.round((mobile ? 1152 : 2048) / FILM_ASPECT), { type: THREE.HalfFloatType, samples: mobile ? 0 : 4 }))
+  // The screen's two big targets (Two's films, and the game or Five's worlds on the screen) never draw in
+  // the same frame: only the one last drawn into holds GPU memory (~70 MB each with MSAA on a desktop);
+  // the other is freed and three.js allocates it again on its next use.
+  let screenRT = null
+  const claim = rt => { if (screenRT && screenRT !== rt) screenRT.dispose(); return (screenRT = rt) }
+  const gameTarget = () => claim(gameRT ??= new THREE.WebGLRenderTarget(mobile ? 1152 : 2048, Math.round((mobile ? 1152 : 2048) / FILM_ASPECT), { type: THREE.HalfFloatType, samples: mobile ? 0 : 4 }))
   const showOnScreen = tex => {
     if (filmScreen.material.map === tex) return
     filmScreen.material.map = tex
@@ -716,7 +776,7 @@ export async function createCinema(canvas, { mobile = false, onProgress } = {}) 
   const drawSize = new THREE.Vector2()
   const gradeNow = {}
   const timer = new THREE.Timer()
-  let active = true
+  let active = true, coldHold = false
   function resize(w, h) {
     renderer.setSize(w, h, false)
     composer.setSize(w, h)
@@ -801,6 +861,8 @@ export async function createCinema(canvas, { mobile = false, onProgress } = {}) 
     // hold its transition's full cover, with nothing drawn behind it, until prepare() has it ready. On
     // the cinema's screen it is simply left off until then.
     const cold = !!game && (((!!INTO[game.level] || game.level === five.FIRST) && !warm[game.level]) || worlds[game.level]().built === false) // the coast, reached by a jump before its steps are done, is simply black for those frames
+    urgent = cold ? game.level : null
+    if (cold) urgentAt = performance.now()
     if (cold) prepare(game.level)
     const res = jy && !cold ? jy.update(state.journey ?? game, t, onScreen ? FILM_ASPECT : camera.aspect) : null
     // (Five's first world, reached cold by a jump or a slow network while its models still load, holds its own seam's cover.)
@@ -808,6 +870,7 @@ export async function createCinema(canvas, { mobile = false, onProgress } = {}) 
     const fx = !!game && !onScreen && ((cold && !!coldKind) || !!game.kind)
     levelFx.enabled = fx
     if (fx) levelFx.set(cold ? coldKind : game.kind, cold ? 0.5 : game.phase, t)
+    coldHold = cold && fx
     const grade = game ? Object.assign(gradeNow, GRADE[game.level], res?.grade) : null
     const walker = res?.here ?? null
     // The film: on the screen from the seats, or the whole frame once the camera is inside it.
@@ -820,7 +883,7 @@ export async function createCinema(canvas, { mobile = false, onProgress } = {}) 
       filmScreen.material.color.setScalar(f.show ?? 1)
       showOnScreen(film.rt.texture)
       if (inFilm) film.cropFor(camera.aspect, renderer.getDrawingBufferSize(drawSize).y)
-      else film.renderToTexture()
+      else claim(film.rt), film.renderToTexture()
     }
     if (onScreen && !cold) {
       const prev = renderer.getRenderTarget()
@@ -881,20 +944,27 @@ export async function createCinema(canvas, { mobile = false, onProgress } = {}) 
   await nextFrame()
   renderer.initTexture(house)
   await nextFrame()
-  await offscreen(() => renderer.compileAsync(scene, camera), composer.inputBuffer).catch(() => {})
+  await offscreen(() => compileAsync(scene, camera), composer.inputBuffer).catch(() => {})
   await nextFrame()
-  // Compile both grades now, so crossing into a film doesn't stall on a shader compile.
+  // Compile both grades now, each in a frame of its own (the post's programs: ~90 ms a grade, the hall's
+  // own one otherwise landing on the first frame drawn), so crossing into a film doesn't stall either.
   toneMap.mode = ToneMappingMode.NEUTRAL
   composer.render()
+  await nextFrame()
   toneMap.mode = ToneMappingMode.AGX
+  composer.render()
   onProgress?.(1)
   return {
     renderer, scene, camera, render, resize, loadFilm, prepare, release, setDpr, get dpr() { return renderer.getPixelRatio() },
     /** Built, compiled, uploaded and drawn once whole: crossing into it will not stall. */
     isWarm: name => !!warm[name],
-    get busy() { return !!compiling },
+    /** Set by render(): a world reached before it was ready is held under its seam's full cover this frame. */
+    get held() { return coldHold },
+    get busy() { return compiling ? compilingName ?? 'film' : null }, // what prepare() (or a film's warm-up) is compiling
     /** Set by the render loop every frame: the last frame's interval (ms), and whether the reader is still. */
-    set gap(v) { gap = v },
+    set gap(v) { gap = v; if (v > 0 && v < 100) pace += (v - pace) * 0.03 },
+    /** The last frame ran on time for this device (prepare steps wait for one). */
+    get calm() { return calm() },
     set still(v) { still = v },
     setActive: v => { active = v },
     debug: { built, warm, gpu, vol, bloom, toneMap, grain, dust, lamp, hallMat, seats, projector, screenLight, hemi, bulb, flare, streak, levelFx, scan },

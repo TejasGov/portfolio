@@ -259,8 +259,7 @@
   width: min(66rem, calc(100vw - 2rem));
   max-height: calc(100svh - 2rem);
   padding: 0;
-  overflow: auto;
-  overscroll-behavior: contain;
+  overflow: hidden;
   color: #f4ead8;
   background: radial-gradient(90% 50% at 50% 0, #2b1210 0, var(--lobby) 70%) var(--lobby);
   border: 1px solid rgb(201 162 74 / 0.35);
@@ -272,6 +271,8 @@
   background: rgb(4 3 3 / 0.72);
 }
 .boxoffice[open] {
+  display: flex;
+  flex-direction: column;
   animation: lobby-in 0.32s var(--ease-out);
 }
 @keyframes lobby-in {
@@ -283,22 +284,26 @@
   }
 }
 .bo-inner {
-  padding: 28px clamp(16px, 4vw, 44px) 36px;
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: 8px clamp(16px, 4vw, 44px) 36px;
+  scrollbar-color: rgb(201 162 74 / 0.5) transparent;
 }
-.bo-head {
-  display: grid;
-  grid-template-columns: minmax(0, 32rem);
-  justify-content: center;
-}
-/* Zero height, so it takes no room; sticky in the dialog's scrollport, so its Close stays in the corner. */
-.bo-bar {
-  position: sticky;
-  top: 10px;
-  z-index: 3;
+/* The sign and Close: outside the scroller, so tickets never pass under the button. */
+.bo-top {
+  flex: none;
   display: flex;
-  justify-content: flex-end;
-  height: 0;
-  padding-right: 10px;
+  align-items: center;
+  gap: 12px;
+  padding: 14px clamp(12px, 3vw, 24px);
+  border-bottom: 1px solid rgb(201 162 74 / 0.22);
+}
+.bo-top .marquee {
+  flex: 1;
+  max-width: 26rem;
+  margin-inline: auto;
 }
 .bo-close {
   display: inline-flex;
@@ -320,7 +325,7 @@
   outline: 2px solid var(--brass-hi);
 }
 .bo-lede {
-  margin: 18px auto 0;
+  margin: 16px auto 0;
   max-width: 34ch;
   text-align: center;
   font-size: 1.05rem;
@@ -365,14 +370,48 @@
   grid-template-columns: repeat(auto-fill, minmax(min(100%, 18.5rem), 1fr));
   gap: 16px;
 }
+/* A phone: one column, loglines kept; the sign shrinks to share its row with Close. */
+@media (max-width: 699px) {
+  .bo-top .marquee-title {
+    font-size: 1.45rem;
+  }
+  .bo-top .marquee {
+    padding: 16px 12px 14px;
+  }
+  .bo-group {
+    margin-top: 30px;
+  }
+  .bo-tickets {
+    gap: 10px;
+  }
+  .bo-tickets .bt-body {
+    padding: 12px 12px 12px 14px;
+    gap: 3px;
+  }
+  .bo-tickets .bt-title {
+    font-size: 1.05rem;
+  }
+  .bo-tickets .bt-line {
+    font-size: 14px;
+  }
+  .bo-tickets .bt-stub {
+    width: 40px;
+    padding: 12px 0;
+    justify-content: flex-end;
+  }
+  .bo-tickets .bt-stub .kicker {
+    display: none; /* a short row: the stub keeps its number */
+  }
+}
 .bo-all {
   margin-top: 56px;
   border-radius: 4px;
 }
 
-/* ---------------------------------------------------------------- the front door (Prologue.jsx) */
-/* Over the booth, after the poster: a light scrim, so the projector and its beam read behind the sign, and
-   a warm cone falling from above onto the marquee. The tickets are opaque paper; the lede has its shadow. */
+/* ---------------------------------------------------------------- the front door: the ticket wall (Prologue.jsx) */
+/* Over the booth, after the poster: a lit wall under the marquee with one ticket per screen pinned to it,
+   each at its own lean. The wall leans toward a mouse (--px, --py from BoxOffice.jsx); a hovered ticket comes
+   off the wall a little; a picked one lifts toward the camera while its stub tears. Phone: a swipeable row. */
 .door {
   position: absolute;
   inset: 0;
@@ -380,11 +419,11 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 18px;
+  gap: 16px;
   padding: 92px 16px 28px;
   background:
-    radial-gradient(34% 46% at 50% 0, rgb(255 206 130 / 0.16), rgb(255 206 130 / 0) 100%),
-    radial-gradient(70% 70% at 50% 52%, rgb(8 5 5 / 0.55) 0, rgb(8 5 5 / 0.38) 60%, rgb(8 5 5 / 0.15) 100%);
+    radial-gradient(40% 52% at 50% 0, rgb(255 206 130 / 0.18), rgb(255 206 130 / 0) 100%),
+    radial-gradient(80% 75% at 50% 55%, rgb(8 5 5 / 0.7) 0, rgb(8 5 5 / 0.5) 60%, rgb(8 5 5 / 0.25) 100%);
   pointer-events: auto;
 }
 .door .marquee {
@@ -398,25 +437,139 @@
   color: #f4ead8;
   text-shadow: 0 2px 16px rgb(0 0 0 / 0.9);
 }
-.door-tickets {
+.wall {
+  --px: 0;
+  --py: 0;
+  --lean: 7deg; /* the wall seen from the seats: its top leans away */
+  position: relative;
+  width: min(92rem, 100%);
+  perspective: 1200px;
+}
+/* One overhead spot: the centre tickets lit, the ends of the wall falling off into the dark. */
+.wall::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  background:
+    radial-gradient(34% 70% at 50% 0, rgb(255 222 168 / 0.1), rgb(255 222 168 / 0) 100%),
+    radial-gradient(62% 120% at 50% 30%, rgb(6 4 3 / 0) 55%, rgb(6 4 3 / 0.5) 100%);
+}
+.wall-plane {
+  position: relative;
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 14px;
-  width: min(60rem, 100%);
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: clamp(14px, 1.8vw, 28px);
+  padding: 34px clamp(18px, 3vw, 40px) 44px;
+  border-radius: 6px;
+  /* The wall itself: dark lacquer, a pool of warm light from above, fine vertical slats, a brass rail. */
+  background:
+    radial-gradient(60% 90% at 50% 0, rgb(255 214 150 / 0.13), rgb(255 214 150 / 0) 70%),
+    repeating-linear-gradient(90deg, rgb(255 255 255 / 0.018) 0 1px, transparent 1px 22px),
+    linear-gradient(#1a1210, #0d0908);
+  box-shadow: inset 0 1px 0 rgb(241 213 140 / 0.35), inset 0 -1px 0 rgb(0 0 0 / 0.6), 0 30px 80px rgb(0 0 0 / 0.55);
+  transform-style: preserve-3d;
+  transform-origin: 50% 100%; /* the foot stays put, so the leaning wall is never wider than its box */
+  transform: rotateX(calc(var(--lean) + var(--py) * -3.5deg)) rotateY(calc(var(--px) * 4.5deg));
+  transition: transform 0.6s var(--ease-out);
 }
-.bt-compact .bt-body {
-  padding: 14px 14px 14px 16px;
-  gap: 4px;
+.bt-wall {
+  transform-style: preserve-3d;
+  transform: translateY(var(--y)) rotate(var(--tilt));
 }
-.bt-compact .bt-title {
-  font-size: 1.12rem;
+/* A soft contact shadow on the wall under each ticket. */
+.bt-wall::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: auto 6% -16px;
+  height: 26px;
+  background: radial-gradient(50% 50% at 50% 50%, rgb(0 0 0 / 0.6), rgb(0 0 0 / 0));
+  pointer-events: none;
 }
-.bt-compact .bt-line {
-  font-size: 14px;
+/* The brass pin: stays on the wall when its ticket is taken. */
+.bt-wall::before {
+  content: "";
+  position: absolute;
+  z-index: 2;
+  top: -5px;
+  left: 50%;
+  width: 11px;
+  height: 11px;
+  margin-left: -5.5px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #fff1c4, #c9a24a 45%, #6e5217);
+  box-shadow: 0 3px 4px rgb(0 0 0 / 0.55);
+  transform: translateZ(1px);
 }
-.bt-compact .bt-stub {
-  width: 46px;
-  padding: 12px 0;
+.bt-wall .bt-face {
+  grid-template-columns: 1fr;
+  grid-template-rows: 1fr auto;
+  min-height: 16.5rem;
+  filter: drop-shadow(0 10px 14px rgb(0 0 0 / 0.5)) drop-shadow(0 2px 2px rgb(0 0 0 / 0.4));
+  transition: transform 0.45s var(--ease-out), opacity 0.25s;
+}
+.bt-wall .bt-body {
+  padding: 24px 20px 18px;
+  gap: 10px;
+  mask:
+    radial-gradient(circle at 0 100%, transparent var(--bite), #000 calc(var(--bite) + 0.5px)) left / 51% 100% no-repeat,
+    radial-gradient(circle at 100% 100%, transparent var(--bite), #000 calc(var(--bite) + 0.5px)) right / 51% 100% no-repeat;
+}
+.bt-wall .bt-title {
+  font-size: clamp(1.15rem, 1.6vw, 1.65rem);
+}
+.bt-wall .bt-meta {
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  white-space: nowrap;
+}
+.bt-wall .bt-line {
+  font-size: clamp(14px, 1.1vw, 16px);
+  line-height: 1.38;
+}
+.bt-wall .bt-stub {
+  flex-direction: row;
+  align-items: center;
+  width: auto;
+  padding: 11px 16px;
+  transform-origin: 100% 0;
+  mask:
+    radial-gradient(circle at 0 0, transparent var(--bite), #000 calc(var(--bite) + 0.5px)) left / 51% 100% no-repeat,
+    radial-gradient(circle at 100% 0, transparent var(--bite), #000 calc(var(--bite) + 0.5px)) right / 51% 100% no-repeat;
+}
+.bt-wall .bt-stub::before {
+  inset: 0 10px auto 10px;
+  width: auto;
+  height: 3px;
+  background: radial-gradient(circle, rgb(23 20 15 / 0.35) 0 1.2px, transparent 1.7px) 0 0 / 7px 3px repeat-x;
+}
+.bt-wall .bt-stub .kicker {
+  writing-mode: horizontal-tb;
+}
+.bt-wall .bt-stamp {
+  bottom: 18px;
+}
+@media (hover: hover) {
+  .bt-wall .bt-face:not([aria-disabled="true"]):hover {
+    transform: translateZ(28px) rotate(calc(var(--tilt) * -1));
+  }
+}
+.bt-wall .bt-face:focus-visible {
+  transform: translateZ(28px) rotate(calc(var(--tilt) * -1));
+}
+/* Picked: off the pin and toward the camera; the stub tears from the foot. */
+.bt-wall[data-phase] .bt-face {
+  transform: translate3d(0, -8px, 170px) rotate(calc(var(--tilt) * -1));
+}
+.bt-wall[data-phase] .bt-stub {
+  animation-name: tear-foot;
+}
+@keyframes tear-foot {
+  0% { transform: none; }
+  28% { transform: translate(-2px, 3px) rotate(-6deg); }
+  100% { transform: translate(-16px, 110px) rotate(-24deg); opacity: 0; }
 }
 .door-actions {
   display: flex;
@@ -451,78 +604,92 @@
   outline: 2px solid var(--brass-hi);
   outline-offset: 3px;
 }
-/* A phone: two columns of short tickets (titles and times; the loglines live in the full box office). */
+/* Three across, two rows. */
+@media (max-width: 1179px) {
+  .wall {
+    width: min(48rem, 100%);
+  }
+  .wall-plane {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    row-gap: 30px;
+  }
+  .bt-wall .bt-face {
+    min-height: 12.5rem;
+  }
+}
+/* A short desktop window: loglines to three lines. */
+@media (max-height: 820px) and (min-width: 761px) {
+  .bt-wall .bt-line {
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+}
+/* A phone: the wall is a row to swipe, one ticket centred and the next peeking in. */
 @media (max-width: 760px) {
   .door {
-    gap: 14px;
-    padding: 76px 16px 20px;
+    gap: 12px;
+    padding: 76px 0 20px;
   }
-  .door-tickets {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 10px;
-  }
-  .bt-compact .bt-line {
-    display: none;
-  }
-  .bt-compact .bt-title {
-    font-size: 1rem;
-  }
-  .bt-compact .bt-body {
-    padding: 12px 10px 12px 12px;
-  }
-  .bt-compact .bt-stub {
-    width: 34px;
-  }
-  .bt-compact .bt-stub .kicker {
-    display: none; /* a short ticket: the stub keeps its number */
-  }
-  .bt-compact .bt-stub {
-    justify-content: flex-end;
-  }
-  .door-actions button {
-    padding: 0 14px;
+  .door .marquee {
+    width: calc(100% - 32px);
   }
   .door .marquee-title {
     font-size: 1.6rem;
   }
-  .bt-compact .bt-time {
-    display: none; /* "Screen 4" fits a phone's short ticket on one line; the times are in the box office */
+  .door-lede {
+    padding-inline: 16px;
   }
-}
-/* A phone: the close sits on its own row above the sign, and the showings are the front door's short
-   tickets, two to a row (the group headings carry the screen and its logline). */
-@media (max-width: 699px) {
-  /* Close gets its own band: the tickets scroll under the band, never under the button. */
-  .bo-bar {
-    top: 0;
-    height: auto;
-    padding: 10px 10px 16px;
-    background: linear-gradient(rgb(36 16 14) 72%, rgb(36 16 14 / 0));
+  .wall {
+    --lean: 6deg;
+    perspective: 900px;
   }
-  .bo-inner {
-    padding-top: 0;
+  .wall::after {
+    background:
+      radial-gradient(60% 70% at 50% 0, rgb(255 222 168 / 0.1), rgb(255 222 168 / 0) 100%),
+      linear-gradient(90deg, rgb(6 4 3 / 0.5), rgb(6 4 3 / 0) 16%, rgb(6 4 3 / 0) 84%, rgb(6 4 3 / 0.5));
   }
-  .bo-group {
-    margin-top: 32px;
+  .wall-plane {
+    display: flex;
+    gap: 14px;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+    padding: 24px 15vw 30px;
+    border-radius: 0;
+    transform: rotateX(var(--lean));
+    transition: none;
   }
-  .bo-tickets {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 10px;
-  }
-  .bo-tickets .bt-body {
-    padding: 12px 10px 12px 12px;
-    gap: 4px;
-  }
-  .bo-tickets .bt-title {
-    font-size: 1rem;
-  }
-  .bo-tickets .bt-line,
-  .bo-tickets .bt-stub .kicker {
+  .wall-plane::-webkit-scrollbar {
     display: none;
   }
-  .bo-tickets .bt-stub {
-    width: 34px;
-    padding: 12px 0;
-    justify-content: flex-end;
+  .bt-wall {
+    flex: 0 0 70vw; /* one ticket centred, the next ~15% in */
+    scroll-snap-align: center;
+    scroll-snap-stop: always;
+    transform: rotate(var(--tilt));
+  }
+  .bt-wall .bt-face {
+    min-height: 0;
+    height: 100%;
+  }
+  .bt-wall .bt-body {
+    min-height: 9.5rem;
+  }
+  .bt-wall[data-phase] .bt-face,
+  .bt-wall .bt-face:focus-visible {
+    transform: translateY(-6px) scale(1.04) rotate(calc(var(--tilt) * -1));
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .wall-plane {
+    transform: rotateX(var(--lean)) !important; /* the wall's lean is a pose, not motion */
+    transition: none;
+  }
+  .bt-wall .bt-face {
+    transform: none !important;
+    transition: none;
   }
 }

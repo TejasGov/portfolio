@@ -790,10 +790,10 @@ export function createLanding(renderer, { loader, mobile = false }) {
       pm.dispose()
       envScene.traverse(o => { o.geometry?.dispose(); o.material?.dispose() })
       await new Promise(r => setTimeout(r))
-      // A phone takes the suit's 2048 px maps at 1024 (as dive.js does the spider's): a quarter of the memory.
+      // A phone takes the suit's and the axe's 2048 px maps at 1024 (as dive.js does the spider's): a quarter of the memory.
       if (mobile) {
         const maps = new Set()
-        suit.scene.traverse(o => { for (const v of Object.values(o.material ?? {})) if (v?.isTexture && v.image?.width > 1024) maps.add(v) })
+        for (const s of [suit.scene, axeGltf.scene]) s.traverse(o => { for (const v of Object.values(o.material ?? {})) if (v?.isTexture && v.image?.width > 1024) maps.add(v) })
         for (const tex of maps) {
           const c = document.createElement('canvas')
           c.width = c.height = 1024
@@ -815,7 +815,7 @@ export function createLanding(renderer, { loader, mobile = false }) {
       you.root.add(axe.group)
       you.root.updateMatrixWorld(true)
       you.bone('RightHand').attach(axe.group)
-      for (const n of ['RightArm', 'RightForeArm', 'RightHand']) bones[n] = you.bone(n)
+      for (const n of ['RightArm', 'RightForeArm', 'RightHand', 'Head']) bones[n] = you.bone(n)
       land = you.mixer.clipAction(clips[0])
       stance = you.actions.Axe_Breathe_and_Look_Around
       for (const a of [land, stance]) {
@@ -906,9 +906,11 @@ export function createLanding(renderer, { loader, mobile = false }) {
       strike.position.set(0, last > 0 ? 3 : 2.5, 0)
       const L = (lift.value = 1 + 0.41 * ss(0.33, 0.42, p)) // half a stop up once the pillar is gone
       hemi.intensity = (1.9 + 0.9 * far + 0.6 * lightK) * L
+      // A key on him while he crouches low in the dark grass, easing off as the sun breaks through.
+      const crouchK = ss(0.42, 0.52, p) * (1 - ss(0.66, 0.76, p))
       fill.intensity = 2.4 * L
-      front.intensity = 24 * L
-      top.intensity = (1.4 + 3 * flash.value) * ss(0.3, 0.4, p)
+      front.intensity = 24 * L * (1 + 1.6 * crouchK)
+      top.intensity = (1.4 + 3 * flash.value + 2.5 * crouchK) * ss(0.3, 0.4, p)
       skyU.uFlash.value = Math.max(far, lightK * 0.6)
       skyU.uBolt.value = Math.max(pillar * flick, last)
       skyU.uSwirl.value = ss(0.05, 0.2, p) * (1 - ss(0.5, 0.85, p)) + ss(0.84, 0.95, p) * 0.6
@@ -919,7 +921,7 @@ export function createLanding(renderer, { loader, mobile = false }) {
       raysU.uRays.value = breakK
       sunK.value = 0.25 + 1.6 * breakK
       sun.intensity = (0.5 + 3.2 * breakK) * L
-      rimK = 0.15 + 0.85 * breakK
+      rimK = 0.15 + 0.85 * breakK + 0.4 * crouchK
       grassU.uWind.value = still ? 0.15 : 0.6 + 0.5 * storm
 
       // ---- the impact: ring, wall, dust, sparks, scorch, arcs
@@ -985,8 +987,16 @@ export function createLanding(renderer, { loader, mobile = false }) {
         look.y -= 0.35 * ss(0.25, 0.4, p)
       }
       if (ins > 0) {
-        axe.end.getWorldPosition(head)
-        near.subVectors(cam, head).setLength(portrait ? 2 : 1.25).add(head) // the head about a third of the frame (a phone's narrow width)
+        // Aim between the fist (the group's origin: the grip) and the head's centre, back far enough that both read.
+        if (portrait && bones.Head) {
+          // A phone is too narrow for the axe alone to carry him: aim between the axe's head and his, a quarter further back.
+          axe.head.getWorldPosition(head)
+          head.add(bones.Head.getWorldPosition(tip)).multiplyScalar(0.5)
+        } else {
+          axe.group.getWorldPosition(tip)
+          axe.end.getWorldPosition(head).lerp(tip, 0.4)
+        }
+        near.subVectors(cam, head).setLength(portrait ? 2.9 : 1.7).add(head)
         near.y += 0.08
         cam.lerp(near, ins)
         look.lerp(head, ins)
@@ -1042,13 +1052,15 @@ function aim(bone, child, dir, k) {
  * metal's own space, lit by `charge` (a uniform, 0 off).
  */
 const AXE_ROLL = 0
+// The fist closes a little above the attach point: slide the axe up through it so the palm sits on the leather wrap.
+const AXE_SLIDE = 0.09
 // A rim from behind (uRimDir: toward the sun, camera space): glancing edges facing it catch uRimCol.
 const RIM = k => /* glsl */ `totalEmissiveRadiance += uRimCol * (${k}) * pow(1. - clamp(dot(normal, normalize(vViewPosition)), 0., 1.), 2.5) * clamp(dot(normal, uRimDir) * .8 + .35, 0., 1.);`
 function makeAxe(src, charge, time, env, rim) {
   const group = new THREE.Group(), spin = new THREE.Group()
   spin.rotation.z = AXE_ROLL
   src.rotation.set(Math.PI / 2, 0, 0)
-  src.position.set(0, 0, 0)
+  src.position.set(0, 0, AXE_SLIDE)
   spin.add(src)
   group.add(spin)
   src.traverse(o => {
@@ -1076,16 +1088,16 @@ function makeAxe(src, charge, time, env, rim) {
             vec2 q = vAxe.xy * 16. + vec2(tt, -tt * .6);
             float line = 1. - smoothstep(0., .035, abs(fbm3(q) - .5));
             line *= smoothstep(.35, .6, vnoise(vAxe.xy * 9. - tt * 1.7));
-            float head = smoothstep(.5, .62, vAxe.y);
+            float head = smoothstep(.32, .42, vAxe.y); // the head starts at the blade's foot (y ~.33)
             totalEmissiveRadiance += vec3(.55, .74, 1.) * line * head * uCharge * 2.6 + vec3(.3, .42, .7) * head * uCharge * .04;
           }`)
     }
     m.customProgramCacheKey = () => 'landing-axe'
   })
   const head = new THREE.Object3D()
-  head.position.set(0, 0, 0.87) // the forged cap on the haft's end: where the last bolt lands
+  head.position.set(0, 0, 0.73 + AXE_SLIDE) // the top of the head: where the last bolt lands
   const end = new THREE.Object3D()
-  end.position.set(0, 0, 0.7) // the head's centre on the haft: aimed by the wrist
+  end.position.set(0, 0, 0.56 + AXE_SLIDE) // the head's centre on the haft: aimed by the wrist
   group.add(head, end)
   return { group, head, end }
 }

@@ -82,12 +82,15 @@ export const Marquee = ({ id, small }) => (
 
 const STATUS = { print: 'Printing your ticket', admit: 'Admitted' }
 
-/** A ticket: the showing on the left, a stub past the perforation that tears off when it is picked. */
-function Ticket({ s, no, picked, pick, compact }) {
+/**
+ * A ticket: the showing, then a stub past the perforation that tears off when it is picked. `wall` is the
+ * front door's portrait ticket, pinned to the lit wall (stub at its foot); otherwise the dialog's, stub at its side.
+ */
+function Ticket({ s, no, picked, pick, wall, style }) {
   const phase = picked?.id === s.id ? picked.phase : null
   const dwell = useRef(0)
   return (
-    <li className={`bt ${compact ? 'bt-compact' : ''}`} data-phase={phase ?? undefined}>
+    <li className={`bt ${wall ? 'bt-wall' : ''}`} data-phase={phase ?? undefined} style={style}>
       <button
         type="button"
         className="bt-face"
@@ -122,6 +125,8 @@ const Status = ({ picked }) => (
 let n = 0
 const GROUPS = PROGRAMME.map(g => ({ ...g, showings: (g.showings ?? [g]).map(s => ({ screen: g.screen, ...s, no: ++n })) }))
 const DOOR_TICKETS = PROGRAMME.map((g, i) => ({ ...g, no: i + 1 }))
+// Pinned by hand: each ticket's own lean and height on the wall.
+const PINNED = [[-2.4, 6], [1.6, 22], [-0.8, 0], [2.2, 16], [-1.6, 4], [1.1, 20]]
 
 const MID = (DOOR[0] + DOOR[1]) / 2
 const SCROLL_KEYS = ['ArrowDown', 'ArrowUp', 'PageDown', 'PageUp', 'Home', 'End']
@@ -209,13 +214,28 @@ export function FrontDoor({ section }) {
   }, [picked]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const onScrollOn = () => scrollTo({ top: at(DOOR[1] + 0.03), behavior: reducedMotion() ? 'instant' : 'smooth' })
+  // The wall leans a few degrees toward a mouse (CSS vars only; no tilt for touch or reduced motion).
+  const wall = useRef(null)
+  const lean = (x, y) => {
+    wall.current.style.setProperty('--px', x.toFixed(3))
+    wall.current.style.setProperty('--py', y.toFixed(3))
+  }
+  const onMove = e => {
+    if (e.pointerType !== 'mouse' || reducedMotion()) return
+    const r = wall.current.getBoundingClientRect()
+    lean(((e.clientX - r.left) / r.width) * 2 - 1, ((e.clientY - r.top) / r.height) * 2 - 1)
+  }
   return (
-    <div className="door">
+    <div className="door" onPointerMove={onMove} onPointerLeave={() => lean(0, 0)}>
       <Marquee small />
       <p className="door-lede">Choose a showing, or keep scrolling to watch the whole feature.</p>
-      <ul className="door-tickets" aria-label="The programme">
-        {DOOR_TICKETS.map(g => <Ticket key={g.id} s={g} no={g.no} picked={picked} pick={pick} compact />)}
-      </ul>
+      <div ref={wall} className="wall">
+        <ul className="wall-plane" aria-label="The programme">
+          {DOOR_TICKETS.map((g, i) => (
+            <Ticket key={g.id} s={g} no={g.no} picked={picked} pick={pick} wall style={{ '--tilt': `${PINNED[i % 6][0]}deg`, '--y': `${PINNED[i % 6][1]}px` }} />
+          ))}
+        </ul>
+      </div>
       <div className="door-actions">
         <button type="button" className="door-all kicker" onClick={openBoxOffice}>Every showing</button>
         <button type="button" className="door-on kicker" onClick={onScrollOn}>Keep scrolling <span aria-hidden="true">↓</span></button>
@@ -242,14 +262,12 @@ export function BoxOffice({ dialogRef, children }) {
       onClick={e => e.target === dialogRef.current && dialogRef.current.close()}
       className="boxoffice"
     >
-      {/* Pinned to the dialog's corner while it scrolls, so there is always a way out. */}
-      <div className="bo-bar">
+      {/* The sign and Close stay put above the scrolling programme, so nothing ever scrolls under the button. */}
+      <div className="bo-top">
+        <Marquee id="boxoffice-title" small />
         <button type="button" autoFocus onClick={() => dialogRef.current?.close()} className="bo-close kicker">Close</button>
       </div>
-      <div className="bo-inner">
-        <div className="bo-head">
-          <Marquee id="boxoffice-title" />
-        </div>
+      <div className="bo-inner" data-lenis-prevent>
         <p className="bo-lede">Pick a ticket and it takes you straight to that showing.</p>
         {GROUPS.map(g => (
           <section key={g.id} className="bo-group" aria-labelledby={`bo-${g.id}`}>

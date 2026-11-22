@@ -10,8 +10,9 @@ import { loadTraveller, alohaLinear, sky, paintTexture } from './films/kit'
  * phosphor), out into a second yard under a watchtower and a radio mast, and up to a helicopter
  * waiting on its pad with its rotors turning. A drone keeps station ahead of him. It is also the level
  * that ends the game: at p = 1 it plays on the cinema's screen while the camera backs out into the
- * hall, and fades there as the epilogue rises. Everything here is built in code: no models to load
- * but the traveller.
+ * hall, and fades there as the epilogue rises. He carries a rifle (public/cinema/ops/rifle.glb) in both hands:
+ * at low ready on the move, raised to each target in turn, a short burst as it drops. Everything else is built
+ * in code: no models to load but the traveller and the rifle.
  *
  * CONTRACT (world.js, timeline.js and levels.js rely on it; do not change the export or its signature)
  *   export function createOps(renderer, { loader, normalize, mobile }) -> { scene, camera, update }
@@ -68,6 +69,18 @@ const BARRIERS = [[4.6, -1.7, 0.03], [6.7, -1.7, -0.02], [8.8, -1.7, 0.04], [10.
 
 const ss = (a, b, x) => THREE.MathUtils.smoothstep(x, a, b)
 const lerp = THREE.MathUtils.lerp
+const SHOT = 2.5 // metres short of a target where he fires on it: its plate starts down 0.1 m later
+const BLADE = 0.3 // his chest turned this far right of where the rifle points: the left shoulder forward, to reach the handguard
+/**
+ * Each hand on the rifle, in its own space (+z the barrel, +y its top, +x its left): [side, where the palm
+ * meets it, the fingers' direction, the palm's facing, the elbow's pull (to his left, down)]. The right hand
+ * wraps the pistol grip from its right side; the left clamps the handguard's left side, thumb over the top,
+ * behind the vertical grip (his hands have no finger bones, so a flat palm along a side reads best).
+ */
+const HOLD = [
+  ['Right', new THREE.Vector3(0, 0.0, -0.005), new THREE.Vector3(0.3, -0.32, 0.9), new THREE.Vector3(1, 0, -0.2), -0.6, -0.8],
+  ['Left', new THREE.Vector3(0.028, 0.1, 0.37), new THREE.Vector3(-0.15, 0.2, 0.95), new THREE.Vector3(-1, 0.25, 0), 0.35, -0.9],
+]
 const TAU = Math.PI * 2
 const MONO = px => `600 ${px}px "Geist Mono Variable", ui-monospace, Consolas, Menlo, monospace`
 const _m = new THREE.Matrix4(), _e = new THREE.Euler(), _yxz = new THREE.Euler(0, 0, 0, 'YXZ'), _c = new THREE.Color(), _q = new THREE.Quaternion(), _v = new THREE.Vector3(), _w = new THREE.Vector3()
@@ -737,8 +750,122 @@ export function createOps(renderer, { loader, mobile = false }) {
       kit = dress(you) // fitted in his rest pose, so before the mixer first poses him
       you.root.rotation.y = Math.PI / 2 // facing +x, down the path
       if (you.actions.Walk) you.actions.Walk.timeScale = 1.3
+      for (const s of ['Left', 'Right']) {
+        const arm = you.bone(s + 'Arm'), fore = you.bone(s + 'ForeArm'), hand = you.bone(s + 'Hand')
+        arms[s] = { arm, fore, hand, ...handAxes(hand, fore) }
+      }
+      spine = ['Spine', 'Spine01', 'Spine02'].map(n => you.bone(n))
+      you.root.updateMatrixWorld(true)
+      chestAxis.set(1, 0, 0).applyQuaternion(spine[0].getWorldQuaternion(_q).invert()) // his front (+x now) in his upper spine's own axes
+      neck = [you.bone('neck'), you.bone('Head')]
+      headAxis.set(1, 0, 0).applyQuaternion(neck[1].getWorldQuaternion(_q).invert())
+      // Every bone the hold turns, with its rest pose: put back before any clip plays or the mixer runs, as a
+      // bone no clip animates would otherwise keep last frame's turn (and a clip bound later would save it).
+      posed = [...spine, ...neck, ...Object.values(arms).flatMap(a => [a.arm, a.fore, a.hand])].map(b => ({ b, q: b.quaternion.clone() }))
       scene.add(you.root)
     })
+
+    // ------------------------------------------------------------ his rifle (public/cinema/ops/rifle.glb)
+    // Origin at the pistol grip, barrel along +z, top +y. Held in both hands every frame by a two-bone reach
+    // of each arm to its grip, the stock in his right shoulder: low ready on the move, raised to each target.
+    const R = { butt: new THREE.Vector3(0, 0.055, -0.271), muzzle: new THREE.Vector3(0, 0.1, 0.645) } // measured off the model
+    const rifle = new THREE.Group()
+    const arms = {}
+    let spine = null, neck = null, posed = []
+    const chestAxis = new THREE.Vector3(), headAxis = new THREE.Vector3()
+    loader.loadAsync('/cinema/ops/rifle.glb').then(gltf => {
+      gltf.scene.traverse(o => {
+        if (!o.isMesh) return
+        const map = o.material.map
+        if (map) { map.colorSpace = THREE.NoColorSpace; map.anisotropy = mobile ? 2 : 4 } // as painted: the frame has no sRGB encode
+        o.material = new THREE.MeshStandardMaterial({ map, roughness: 0.42, metalness: 0.5, color: '#d2d6da' })
+        o.castShadow = !mobile
+      })
+      rifle.add(gltf.scene)
+    })
+    // The muzzle flash: three crossed quads of a soft star, added at the muzzle; scaled to nothing between rounds.
+    const starTex = canvasTexture(128, 128, (g, w) => {
+      const r = g.createRadialGradient(w / 2, w / 2, 0, w / 2, w / 2, w / 2)
+      r.addColorStop(0, 'rgba(255,250,230,1)'); r.addColorStop(0.18, 'rgba(255,214,140,0.95)'); r.addColorStop(0.5, 'rgba(255,140,40,0.35)'); r.addColorStop(1, 'rgba(255,90,20,0)')
+      g.fillStyle = r
+      g.beginPath()
+      for (let i = 0; i < 16; i++) { const a = (i / 16) * TAU, k = i % 2 ? 0.2 : 0.5; g.lineTo(w / 2 + Math.cos(a) * w * k, w / 2 + Math.sin(a) * w * k) }
+      g.fill()
+    })
+    const flashMat = new THREE.MeshBasicMaterial({ map: starTex, color: new THREE.Color(2.4, 2.1, 1.6), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false, side: THREE.DoubleSide })
+    const flash = new THREE.Mesh(mergeGeometries([new THREE.PlaneGeometry(0.22, 0.22), new THREE.PlaneGeometry(0.12, 0.34).rotateY(Math.PI / 2).translate(0, 0, 0.12), new THREE.PlaneGeometry(0.34, 0.12).rotateX(Math.PI / 2).translate(0, 0, 0.12)]), flashMat)
+    flash.position.copy(R.muzzle)
+    rifle.add(flash)
+    // A spark where a round meets the steel, and his rifle's infrared aiming laser, seen only through the tube.
+    const spark = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 0.5), flashMat)
+    const laser = new THREE.Mesh(new THREE.CylinderGeometry(0.004, 0.004, 1, 5).translate(0, 0.5, 0).rotateX(Math.PI / 2), new THREE.MeshBasicMaterial({ color: new THREE.Color(1.6, 2, 1.7), transparent: true, opacity: 0.5, depthWrite: false, blending: THREE.AdditiveBlending, fog: false }))
+    laser.position.set(0.03, 0.115, 0.38) // a box on the handguard's left rail
+    rifle.add(laser)
+    for (const m of [flash, spark, laser]) { m.frustumCulled = false; m.renderOrder = 5 }
+    scene.add(rifle, spark)
+
+    /** A hand's own axes for its fingers and its palm, read in his rest pose (arms out, palms down; the rig has no finger bones, so the fingers run on from the forearm). */
+    function handAxes(hand, fore) {
+      you.root.updateMatrixWorld(true)
+      hand.getWorldQuaternion(_q).invert()
+      const fingers = hand.getWorldPosition(new THREE.Vector3()).sub(fore.getWorldPosition(new THREE.Vector3())).normalize().applyQuaternion(_q)
+      const palm = DOWN.clone().applyQuaternion(_q)
+      palm.addScaledVector(fingers, -palm.dot(fingers)).normalize()
+      return { rest: new THREE.Matrix4().makeBasis(fingers, palm, new THREE.Vector3().crossVectors(fingers, palm)).invert(), q0: new THREE.Quaternion(), q1: new THREE.Quaternion() }
+    }
+    const _a = new THREE.Vector3(), _b = new THREE.Vector3(), _t = new THREE.Vector3(), _e2 = new THREE.Vector3(), _pole = new THREE.Vector3(), _f = new THREE.Vector3(), _n = new THREE.Vector3()
+    const _qa = new THREE.Quaternion(), _qb = new THREE.Quaternion(), _qr = new THREE.Quaternion(), _mb = new THREE.Matrix4()
+    const D = new THREE.Vector3(), U = new THREE.Vector3(), L = new THREE.Vector3(), F = new THREE.Vector3(), POCKET = new THREE.Vector3(), HF = new THREE.Vector3(), HN = new THREE.Vector3(), POLE = new THREE.Vector3()
+    /** Turn a bone in world space by q. */
+    const turn = (bone, q) => {
+      bone.getWorldQuaternion(_qa).premultiply(q)
+      bone.parent.getWorldQuaternion(_qb).invert()
+      bone.quaternion.copy(_qb.multiply(_qa))
+      bone.updateMatrixWorld(true)
+    }
+    /** Turn a bone so the direction from it to `from` (a world point) points at `to`. */
+    const swing = (bone, from, to) => {
+      bone.getWorldPosition(_a)
+      _qr.setFromUnitVectors(_b.copy(from).sub(_a).normalize(), _t.copy(to).sub(_a).normalize())
+      turn(bone, _qr)
+    }
+    /** Two-bone reach of arm s: wrist to W, elbow bent toward the pole direction P, blended in by w. */
+    const _S = new THREE.Vector3(), _B = new THREE.Vector3(), _C = new THREE.Vector3()
+    function reachTo(s, W, P, w) {
+      const A = arms[s]
+      A.q0.copy(A.arm.quaternion)
+      A.q1.copy(A.fore.quaternion)
+      A.arm.getWorldPosition(_S)
+      A.fore.getWorldPosition(_B)
+      A.hand.getWorldPosition(_C)
+      const l1 = _B.distanceTo(_S), l2 = _C.distanceTo(_B)
+      _n.copy(W).sub(_S)
+      const d = THREE.MathUtils.clamp(_n.length(), Math.abs(l1 - l2) + 1e-3, (l1 + l2) * 0.999)
+      _n.normalize()
+      _pole.copy(P).addScaledVector(_n, -P.dot(_n)).normalize()
+      const ca = (l1 * l1 + d * d - l2 * l2) / (2 * l1 * d), sa = Math.sqrt(Math.max(0, 1 - ca * ca))
+      _e2.copy(_S).addScaledVector(_n, ca * l1).addScaledVector(_pole, sa * l1) // the elbow
+      _f.copy(_S).addScaledVector(_n, d) // the wrist, as far as it can reach
+      swing(A.arm, _B, _e2)
+      A.hand.getWorldPosition(_C)
+      swing(A.fore, _C, _f)
+      if (w < 1) {
+        A.arm.quaternion.slerpQuaternions(A.q0, A.arm.quaternion, w)
+        A.fore.quaternion.slerpQuaternions(A.q1, A.fore.quaternion, w)
+        A.arm.updateMatrixWorld(true)
+      }
+    }
+    /** Lay hand s on a grip: its fingers along f and its palm facing n (world), blended in by w. */
+    function grip(s, f, n, w) {
+      const A = arms[s]
+      _n.copy(n).addScaledVector(f, -n.dot(f)).normalize()
+      _mb.makeBasis(f, _n, _a.crossVectors(f, _n)).multiply(A.rest)
+      _qr.setFromRotationMatrix(_mb)
+      A.hand.parent.getWorldQuaternion(_qb).invert()
+      _qa.copy(A.hand.quaternion)
+      A.hand.quaternion.copy(_qb.multiply(_qr))
+      if (w < 1) A.hand.quaternion.slerpQuaternions(_qa, A.hand.quaternion, w)
+    }
 
     await step()
 
@@ -873,7 +1000,7 @@ export function createOps(renderer, { loader, mobile = false }) {
     const look = new THREE.Vector3(), camPos = new THREE.Vector3()
     const grade = { bloom: 0.32, threshold: 0.9, vignette: 0.6, grain: 0.6, scan: 0.07 }
     const out = { here: look, dream: 0, grade }
-    let lastT = null, lastX = 0, movedAt = -1, cue = '', late = null
+    let lastT = null, lastX = 0, movedAt = -1, cue = '', late = null, shotAt = -1, shotI = 0
 
     function update(state, t, aspect) {
       const p = state.p, portrait = state.portrait ?? aspect < 0.85
@@ -885,6 +1012,18 @@ export function createOps(renderer, { loader, mobile = false }) {
       const x = (LENGTH * f) / 0.9, z = pathZ(x), slope = (pathZ(x + 0.1) - pathZ(x - 0.1)) / 0.2
       const end = ss(0.8, 0.97, p)
       const nv = ss(ALLEY[0], ALLEY[0] + 1.6, x) * (1 - ss(ALLEY[1] - 1.6, ALLEY[1], x))
+      // The target he covers: raised to it as it comes up, lowered once it is down.
+      let ka = 0, ti = 0
+      for (let i = 0; i < TARGETS.length; i++) {
+        const T0 = TARGETS[i][0], k = ss(T0 - 3.7, T0 - 3.0, x) * (1 - ss(T0 - 1.5, T0 - 0.5, x))
+        if (k > ka) { ka = k; ti = i }
+      }
+      const ks = ss(0.9, 0.94, p) // at the pad the rifle goes to its sling and his hands are free to wave
+      ka *= 1 - ks
+      const TT = TARGETS[ti], tx = TT[0] - x, tz = TT[1] - z
+      const fy = Math.PI / 2 - slope
+      let twist = Math.atan2(tx, tz) - fy
+      twist = Math.atan2(Math.sin(twist), Math.cos(twist)) * ka
 
       // Third person, low and close behind his right shoulder. The last shot steps out to his side: him
       // in the foreground, the helicopter beyond, the moon over both. A phone stands behind him instead,
@@ -897,6 +1036,16 @@ export function createOps(renderer, { loader, mobile = false }) {
       } else {
         camPos.set(x - 4.1, 1.62, 2.5 + 0.5 * z).lerp(_v.set(36.8, 1.5, 5), end)
         look.set(x + 6, 1.3, -0.9 + 0.3 * z).lerp(_v.set(47, 2, -1.6), end)
+      }
+      // While he aims the camera comes round behind him with his turn, a little closer, so the rifle points
+      // into the frame at the target over his shoulder instead of hiding in front of his chest.
+      if (ka > 0 && !state.still) {
+        // A phone's narrow frame cannot swing round with him (the alley's containers stand right there): it
+        // cranes up behind his right shoulder instead, looking down the rifle at the plate.
+        const ay = Math.atan2(tx, tz), sa = Math.sin(ay), ca = Math.cos(ay)
+        if (portrait) camPos.lerp(_w.set(x - 5.2, 3.2, z + 2.2), ka)
+        else camPos.lerp(_w.set(x - sa * 2.8 - ca * 1.55, 1.6, z - ca * 2.8 + sa * 1.55), ka)
+        look.lerp(_v.set(lerp(x, TT[0], portrait ? 0.18 : 0.6), portrait ? 1.0 : 1.15, lerp(z, TT[1], portrait ? 0.18 : 0.6)), ka)
       }
       // A hand on the camera, stilled for the last shot so it matches the one on the cinema's screen.
       const sway = state.still ? 0 : 1 - ss(0.86, 0.97, p)
@@ -911,14 +1060,85 @@ export function createOps(renderer, { loader, mobile = false }) {
       stars.position.copy(camera.position)
 
       // He walks while the scroll moves him and stands when it rests; at the pad he turns to you and waves.
+      // He fires a short burst at each target as it comes up (stepping forward past its mark only), just before it drops.
+      for (let i = 0; i < TARGETS.length; i++) {
+        const mark = TARGETS[i][0] - SHOT
+        if (lastX < mark && x >= mark && x - lastX < 1.5) { shotAt = t; shotI = i }
+      }
       if (Math.abs(x - lastX) > 1e-4) movedAt = t
       lastX = x
       if (you) {
+        for (const o of posed) o.b.quaternion.copy(o.q)
         const next = p > 0.945 ? 'Wave_One_Hand' : t - movedAt < 0.25 ? 'Walk' : 'Idle'
         if (next !== cue) you.play((cue = next), { fade: 0.3 })
         you.root.position.set(x, 0.02, z)
-        you.root.rotation.y = lerp(Math.PI / 2 - slope, Math.atan2(camPos.x - x, camPos.z - z), ss(0.9, 0.955, p))
+        you.root.rotation.y = lerp(fy + 0.3 * twist, Math.atan2(camPos.x - x, camPos.z - z), ss(0.9, 0.955, p))
         you.mixer.update(dt)
+        if (spine) {
+          you.root.updateMatrixWorld(true)
+          // His chest to a set heading: the idle clip swings his whole body a long way, and the rifle must not swing with it.
+          const blade = BLADE * (1 - ks), chest = you.root.rotation.y + 0.7 * twist - blade
+          _w.copy(chestAxis).applyQuaternion(spine[0].getWorldQuaternion(_qa))
+          const off = Math.atan2(Math.sin(chest - Math.atan2(_w.x, _w.z)), Math.cos(chest - Math.atan2(_w.x, _w.z)))
+          _q.setFromAxisAngle(UP, (off * (1 - ks)) / 3)
+          for (const b of spine) turn(b, _q)
+          // His eyes go where the rifle goes: the idle's look-around would have him glance away mid-aim.
+          const gaze = chest + blade * (0.4 + 0.6 * ka)
+          _w.copy(headAxis).applyQuaternion(neck[1].getWorldQuaternion(_qa))
+          const look2 = Math.atan2(Math.sin(gaze - Math.atan2(_w.x, _w.z)), Math.cos(gaze - Math.atan2(_w.x, _w.z)))
+          _q.setFromAxisAngle(UP, (look2 * (1 - ks)) / 2)
+          for (const b of neck) turn(b, _q)
+          // Recoil: three rounds 90 ms apart, each a short kick back and up.
+          const since = t - shotAt, fire = !state.still && shotAt >= 0 && since < 0.4
+          let kick = 0, burst = 0, round = 0
+          if (fire) for (let r = 0; r < 3; r++) {
+            const u = since - r * 0.09
+            if (u < 0) continue
+            kick += Math.exp(-u * 22) * Math.min(1, u * 60)
+            if (u < 0.045) { burst = 1 - u / 0.045; round = r + 1 }
+          }
+          const yaw = chest + blade + 0.15 * (1 - ka)
+          const pitch = lerp(-0.62, Math.atan2(0.95 - 1.42, Math.hypot(tx, tz)), ka) + 0.05 * kick
+          const cp = Math.cos(pitch), sp = Math.sin(pitch)
+          D.set(Math.sin(yaw) * cp, sp, Math.cos(yaw) * cp)
+          U.set(-Math.sin(yaw) * sp, cp, -Math.cos(yaw) * sp)
+          F.set(Math.sin(chest), 0, Math.cos(chest))
+          L.set(Math.cos(chest), 0, -Math.sin(chest))
+          // The stock in the pocket of his right shoulder, a little in from the joint and forward of it.
+          arms.Right.arm.getWorldPosition(POCKET).addScaledVector(L, 0.07).addScaledVector(F, 0.11).addScaledVector(UP, -0.06 + 0.05 * ka).addScaledVector(D, -0.03 * kick)
+          rifle.quaternion.setFromRotationMatrix(_mb.makeBasis(_a.crossVectors(U, D), U, D))
+          rifle.position.copy(R.butt).applyQuaternion(rifle.quaternion).negate().add(POCKET)
+          if (ks > 0) {
+            // Slung: hanging muzzle-down across his front, its top to the lens.
+            spine[2].getWorldPosition(_b).addScaledVector(F, 0.14).addScaledVector(UP, -0.2).addScaledVector(L, -0.06)
+            D.copy(UP).multiplyScalar(-0.8).addScaledVector(L, 0.6).normalize()
+            U.copy(F).addScaledVector(D, -F.dot(D)).normalize()
+            _qa.setFromRotationMatrix(_mb.makeBasis(_a.crossVectors(U, D), U, D))
+            rifle.quaternion.slerp(_qa, ks)
+            rifle.position.lerp(_b, ks)
+          }
+          rifle.updateMatrixWorld(true)
+          // Hands: right on the pistol grip, left on the foregrip; each wrist set back from its grip along the fingers.
+          const w = 1 - ks
+          if (w > 0) for (const [s, at, fd, nd, px, py] of HOLD) {
+            HF.copy(fd).applyQuaternion(rifle.quaternion).normalize()
+            HN.copy(nd).applyQuaternion(rifle.quaternion).normalize()
+            _w.copy(at).applyMatrix4(rifle.matrixWorld).addScaledVector(HN, -0.03).addScaledVector(HF, -0.075)
+            POLE.copy(L).multiplyScalar(px + (s === 'Right' ? -0.4 * ka : 0)).addScaledVector(UP, py)
+            reachTo(s, _w, POLE, w)
+            grip(s, HF, HN, w)
+          }
+          // The flash at the muzzle, a spark on the plate.
+          const fs = burst > 0 ? 0.7 + 0.5 * burst : 1e-4
+          flash.scale.setScalar(fs)
+          flash.rotation.z = round * 2.1
+          _v.set(TARGETS[shotI][0], 0.95, TARGETS[shotI][1] + 0.05)
+          spark.position.copy(_v)
+          spark.quaternion.copy(camera.quaternion)
+          spark.scale.setScalar(burst > 0 ? 0.4 + 0.5 * burst : 1e-4)
+          laser.scale.set(1, 1, nv > 0.01 ? 30 : 1e-4)
+          laser.material.opacity = 0.4 * nv
+        }
         kit.nvg.quaternion.copy(kit.q0).multiply(_q.setFromAxisAngle(X, -1.75 * (1 - nv)))
         out.here = you.root.position
       }

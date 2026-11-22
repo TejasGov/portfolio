@@ -1,18 +1,20 @@
 """Render the skinned suits posed by the traveller's own clips (a check for scripts/cinema/suit_skin.py).
 blender -b --factory-startup --python suit_check.py -- <out_dir> <traveller.glb> <suit.glb> [<suit.glb> ...] [--body] [--clips a.glb,b.glb]
 Each suit is bound to the traveller's armature (by bone name) and rendered at rest and in a few clip poses,
-front and three-quarter, as <out_dir>/<suit>_<pose>_<view>.png. --body also shows his body (to spot poke-through).
+front and three-quarter, as <out_dir>/<suit>_<pose>_<view>.png. --body also shows his body (to spot poke-through);
+--head shows only his head and neck (as the worlds do under a suit whose Meshy head was cut off).
 """
 import bpy, sys, os, math
 from mathutils import Vector, Matrix
 
 a = sys.argv[sys.argv.index('--') + 1:]
 BODY = '--body' in a
+HEAD = '--head' in a
 CLOSE = '--close' in a  # frame the head and shoulders
 CLIPS = []
 if '--clips' in a:
     i = a.index('--clips'); CLIPS = a[i + 1].split(','); del a[i:i + 2]
-a = [x for x in a if x not in ('--body', '--close')]
+a = [x for x in a if x not in ('--body', '--close', '--head')]
 OUT, TRAV, SUITS = a[0], a[1], a[2:]
 os.makedirs(OUT, exist_ok=True)
 
@@ -28,7 +30,14 @@ for c in CLIPS:  # extra clips on the same rig: keep their actions only
     for o in list(bpy.data.objects):
         if o not in keep: bpy.data.objects.remove(o, do_unlink=True)
 for act in bpy.data.actions: act.use_fake_user = True
-body.hide_render = not BODY
+body.hide_render = not (BODY or HEAD)
+if HEAD:  # drop every body vertex whose strongest bone is not his neck or head (landing.js's headOnly)
+    import bmesh
+    keep = {g.index for g in body.vertex_groups if g.name in ('neck', 'Head', 'head_end', 'headfront')}
+    bm = bmesh.new(); bm.from_mesh(body.data)
+    dl = bm.verts.layers.deform.active
+    bmesh.ops.delete(bm, geom=[v for v in bm.verts if max(v[dl].items(), key=lambda e: e[1], default=(-1, 0))[0] not in keep], context='VERTS')
+    bm.to_mesh(body.data); bm.free()
 
 suits = []
 for path in SUITS:

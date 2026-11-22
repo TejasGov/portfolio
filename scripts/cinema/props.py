@@ -1,7 +1,9 @@
 """Chapter Five's props from the Meshy models (Blender 5.2, run from E:/portfolio):
   B="C:/Program Files/Blender Foundation/Blender 5.2/blender.exe"; M=<folder with the Meshy GLBs>
   "$B" -b --factory-startup --python scripts/cinema/props.py -- axe   $M/axe1.glb $M/axe2.glb public/cinema/landing/axe.glb
+  "$B" -b --factory-startup --python scripts/cinema/props.py -- stormbreaker $M/stormbreaker.glb public/cinema/landing/axe.glb  (replaces 'axe')
   "$B" -b --factory-startup --python scripts/cinema/props.py -- bike  $M/batpod.glb public/cinema/chase/bike.glb
+  "$B" -b --factory-startup --python scripts/cinema/props.py -- rifle $M/rifle.glb public/cinema/ops/rifle.glb
   "$B" -b --factory-startup --python scripts/cinema/props.py -- bones $M/skeleton.glb public/cinema/dance/bones.glb
 
 axe:   Stormbreaker. axe1's gnarled branch handle (its own blade and lanyard cut away), axe2's crescent blade on one
@@ -13,6 +15,7 @@ bike:  the armoured bike at ~2.6 m, +Z forward (glTF), tyres on the ground (y = 
        nodes 'wheel_front' / 'wheel_back', each with its origin on its axle (spin about local X); the rest is 'bike'.
 bones: the silver metal skeleton, 1.75 m, with three straight claws per hand; node 'bones', origin between the
        feet on the floor, and an empty 'grip' at its right ankle (where a hand would hold it to swing it).
+rifle: the assault rifle at 0.9 m, node 'rifle', origin in the middle of the pistol grip, barrel along +Z (glTF), top up (+Y).
 Every output: Draco geometry, WebP maps at most 1024 px.
 """
 import bpy, bmesh, sys, math, numpy as np
@@ -277,6 +280,79 @@ def axe(p1, p2, out):
     export([h], out)
 
 
+# ---------------------------------------------------------------------------------------------- Stormbreaker (Meshy)
+def stormbreaker(src, out):
+    """The Meshy Stormbreaker (crescent blade, square hammer, branch haft with a leather wrap; PBR maps).
+    In the Meshy file: haft along +Z, 1.9 units, blade toward -X, the wrap at z -0.69..-0.19, the lowest blade
+    point at z 0.03. Out: 'stormbreaker', origin at the middle of the wrap, haft +Y (glTF), blade +X, ~0.95 m,
+    the plain branch between the wrap and the blade lengthened 2.5x (the head is not stretched).
+    Materials 'stormbreaker_wood' and 'stormbreaker_metal' (the head) share the Meshy maps; the metal one
+    carries an emissive map of the painted runes (1024 px) with emissive factor ~0 (light it in three.js
+    by setting material.emissive)."""
+    m = load(src)
+    V = co(m)
+    zg, z0, z1, f, s = -0.44, -0.16, 0.02, 2.5, 0.44
+    ring = V[np.abs(V[:, 2] - zg) < 0.04]
+    g = (ring.min(0) + ring.max(0)) / 2
+    V[:, 2] = np.where(V[:, 2] < z0, V[:, 2], np.where(V[:, 2] < z1, z0 + (V[:, 2] - z0) * f, V[:, 2] + (f - 1) * (z1 - z0)))
+    V -= [g[0], g[1], zg]
+    V[:, :2] *= -1  # a half turn about Z: the blade to +X
+    V *= s
+    set_co(m, V)
+    decimate(m, 16000)
+
+    mat = m.data.materials[0]
+    nt = mat.node_tree
+    base = next(n.image for n in nt.nodes if n.type == 'TEX_IMAGE' and any(l.to_socket.name == 'Base Color' for l in n.outputs[0].links))
+    w, h = base.size
+    px = np.empty(w * h * 4, np.float32); base.pixels.foreach_get(px); px = px.reshape(h, w, 4)
+    # Metal or wood per face: the base colour at its UV centre (grey metal above the wrap; bark, leather, leaves are not).
+    me = m.data
+    uv = np.empty(len(me.loops) * 2); me.uv_layers.active.data.foreach_get('uv', uv); uv = uv.reshape(-1, 2)
+    ls = np.empty(len(me.polygons), int); me.polygons.foreach_get('loop_start', ls)
+    lt = np.empty(len(me.polygons), int); me.polygons.foreach_get('loop_total', lt)
+    U = np.add.reduceat(uv, ls) / lt[:, None]
+    c = px[np.clip((U[:, 1] % 1) * h, 0, h - 1).astype(int), np.clip((U[:, 0] % 1) * w, 0, w - 1).astype(int), :3]
+    sat = c.max(1) - c.min(1)
+    C = np.array([p.center for p in me.polygons])
+    metal = (sat < 0.09) & (c.mean(1) > 0.18) & (C[:, 2] > (z1 + (f - 1) * (z1 - z0) - zg) * s - 0.02)  # above the blade's foot
+    # Runes: the pale blue strokes painted on the blade, as an emissive mask (1024 px, a little soft).
+    r, gg, b = px[..., 0], px[..., 1], px[..., 2]
+    mk = ((b - r > 0.05) & ((r + gg + b) / 3 > 0.55)).astype(np.float32)
+    mk = mk.reshape(h // 2, 2, w // 2, 2).max((1, 3))
+    for _ in range(2): mk = np.maximum(mk, 0.5 * (np.roll(mk, 1, 0) + np.roll(mk, -1, 1)))
+    rune = image('stormbreaker_runes', np.dstack([mk, mk, mk]))
+    wood = mat.copy(); wood.name = 'stormbreaker_wood'; mat.name = 'stormbreaker_metal'
+    t = nt.nodes.new('ShaderNodeTexImage'); t.image = rune
+    P = nt.nodes['Principled BSDF']
+    nt.links.new(t.outputs['Color'], P.inputs['Emission Color']); P.inputs['Emission Strength'].default_value = 0.001
+    # metal first: three.js names the primitives stormbreaker_1 (metal) and stormbreaker_2, as landing.js expects
+    me.materials.clear(); me.materials.append(mat); me.materials.append(wood)
+    me.polygons.foreach_set('material_index', (~metal).astype(int)); me.update()
+    for img in bpy.data.images:
+        mx = 2048 if img == base else 1024
+        if img.size[0] > mx: img.scale(mx, mx)
+    m.name = me.name = 'stormbreaker'
+    V = co(m)
+    blk = V[V[:, 0] < -0.10]  # the hammer block (-X): its middle is the head's centre on the haft
+    print('AXE len', round(np.ptp(V[:, 2]), 3), 'z', V[:, 2].min().round(3), V[:, 2].max().round(3), 'x', V[:, 0].min().round(3), V[:, 0].max().round(3),
+          'head centre z', round(float((blk[:, 2].min() + blk[:, 2].max()) / 2), 3), 'metal faces', int(metal.sum()), 'of', len(metal))
+    export([m], out)
+
+
+# ---------------------------------------------------------------------------------------------- the rifle
+def rifle(src, out):
+    m = load(src)  # the Meshy file: muzzle toward -X, 0.957 long, the pistol grip's middle at x 0.19, z -0.055
+    V = co(m) - [0.19, 0, -0.055]
+    V = np.c_[-V[:, 1], V[:, 0], V[:, 2]] * (0.9 / 0.957)  # a quarter turn about Z: the muzzle to -Y (glTF +Z)
+    set_co(m, V)
+    decimate(m, 12000)
+    for img in bpy.data.images:
+        if img.size[0] > 1024: img.scale(1024, 1024)
+    m.name = m.data.name = 'rifle'
+    export([m], out)
+
+
 # ---------------------------------------------------------------------------------------------- the bike
 def bike(src, out):
     m = load(src)
@@ -370,4 +446,4 @@ def bones(src, out):
 
 
 clear()
-{'axe': axe, 'bike': bike, 'bones': bones}[KIND](*ARGS)
+{'axe': axe, 'stormbreaker': stormbreaker, 'rifle': rifle, 'bike': bike, 'bones': bones}[KIND](*ARGS)

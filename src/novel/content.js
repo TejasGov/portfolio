@@ -123,14 +123,15 @@ export const PROGRAMME = [
     ],
   },
   {
-    id: 'screen', screen: 'Screen 5', time: '6 min', title: 'The Big Screen', line: 'A fan’s tribute: the scenes I’d jump into.', go: FIVE, worlds: ['swing'],
+    id: 'screen', screen: 'Screen 5', time: '7 min', title: 'The Big Screen', line: 'A fan’s tribute: the scenes I’d jump into.', go: FIVE, worlds: ['swing'],
     showings: [
       { id: 'swing', time: '1 min', title: 'Spider-Man', line: 'Golden hour on a copper dome. One leap, then the swing.', go: { id: 'scene-swing', or: FIVE }, worlds: ['swing'] },
       { id: 'dive', time: '1 min', title: 'Iron Man', line: 'Off the tower’s landing pad and into the suit.', go: { id: 'scene-dive', or: FIVE }, worlds: ['dive'] },
       { id: 'landing', time: '1 min', title: 'Thor', line: 'Out of the lightning, Stormbreaker in hand.', go: { id: 'scene-landing', or: FIVE }, worlds: ['landing'] },
       { id: 'chase', time: '1 min', title: 'The Dark Knight', line: 'A night chase under the tracks.', go: { id: 'scene-chase', or: FIVE }, worlds: ['chase'] },
-      { id: 'final', time: '1 min', title: 'Argentina 2022', line: 'The final, 18 December 2022.', go: { id: 'scene-final', or: FIVE }, worlds: ['final'] },
+      { id: 'vault', time: '1 min', title: 'Mission: Impossible', line: 'Lowered on wires into a white vault, inches above the floor.', go: { id: 'scene-vault', or: FIVE }, worlds: ['vault'] },
       { id: 'dance', time: '1 min', title: 'Deadpool & Wolverine', line: 'Bye Bye Bye, and a snowy clearing full of henchmen.', go: { id: 'scene-dance', or: FIVE }, worlds: ['dance'] },
+      { id: 'final', time: '1 min', title: 'Argentina 2022', line: 'The final, 18 December 2022, as the house lights come up.', go: { id: 'scene-final', or: FIVE }, worlds: ['final'] },
     ],
   },
   { id: 'contact', screen: 'The lobby', time: '1 min', title: 'Contact', line: 'House lights up, and how to reach me.', go: { id: 'epilogue' } },

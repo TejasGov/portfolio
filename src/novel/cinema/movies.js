@@ -2,34 +2,36 @@ import { PLATEAU, coverAt } from './levels'
 
 /*
  * Chapter Five's level map, in the shape of levels.js: one scroll (P, 0..1 through the chapter) plays
- * six fan-tribute film worlds, one at a time. The map is laid out in svh of scroll (each world's own
+ * seven fan-tribute film worlds, one at a time. The map is laid out in svh of scroll (each world's own
  * length, the same gap and seam size between every two) and divided by the chapter's height, SVH, which
  * ChapterFive.jsx uses for its section: so a world's pace per screen of scroll is set here alone.
- *   hall     P 0      - 0.0276  in the hall after Four's back-out: Four's last world fades off the screen,
+ *   hall     P 0      - 0.0243  in the hall after Four's back-out: Four's last world fades off the screen,
  *                               the projector flares for a new reel, the swing comes up on the screen and
  *                               the camera pushes into it (timeline.js)
- *   swing    P 0.0276 - 0.2366  Spider-Man (swing.js)              500 svh
- *   dive     P 0.2458 - 0.4381  Iron Man (dive.js)                 460 svh
- *   landing  P 0.4473 - 0.5577  Thor (landing.js)                  264 svh (its length in 1100 svh before)
- *   chase    P 0.5669 - 0.6923  The Dark Knight (chase.js)         300 svh
- *   final    P 0.7015 - 0.8165  Argentina 2022 (final.js)          275 svh (as before)
- *   dance    P 0.8257 - 0.9678  Deadpool & Wolverine (dance.js)    340 svh
- *   back-out P 0.9678 - 1       the dance plays on the cinema's screen (p held at 1) and the camera backs
- *                               out into the hall, where the epilogue begins
+ *   swing    P 0.0243 - 0.2085  Spider-Man (swing.js)              500 svh
+ *   dive     P 0.2167 - 0.3861  Iron Man (dive.js)                 460 svh
+ *   landing  P 0.3943 - 0.4915  Thor (landing.js)                  264 svh
+ *   chase    P 0.4996 - 0.6102  The Dark Knight (chase.js)         300 svh
+ *   vault    P 0.6183 - 0.7288  Mission: Impossible (vault.js)     300 svh
+ *   dance    P 0.7369 - 0.8622  Deadpool & Wolverine (dance.js)    340 svh
+ *   final    P 0.8703 - 0.9716  Argentina 2022 (final.js)          275 svh
+ *   back-out P 0.9716 - 1       the final plays on the cinema's screen (p held at 1) and the camera backs
+ *                               out into the hall, where the epilogue begins (and fades it)
  * Between worlds a covering transition (levelfx.js) hides the swap: only one world is ever drawn.
- *   whip     P 0.2251 - 0.2573  swap at 0.2412     swing -> dive
- *   storm    P 0.4266 - 0.4588  swap at 0.4427     dive -> landing
- *   bats     P 0.5462 - 0.5784  swap at 0.5623     landing -> chase
- *   flash    P 0.6808 - 0.7130  swap at 0.6969     chase -> final
- *   comic    P 0.8050 - 0.8372  swap at 0.8211     final -> dance
+ *   whip     P 0.1984 - 0.2268  swap at 0.2126     swing -> dive
+ *   storm    P 0.3760 - 0.4044  swap at 0.3902     dive -> landing
+ *   bats     P 0.4814 - 0.5098  swap at 0.4956     landing -> chase
+ *   laser    P 0.6000 - 0.6284  swap at 0.6142     chase -> vault
+ *   comic    P 0.7187 - 0.7471  swap at 0.7329     vault -> dance
+ *   flash    P 0.8521 - 0.8804  swap at 0.8662     dance -> final
  * So each world is seen clear of its transitions only for part of its own p (CLEAR):
- *   swing 0..0.945, dive 0.060..0.940, landing 0.104..0.896, chase 0.092..0.908, final 0.100..0.900,
- *   dance 0.081..1. Each world's p reaches 1 a little before its seam's middle and holds there under
- *   the full cover; the next starts at 0 just after it.
+ *   swing 0..0.945, dive 0.060..0.940, landing 0.104..0.896, chase 0.092..0.908, vault 0.092..0.908,
+ *   dance 0.081..0.919, final 0.100..1. Each world's p reaches 1 a little before its seam's middle and
+ *   holds there under the full cover; the next starts at 0 just after it.
  */
 const HALL = 66, GAP = 22, HALF = 38.5, OUT = 77 // svh: the push-in, the gap between two walks, half a seam, the back-out
-const PLAN = [['swing', 500], ['dive', 460], ['landing', 264], ['chase', 300], ['final', 275], ['dance', 340]]
-const KINDS = ['whip', 'storm', 'bats', 'flash', 'comic'] // SEAMS[k] sits between LEVELS[k] and LEVELS[k + 1]
+const PLAN = [['swing', 500], ['dive', 460], ['landing', 264], ['chase', 300], ['vault', 300], ['dance', 340], ['final', 275]]
+const KINDS = ['whip', 'storm', 'bats', 'laser', 'comic', 'flash'] // SEAMS[k] sits between LEVELS[k] and LEVELS[k + 1]
 /** The chapter's height in svh (ChapterFive.jsx's section): P runs over it, 'top bottom' to 'bottom bottom'. */
 export const SVH = HALL + PLAN.reduce((a, [, n]) => a + n, 0) + GAP * (PLAN.length - 1) + OUT
 /** How much shorter one svh of scroll is in P than it was at the three-world chapter's 1100 svh (timeline.js, the beats). */
@@ -58,6 +60,7 @@ export const GRADE = {
   dive:{ bloom: 0.7, threshold: 0.72, vignette: 0.55, grain: 0.5, scan: 0 }, // cool and filmic: the city's lights bloom
   landing: { bloom: 0.6, threshold: 0.8, vignette: 0.5, grain: 0.35, scan: 0 }, // dusky and stormy
   final: { bloom: 0.95, threshold: 0.68, vignette: 0.38, grain: 0.3, scan: 0 }, // warm floodlight, bloom on the confetti
+  vault: { bloom: 0.55, threshold: 0.86, vignette: 0.18, grain: 0.08, scan: 0 }, // sterile cool white, high key: only the white walls and lamps bloom
 }
 
 const clamp01 = x => Math.min(1, Math.max(0, x))
@@ -99,8 +102,8 @@ export const CLEAR = Object.fromEntries(LEVELS.map((L, i) => {
 if (import.meta.env?.DEV) {
   const near = (a, b) => Math.abs(a - b) < 1e-6
   const names = LEVELS.map(l => l.name).join()
-  console.assert(names === 'swing,dive,landing,chase,final,dance' && SEAMS.map(s => s.kind).join() === 'whip,storm,bats,flash,comic', 'movies: running order')
-  console.assert(PLATEAU[0] < 0.5 && PLATEAU[1] > 0.5 && SVH === 2392 && near(BACK, 1 - OUT / SVH), 'movies: plateau, height')
+  console.assert(names === 'swing,dive,landing,chase,vault,dance,final' && SEAMS.map(s => s.kind).join() === 'whip,storm,bats,laser,comic,flash', 'movies: running order')
+  console.assert(PLATEAU[0] < 0.5 && PLATEAU[1] > 0.5 && SVH === 2714 && near(BACK, 1 - OUT / SVH), 'movies: plateau, height')
   console.assert(Object.keys(GRADE).length === LEVELS.length && LEVELS.every(l => GRADE[l.name]), 'movies: a grade per world')
   const IN = LEVELS[0].walk[0]
   console.assert(levelAt(IN).level === 'swing' && levelAt(IN).p === 0 && levelAt(IN + 0.05).kind === null, 'movies: start')

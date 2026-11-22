@@ -189,9 +189,9 @@ export function stateAt(s, mouse, aspect) {
   } else if (sec === 'five') {
     // The Big Screen. It opens where Four left you, in your seat with Four's last world on the screen:
     // that fades to black, the projector flares white for a new reel and goes dark, the swing comes up on
-    // the screen and the camera pushes into it. Inside, six worlds swap under covering transitions
-    // (movies.js). It ends as a film does: the dance plays on the screen and the camera backs out of it
-    // to your seat, where the epilogue begins.
+    // the screen and the camera pushes into it. Inside, seven worlds swap under covering transitions
+    // (movies.js). It ends as a film does: its last world (the final) plays on the screen and the camera
+    // backs out of it to your seat, where the epilogue begins and fades it.
     const P = s.five
     const IN = five.LEVELS[0].walk[0] // inside the screen from here
     // The hall's moves keep their length in svh as the chapter grows: timed in the three-world chapter's
