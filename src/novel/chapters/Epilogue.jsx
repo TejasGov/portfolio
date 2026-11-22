@@ -88,7 +88,8 @@ export default function Epilogue() {
         </div>
       </section>
 
-      <footer ref={colophon} className="relative z-10 bg-night px-6 pt-[6svh] pb-[16svh] md:px-[6vw]" aria-label="Colophon">
+      {/* Its last pixel row a hair short of opaque: a canvas the browser sees as wholly covered is culled, and showing it again on the way back up stalled ~200 ms. */}
+      <footer ref={colophon} className="relative z-10 px-6 pt-[6svh] pb-[16svh] md:px-[6vw]" style={{ background: 'linear-gradient(var(--night) calc(100% - 1px), color-mix(in srgb, var(--night) 99.6%, transparent) 0)' }} aria-label="Colophon">
         {/* High in the footer, so it is in full view before the card above goes, and held under the header to the last line. The address itself is the card's alone. */}
         <div className="sticky top-[72px] z-10 mx-auto flex max-w-5xl flex-wrap items-center gap-x-7 gap-y-2 bg-night py-2 md:top-[84px]">
           <a href={`mailto:${CONTACT.email}`} className="inline-flex min-h-11 items-center bg-glow px-6 font-mono text-[13px] tracking-[0.18em] text-night uppercase hover:opacity-90">
@@ -110,7 +111,7 @@ export default function Epilogue() {
             Set in Archivo, Newsreader and Geist Mono. The cinema was modelled and light-baked in Blender, with
             surface textures from Poly Haven (CC0) and a carpet drawn for it; the projector, the recliners, the traveller (a stylised me) and
             the six little worlds of Chapter Three were generated with Meshy. The five films, the ink drawings and the waves between them, the
-            beam, the haze and the dust are all drawn live in WebGL, and the projector you can hear is synthesized in the browser. The armour in
+            beam, the haze and the dust are all drawn live in WebGL, and the projector you can hear is synthesized in the browser. The suits in
             Chapter Five, the coast's buildings, cars and palms in Chapter Four, and some of the traveller's movements were generated with Meshy;
             the coast's ground textures are from Poly Haven (CC0); the rest of Chapters Four and Five is drawn live in WebGL.
             Photographs in Chapter One come from Wikimedia Commons under the licences below; they were cut out, torn and taped for this book.
@@ -130,6 +131,9 @@ export default function Epilogue() {
               ))}
             </ul>
           </details>
+          <p className="mt-6 max-w-[62ch] font-serif text-base leading-relaxed text-night-ink/65">
+            The scenes in Chapter Five are a fan tribute; the characters belong to their owners.
+          </p>
           <p className="mt-6 font-serif text-base text-night-ink/65">
             Also: <a href="/os/" className="underline underline-offset-4 hover:text-night-ink">the 2023 edition, as a desktop OS →</a>
           </p>

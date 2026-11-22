@@ -16,6 +16,14 @@ import { Pass } from 'postprocessing'
  *   FLASH  a strike's whiteout: the picture burns out from its highlights to white; the white veil
  *          thins off the stadium and leaves thousands of soft camera flashes with short cross
  *          streaks, popping and thinning out until the crowd's own flashes take over.
+ *   WHIP   a whip pan: the picture smears sideways into streaks of low sun and city light, which fill
+ *          the frame and race past; coming out the warm light drains to night-blue as the pan slows.
+ *   BATS   a swarm: bats (drawn in the shader, wings beating) sweep in from the right at four depths
+ *          over a moonlit night until they and the dark are all there is; they leave to the left.
+ *   COMIC  the picture goes to print (halftone dots), then five comic panels with ink borders and paper
+ *          gutters slam onto the page one by one, a POW burst pops in the middle, and the panels slide
+ *          off the page onto the next world, which prints back into colour.
+ * Every mode is whole (independent of the picture under it) across the plateau, so the swap is hidden.
  * It runs after tone mapping, on display-ready colour, so every colour below is what the screen shows.
  */
 const VERT = /* glsl */ `
@@ -328,12 +336,229 @@ vec3 flash(vec2 uv, vec3 src) {
   return mix(col, src, ss(0.85, 1.0, ph)); // and the last pops give way to the stadium's own
 }
 
+// ---------------------------------------------------------------- whip
+// The cover's own picture: the low sun and the city smeared into horizontal light by a pan too fast to
+// see, warm on the way in and night-blue on the way out. Independent of the frame, so the swap is hidden.
+vec3 smear(vec2 c, float ph, float night) {
+  float run = ph * 9.0 + uTime * 0.6; // the pan: everything races left, faster at the middle
+  vec3 sky = mix(mix(vec3(1.0, 0.62, 0.3), vec3(0.42, 0.2, 0.3), ss(-0.1, 0.5, c.y)), mix(vec3(0.05, 0.07, 0.17), vec3(0.01, 0.015, 0.05), ss(-0.2, 0.5, c.y)), night);
+  vec3 col = sky * (0.75 + 0.5 * n3(vec3(c.x * 0.04 + run * 0.05, c.y * 2.5, 0.37)));
+  // Streaks at three sizes: the volume's noise stretched forty times along x is a field of light lines.
+  for (int k = 0; k < 3; k++) {
+    float fk = float(k);
+    float s = n3(vec3(c.x * (0.05 + 0.03 * fk) + run * (0.12 + 0.06 * fk), c.y * (7.0 + 9.0 * fk), 0.13 + 0.29 * fk));
+    float line = pow(ss(0.45, 0.85, s), 3.0) * (0.9 - 0.25 * fk);
+    vec3 hue = mix(mix(vec3(1.0, 0.86, 0.6), vec3(1.0, 0.55, 0.25), fk * 0.5), mix(vec3(0.55, 0.7, 1.0), vec3(1.0, 0.7, 0.35), fk * 0.5), night);
+    col += hue * line;
+  }
+  return col;
+}
+vec3 whip(vec2 uv, vec3 src) {
+  float ph = uPhase;
+  vec2 c = (uv - 0.5) * vec2(uRes.x / uRes.y, 1.0);
+  float cov = clamp(min(ph, 1.0 - ph) / 0.44, 0.0, 1.0);
+  float night = ss(0.42, 0.58, ph);
+  // Motion blur along x, longer as the pan speeds up: the picture smears into its own streaks.
+  float len = 0.28 * cov * cov;
+  vec3 acc = vec3(0.0);
+  for (int k = 0; k < 12; k++) acc += texture2D(inputBuffer, vec2(uv.x + (float(k) / 11.0 - 0.5) * len, uv.y)).rgb;
+  vec3 col = mix(src, acc / 12.0, ss(0.0, 0.3, cov));
+  // Going in, the sun's warmth floods the smear; coming out, the dusk drains to night as the pan slows.
+  col *= mix(mix(vec3(1.0), vec3(1.12, 0.96, 0.8), ss(0.0, 0.5, cov)), mix(vec3(1.0), vec3(0.78, 0.86, 1.08), ss(0.0, 0.6, cov)), night);
+  vec3 lines = smear(c, ph, night);
+  col += lines * 0.35 * ss(0.15, 0.7, cov) * (1.0 - ss(0.75, 1.0, cov)); // the first streaks over the smear
+  return mix(col, lines, ss(0.6, 1.0, cov)); // whole by the plateau
+}
+
+// ---------------------------------------------------------------- bats
+const vec3 NIGHT_INK = vec3(0.008, 0.01, 0.02);
+// A bat, wingspan 2 across x in its own frame, y up; flap -1..1 (wings down..up). Returns how much of the
+// pixel it covers, px being a pixel's size in its frame.
+float bat(vec2 p, float flap, float px) {
+  float ax = abs(p.x);
+  float body = (length(p / vec2(0.12, 0.3)) - 1.0) * 0.12;
+  vec2 e = vec2(ax - 0.07, p.y - 0.28);
+  float ear = max(abs(e.x) - 0.035 * (1.0 - e.y / 0.12), max(-e.y, e.y - 0.12)); // two pointed ears
+  float tip = 0.1 + 0.6 * flap;
+  float top = mix(0.14, tip, ax) + 0.1 * sin(ax * 3.14159) * (0.4 + 0.6 * flap); // the leading edge, arched
+  float bot = top - mix(0.4, 0.04, ax) + 0.12 * abs(sin(ax * 9.42)) * ss(0.12, 0.3, ax); // scalloped trailing edge
+  float wing = max(max(p.y - top, bot - p.y), ax - 1.0);
+  float d = min(min(body, ear), wing);
+  return 1.0 - ss(-px, px, d);
+}
+vec3 bats(vec2 uv, vec3 src) {
+  float ph = uPhase;
+  float A = uRes.x / uRes.y;
+  vec2 c = (uv - 0.5) * vec2(A, 1.0);
+  float cov = clamp(min(ph, 1.0 - ph) / 0.44, 0.0, 1.0);
+  // The swarm sweeps in from the right and leaves to the left: its front crosses the frame each way.
+  float x01 = uv.x;
+  float lead = clamp(cov * 1.6 - (ph < 0.5 ? 1.0 - x01 : x01) * 0.6, 0.0, 1.0);
+  // Behind the swarm, a moonlit night: deep blue, a pale crescent moon high right, thin cloud across it.
+  // A crescent, not a full disc: a bat crossing a full moon reads as a bat-signal (no logos).
+  vec2 moon = vec2(A * 0.22, 0.24);
+  float m = length(c - moon);
+  float crescent = (1.0 - ss(0.07, 0.075, m)) * ss(0.062, 0.067, length(c - moon - vec2(-0.03, 0.022)));
+  vec3 back = mix(vec3(0.03, 0.04, 0.08), vec3(0.08, 0.1, 0.17), ss(0.5, -0.5, c.y));
+  back += vec3(0.55, 0.6, 0.72) * (exp(-m * 5.0) * 0.32 + crescent * 0.8);
+  back *= 0.8 + 0.4 * n3(vec3(c * vec2(0.35, 1.2) + vec2(uTime * 0.01, 0.0), 0.61));
+  vec3 col = mix(src, src * 0.3 + back * 0.4, ss(0.0, 0.8, lead) * 0.85); // the light goes as they come
+  col = mix(col, back, ss(0.55, 1.0, cov));
+  // Four depths of bats, near ones bigger, faster and fewer; each cell of a layer holds at most one.
+  float shade = 0.0;
+  for (int L = 0; L < 4; L++) {
+    float fl = float(L);
+    float cell = 0.06 + 0.07 * fl;
+    vec2 q = c * vec2(1.0, 1.0) + vec2(uTime * (0.25 + 0.2 * fl) + ph * (2.0 + 1.5 * fl), uTime * 0.05 * (fl - 1.5));
+    q.y += sin(q.x * 2.3 + fl) * 0.04;
+    vec2 g = q / cell, id = floor(g), f = fract(g) - 0.5;
+    float h = hash(id + fl * 13.1), h2 = hash(id * 1.7 + fl * 5.3);
+    float dens = clamp(lead * (1.35 - 0.2 * fl) - h * 0.9, 0.0, 1.0);
+    if (dens <= 0.0) continue;
+    vec2 jit = (vec2(h2, hash(id + 3.3)) - 0.5) * 0.3;
+    float s = (0.2 + 0.08 * h) * ss(0.0, 0.3, dens);
+    float flap = sin(uTime * (11.0 + 6.0 * h) + h * 40.0);
+    vec2 p = (f - jit) / s;
+    p.y -= 0.12 * flap; // the body rises as the wings beat down
+    float b = bat(p, flap, 1.6 * uScale / (uRes.y * cell * s));
+    shade = max(shade, b);
+  }
+  // Silhouettes, a faint cold rim where the moon catches them.
+  return mix(col, NIGHT_INK + vec3(0.02, 0.025, 0.04) * exp(-m * 3.0), shade);
+}
+
+// ---------------------------------------------------------------- comic
+// Five panels on a page with slanted gutters, laid across a landscape frame or down a portrait one.
+// q is the page (0..1 both ways); returns the panel under it.
+int panelOf(vec2 q) {
+  if (q.x < 0.44 + 0.06 * (q.y - 0.5)) return q.y > 0.58 + 0.04 * q.x ? 0 : 1;
+  return q.y > 0.68 - 0.05 * q.x ? 2 : q.y > 0.3 + 0.05 * q.x ? 3 : 4;
+}
+// Distance (in page pixels) from q to the nearest edge of its own panel.
+float panelEdge(vec2 q, vec2 res) {
+  float d = min(min(q.x, 1.0 - q.x) * res.x, min(q.y, 1.0 - q.y) * res.y);
+  d = min(d, abs(q.x - 0.44 - 0.06 * (q.y - 0.5)) * res.x);
+  if (q.x < 0.44 + 0.06 * (q.y - 0.5)) d = min(d, abs(q.y - 0.58 - 0.04 * q.x) * res.y);
+  else d = min(min(d, abs(q.y - 0.68 + 0.05 * q.x) * res.y), abs(q.y - 0.3 - 0.05 * q.x) * res.y);
+  return d;
+}
+vec2 panelCentre(int i) {
+  return i == 0 ? vec2(0.22, 0.8) : i == 1 ? vec2(0.22, 0.3) : i == 2 ? vec2(0.72, 0.85) : i == 3 ? vec2(0.72, 0.5) : vec2(0.72, 0.15);
+}
+// Halftone dots on a 45 degree screen: tone 0..1 is how much of the cell the dot covers.
+float dots(vec2 px, float cell, float tone) {
+  vec2 r = mat2(0.7071, -0.7071, 0.7071, 0.7071) * px / cell;
+  float d = length(fract(r) - 0.5);
+  float rad = 0.72 * sqrt(clamp(tone, 0.0, 1.0));
+  return 1.0 - ss(rad - 0.06, rad + 0.06, d);
+}
+vec3 panelArt(int i, vec2 q, vec2 px, float flash) {
+  vec3 ink = vec3(0.04, 0.03, 0.05);
+  vec3 a = i == 0 ? vec3(1.0, 0.84, 0.08) : i == 1 ? vec3(0.08, 0.62, 0.95) : i == 2 ? vec3(0.93, 0.13, 0.17) : i == 3 ? vec3(1.0, 0.84, 0.08) : vec3(0.93, 0.13, 0.17);
+  vec3 paper = mix(vec3(1.0, 0.97, 0.9), a, 0.25);
+  vec2 k = q - panelCentre(i);
+  float cell = 9.0 * uScale;
+  vec3 col;
+  if (i == 1 || i == 3) {
+    // Speed lines bursting from a point: black rays on the panel's colour.
+    float ang = atan(k.y, k.x * 1.6);
+    float ray = step(0.62, hash(vec2(floor(ang * 26.0), float(i)))) * ss(0.04, 0.25, length(k));
+    col = mix(mix(paper, a, dots(px, cell, 0.25 + 0.5 * length(k) * 2.0)), ink, ray * 0.9);
+  } else {
+    // A flat colour in big dots, denser toward the panel's lower corner.
+    float tone = 0.25 + 0.7 * ss(-0.3, 0.35, -k.y + k.x * 0.3);
+    col = mix(paper, a, dots(px, cell, tone));
+  }
+  return mix(col, vec3(1.0), flash);
+}
+// One stroke of a letter: distance to the segment a-b.
+float seg(vec2 p, vec2 a, vec2 b) {
+  vec2 pa = p - a, ba = b - a;
+  return length(pa - ba * clamp(dot(pa, ba) / dot(ba, ba), 0.0, 1.0));
+}
+// The burst word, in its own frame (letters 0.16 tall): the distance to its strokes' centre lines.
+float powWord(vec2 p) {
+  vec2 P = p + vec2(0.17, 0.0), O = p, W = p - vec2(0.17, 0.0);
+  float bowl = P.x > -0.01 ? abs(length(P - vec2(-0.01, 0.035)) - 0.045) : 1.0;
+  float dP = min(min(seg(P, vec2(-0.05, -0.08), vec2(-0.05, 0.08)), bowl), min(seg(P, vec2(-0.05, 0.08), vec2(-0.01, 0.08)), seg(P, vec2(-0.05, -0.01), vec2(-0.01, -0.01))));
+  float dO = abs(length(O / vec2(0.055, 0.08)) - 1.0) * 0.055;
+  float dW = min(min(seg(W, vec2(-0.07, 0.08), vec2(-0.035, -0.08)), seg(W, vec2(-0.035, -0.08), vec2(0.0, 0.035))), min(seg(W, vec2(0.0, 0.035), vec2(0.035, -0.08)), seg(W, vec2(0.035, -0.08), vec2(0.07, 0.08))));
+  return min(min(dP, dO), dW);
+}
+vec3 comic(vec2 uv, vec3 src) {
+  float ph = uPhase;
+  float A = uRes.x / uRes.y;
+  bool tall = A < 0.85;
+  vec2 res = tall ? uRes.yx : uRes;
+  // Each panel slams in at its own moment (in) and slides off the page (out).
+  float T0 = 0.04, DT = 0.075;
+  // The page shakes as each one lands.
+  vec2 shake = vec2(0.0);
+  for (int i = 0; i < 5; i++) {
+    float at = T0 + DT * float(i) + 0.035;
+    float e = step(at, ph) * exp(-(ph - at) * 90.0);
+    shake += e * vec2(hash(vec2(float(i), 1.0)) - 0.5, hash(vec2(float(i), 2.0)) - 0.5) * 0.012;
+  }
+  vec2 u = uv + shake * step(ph, 0.5);
+  vec2 page = tall ? vec2(1.0 - u.y, u.x) : u;
+  // Before the panels, the world itself goes to print: posterised colour in halftone dots, and back.
+  float print = ss(0.0, 0.14, ph) * (1.0 - ss(0.86, 1.0, ph));
+  float lum = dot(src, vec3(0.299, 0.587, 0.114));
+  vec3 poster = floor(src / max(lum, 0.02) * 2.0 + 0.5) / 2.0 * 0.85 + 0.1;
+  // Two screens, as a press prints: the hue in fine dots on the paper, and black in dots where it is dark.
+  vec3 hue = mix(vec3(1.0, 0.97, 0.9), poster, dots(uv * uRes, 8.0 * uScale, 0.55));
+  hue *= 1.0 - 0.92 * dots(uv * uRes * 1.13 + 3.0, 8.0 * uScale, clamp(1.0 - lum * 1.8, 0.0, 1.0));
+  vec3 col = mix(src, hue, print * 0.9);
+  vec3 ink = vec3(0.04, 0.03, 0.05);
+  float G = 6.0 * uScale, B = 4.5 * uScale; // half a gutter (paper) and the ink border, in pixels
+  for (int i = 0; i < 5; i++) {
+    float at = T0 + DT * float(i), out0 = 0.6 + 0.07 * float(i);
+    float in1 = ss(at, at + 0.035, ph);
+    if (in1 <= 0.0) continue;
+    vec2 ctr = panelCentre(i);
+    // Slam: it lands from larger, fast; leave: it slides off the page outward.
+    float s = 1.0 + 0.35 * (1.0 - in1) * (1.0 - in1);
+    float go = ss(out0, out0 + 0.09, ph);
+    vec2 away = vec2(ctr.x < 0.5 ? -1.0 : 1.0, (ctr.y - 0.5) * 0.6) * 1.25 * go * go;
+    vec2 q = ctr + (page - ctr) / s - away;
+    if (q.x < 0.0 || q.x > 1.0 || q.y < 0.0 || q.y > 1.0 || panelOf(q) != i) continue;
+    float d = panelEdge(q, res);
+    float flash = (1.0 - ss(at + 0.035, at + 0.07, ph)) * 0.8;
+    vec3 art = panelArt(i, q, q * res, flash);
+    col = d < G ? vec3(1.0, 0.98, 0.94) : d < G + B ? ink : art;
+  }
+  // The burst at the middle of the cover: a jagged star in yellow and red, ink-outlined, and its word.
+  float pop = ss(0.36, 0.4, ph) * (1.0 - ss(0.62, 0.66, ph));
+  if (pop > 0.0) {
+    float S = tall ? A : 1.0;
+    vec2 c = (uv - 0.5) * vec2(A, 1.0) / S;
+    float rot = -0.12;
+    c = mat2(cos(rot), -sin(rot), sin(rot), cos(rot)) * c;
+    float sc = pop * (1.0 + 0.25 * (1.0 - ss(0.36, 0.42, ph)));
+    c /= max(sc, 1e-3);
+    float ang = atan(c.y, c.x) / 6.28318 + 0.5;
+    float sp = fract(ang * 14.0), si = floor(ang * 14.0);
+    float R = 0.27 * (0.72 + 0.28 * (1.0 - abs(sp - 0.5) * 2.0) * (0.6 + 0.4 * hash(vec2(si, 4.0))));
+    float r = length(c * vec2(0.85, 1.0));
+    float px = 1.5 * uScale / (uRes.y / S * max(sc, 1e-3));
+    vec3 burst = mix(vec3(0.93, 0.13, 0.17), vec3(1.0, 0.84, 0.08), ss(R * 0.55, R * 0.8, r));
+    burst = mix(burst, ink, ss(R - 0.012 - px, R - 0.012, r));
+    col = mix(col, burst, 1.0 - ss(R - px, R, r));
+    float w = powWord(c * 1.25) / 1.25;
+    col = mix(col, ink, 1.0 - ss(0.034, 0.034 + px, w));
+    col = mix(col, vec3(1.0, 0.96, 0.75), 1.0 - ss(0.017, 0.017 + px, w));
+  }
+  return col;
+}
+
 void main() {
   vec3 src = texture2D(inputBuffer, vUv).rgb;
-  gl_FragColor = vec4(uMode < 0.5 ? cloud(vUv, src) : uMode < 1.5 ? tech(vUv) : uMode < 2.5 ? storm(vUv, src) : flash(vUv, src), 1.0);
+  gl_FragColor = vec4(
+    uMode < 0.5 ? cloud(vUv, src) : uMode < 1.5 ? tech(vUv) : uMode < 2.5 ? storm(vUv, src) : uMode < 3.5 ? flash(vUv, src)
+    : uMode < 4.5 ? whip(vUv, src) : uMode < 5.5 ? bats(vUv, src) : comic(vUv, src), 1.0);
 }`
 
-const MODES = { cloud: 0, tech: 1, storm: 2, flash: 3 }
+const MODES = { cloud: 0, tech: 1, storm: 2, flash: 3, whip: 4, bats: 5, comic: 6 }
 
 export class LevelFxPass extends Pass {
   constructor(noise) {
@@ -352,7 +577,7 @@ export class LevelFxPass extends Pass {
     this.uniforms = this.fullscreenMaterial.uniforms
   }
 
-  /** kind: 'cloud' | 'tech' | 'storm' | 'flash'; phase 0..1 through the transition (0.5 = full cover). */
+  /** kind: 'cloud' | 'tech' | 'storm' | 'flash' | 'whip' | 'bats' | 'comic'; phase 0..1 through the transition (0.5 = full cover). */
   set(kind, phase, t) {
     this.uniforms.uMode.value = MODES[kind] ?? 0
     this.uniforms.uPhase.value = phase

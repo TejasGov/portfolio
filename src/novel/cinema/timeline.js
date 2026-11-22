@@ -188,15 +188,18 @@ export function stateAt(s, mouse, aspect) {
     }
   } else if (sec === 'five') {
     // The Big Screen. It opens where Four left you, in your seat with Four's last world on the screen:
-    // that fades to black, the projector flares white for a new reel and goes dark, the dive comes up on
-    // the screen and the camera pushes into it. Inside, three worlds swap under covering transitions
-    // (movies.js). It ends as a film does: the final plays on the screen and the camera backs out of it
+    // that fades to black, the projector flares white for a new reel and goes dark, the swing comes up on
+    // the screen and the camera pushes into it. Inside, six worlds swap under covering transitions
+    // (movies.js). It ends as a film does: the dance plays on the screen and the camera backs out of it
     // to your seat, where the epilogue begins.
-    const p = s.five
+    const P = s.five
     const IN = five.LEVELS[0].walk[0] // inside the screen from here
+    // The hall's moves keep their length in svh as the chapter grows: timed in the three-world chapter's
+    // P (where the push-in ended at 0.06 and the back-out ran 0.93..1), mapped from today's.
+    const p = P < IN ? (P / IN) * 0.06 : P > five.BACK ? 0.93 + ((P - five.BACK) / (1 - five.BACK)) * 0.07 : P
     inPos.copy(SCREEN).setZ(SCREEN.z - insideDistance(st.fov, aspect))
-    if (p < IN) {
-      const push = ss(0.035, IN, p)
+    if (P < IN) {
+      const push = ss(0.035, 0.06, p)
       // The screen's own light: the lamp dims with Four's world (so the bare screen is dark when it goes),
       // flares on the white leader, goes dark again, and is back under the dive (lighting only the haze).
       const flare = ss(0.012, 0.017, p) * (1 - ss(0.019, 0.025, p))
@@ -211,16 +214,17 @@ export function stateAt(s, mouse, aspect) {
         focus: 15, exposure: 3, lamp: 1.6 * (1 - ss(0.002, 0.012, p)) + 9 * flare + 1.6 * ss(0.025, 0.035, p),
         density: (0.08 + 0.3 * flare) * (1 - push), dust: (0.05 + 0.2 * flare) * (1 - push), bloom: 1 + 1.5 * flare,
       })
-    } else if (p > five.BACK) {
-      const back = ss(five.BACK, 0.995, p)
+    } else if (P > five.BACK) {
+      const back = ss(0.93, 0.995, p)
       st.game = { level: five.LAST, p: 1, onScreen: true, back, still: s.still }
       out.pos.copy(inPos).lerp(SEAT_POS, back)
       out.target.copy(SCREEN).lerp(SEAT_LOOK, back)
       Object.assign(st, { focus: 15, exposure: 3, lamp: 1.6, density: 0.08 * back, dust: 0.05 * back })
     } else {
-      st.game = five.levelAt(p, s.still) // { level, p (the world's own), kind, phase, cover }
+      st.game = five.levelAt(P, s.still) // { level, p (the world's own), kind, phase, cover }
       st.game.still = s.still // reduced motion: the transitions are cuts, the suit-up is shown finished
     }
+    st.game.pointer = mouse // the eased pointer, for a world's own parallax (the swing's perch)
   } else {
     const e = s.epilogue
     const u = ss(0.05, 1.0, e) // the dolly runs to the last frame, so the house never freezes under the panel

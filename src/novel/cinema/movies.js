@@ -2,34 +2,49 @@ import { PLATEAU, coverAt } from './levels'
 
 /*
  * Chapter Five's level map, in the shape of levels.js: one scroll (P, 0..1 through the chapter) plays
- * three original film-homage worlds, one at a time.
- *   hall     P 0     - 0.06   in the hall after Four's back-out: Four's last world fades off the screen,
- *                             the projector flares for a new reel, the dive comes up on the screen and the
- *                             camera pushes into it (timeline.js)
- *   dive     P 0.06  - 0.40   the dive (dive.js), its own p 0..1
- *   landing  P 0.42  - 0.66   the landing (landing.js), its own p 0..1
- *   final    P 0.68  - 0.93   the final (final.js), its own p 0..1
- *   back-out P 0.93  - 1      the final plays on the cinema's screen (p held at 1) and the camera backs out
- *                             into the hall, where the epilogue begins
+ * six fan-tribute film worlds, one at a time. The map is laid out in svh of scroll (each world's own
+ * length, the same gap and seam size between every two) and divided by the chapter's height, SVH, which
+ * ChapterFive.jsx uses for its section: so a world's pace per screen of scroll is set here alone.
+ *   hall     P 0      - 0.0276  in the hall after Four's back-out: Four's last world fades off the screen,
+ *                               the projector flares for a new reel, the swing comes up on the screen and
+ *                               the camera pushes into it (timeline.js)
+ *   swing    P 0.0276 - 0.2366  Spider-Man (swing.js)              500 svh
+ *   dive     P 0.2458 - 0.4381  Iron Man (dive.js)                 460 svh
+ *   landing  P 0.4473 - 0.5577  Thor (landing.js)                  264 svh (its length in 1100 svh before)
+ *   chase    P 0.5669 - 0.6923  The Dark Knight (chase.js)         300 svh
+ *   final    P 0.7015 - 0.8165  Argentina 2022 (final.js)          275 svh (as before)
+ *   dance    P 0.8257 - 0.9678  Deadpool & Wolverine (dance.js)    340 svh
+ *   back-out P 0.9678 - 1       the dance plays on the cinema's screen (p held at 1) and the camera backs
+ *                               out into the hall, where the epilogue begins
  * Between worlds a covering transition (levelfx.js) hides the swap: only one world is ever drawn.
- *   storm    P 0.375 - 0.445  full cover and the swap at 0.41
- *   flash    P 0.635 - 0.705  full cover and the swap at 0.67
+ *   whip     P 0.2251 - 0.2573  swap at 0.2412     swing -> dive
+ *   storm    P 0.4266 - 0.4588  swap at 0.4427     dive -> landing
+ *   bats     P 0.5462 - 0.5784  swap at 0.5623     landing -> chase
+ *   flash    P 0.6808 - 0.7130  swap at 0.6969     chase -> final
+ *   comic    P 0.8050 - 0.8372  swap at 0.8211     final -> dance
  * So each world is seen clear of its transitions only for part of its own p (CLEAR):
- *   dive 0..0.926, landing 0.104..0.896, final 0.1..1.
+ *   swing 0..0.945, dive 0.060..0.940, landing 0.104..0.896, chase 0.092..0.908, final 0.100..0.900,
+ *   dance 0.081..1. Each world's p reaches 1 a little before its seam's middle and holds there under
+ *   the full cover; the next starts at 0 just after it.
  */
-export const BACK = 0.93
-export const LEVELS = [
-  { name: 'dive', walk: [0.06, 0.4], top: 1 },
-  { name: 'landing', walk: [0.42, 0.66], top: 1 },
-  { name: 'final', walk: [0.68, BACK], top: 1 },
-]
+const HALL = 66, GAP = 22, HALF = 38.5, OUT = 77 // svh: the push-in, the gap between two walks, half a seam, the back-out
+const PLAN = [['swing', 500], ['dive', 460], ['landing', 264], ['chase', 300], ['final', 275], ['dance', 340]]
+const KINDS = ['whip', 'storm', 'bats', 'flash', 'comic'] // SEAMS[k] sits between LEVELS[k] and LEVELS[k + 1]
+/** The chapter's height in svh (ChapterFive.jsx's section): P runs over it, 'top bottom' to 'bottom bottom'. */
+export const SVH = HALL + PLAN.reduce((a, [, n]) => a + n, 0) + GAP * (PLAN.length - 1) + OUT
+/** How much shorter one svh of scroll is in P than it was at the three-world chapter's 1100 svh (timeline.js, the beats). */
+export const UNIT = 1100 / SVH
+export const LEVELS = []
+export const SEAMS = []
+for (let y = HALL, i = 0; i < PLAN.length; i++) {
+  const [name, len] = PLAN[i]
+  LEVELS.push({ name, walk: [y / SVH, (y + len) / SVH], top: 1 })
+  if (i < KINDS.length) SEAMS.push({ at: (y + len + GAP / 2) / SVH, half: HALF / SVH, kind: KINDS[i] })
+  y += len + GAP
+}
+export const BACK = LEVELS[LEVELS.length - 1].walk[1]
 export const FIRST = LEVELS[0].name
 export const LAST = LEVELS[LEVELS.length - 1].name
-// SEAMS[k] sits between LEVELS[k] and LEVELS[k + 1].
-export const SEAMS = [
-  { at: 0.41, half: 0.035, kind: 'storm' },
-  { at: 0.67, half: 0.035, kind: 'flash' },
-]
 
 /*
  * Each world's grade (world.js applies it, as levels.js GRADE; a world may override any of it by
@@ -37,7 +52,10 @@ export const SEAMS = [
  * worlds' own (sprites and shafts in their scenes); this is the frame's bloom, vignette, grain, scan.
  */
 export const GRADE = {
-  dive: { bloom: 0.7, threshold: 0.72, vignette: 0.55, grain: 0.5, scan: 0 }, // cool and filmic: the city's lights bloom
+  swing: { bloom: 0.8, threshold: 0.7, vignette: 0.4, grain: 0.3, scan: 0 }, // golden hour: soft bloom off the sun on glass and stone
+  chase: { bloom: 0.9, threshold: 0.62, vignette: 0.62, grain: 0.55, scan: 0 }, // sodium-orange night: fire and streetlights bloom, the dark holds
+  dance: { bloom: 0.45, threshold: 0.88, vignette: 0.22, grain: 0.12, scan: 0 }, // punchy comic colour: clean, flat, little vignette
+  dive:{ bloom: 0.7, threshold: 0.72, vignette: 0.55, grain: 0.5, scan: 0 }, // cool and filmic: the city's lights bloom
   landing: { bloom: 0.6, threshold: 0.8, vignette: 0.5, grain: 0.35, scan: 0 }, // dusky and stormy
   final: { bloom: 0.95, threshold: 0.68, vignette: 0.38, grain: 0.3, scan: 0 }, // warm floodlight, bloom on the confetti
 }
@@ -46,8 +64,8 @@ const clamp01 = x => Math.min(1, Math.max(0, x))
 
 /**
  * Where the chapter is at progress P (Five's worlds only: the hall and the back-out are timeline.js's).
- * Returns { i, level (its name), p (that world's own progress), kind ('storm' | 'flash' | null: the
- * transition on screen), phase (0..1 through it, 0.5 = the swap), cover (0..1..0) }.
+ * Returns { i, level (its name), p (that world's own progress), kind (a seam's kind, see KINDS, or null:
+ * the transition on screen), phase (0..1 through it, 0.5 = the swap), cover (0..1..0) }.
  * `still` (reduced motion): no transitions, the worlds cut.
  */
 export function levelAt(P, still = false) {
@@ -80,13 +98,24 @@ export const CLEAR = Object.fromEntries(LEVELS.map((L, i) => {
 
 if (import.meta.env?.DEV) {
   const near = (a, b) => Math.abs(a - b) < 1e-6
-  console.assert(PLATEAU[0] < 0.5 && PLATEAU[1] > 0.5, 'movies: plateau')
-  console.assert(levelAt(0.06).level === 'dive' && levelAt(0.06).p === 0 && levelAt(0.2).kind === null, 'movies: start')
-  console.assert(near(levelAt(0.4).p, 1) && levelAt(0.409).level === 'dive' && levelAt(0.4).kind === 'storm', 'movies: the dive ends under the storm')
-  console.assert(levelAt(0.41).level === 'landing' && levelAt(0.41).p === 0 && near(levelAt(0.41).cover, 1), 'movies: the swap is under full cover')
-  console.assert(levelAt(0.67).level === 'final' && levelAt(0.67).kind === 'flash' && near(levelAt(0.67).cover, 1) && levelAt(0.8).kind === null, 'movies: flash seam')
-  console.assert(levelAt(BACK).p === 1 && levelAt(1).p === 1 && levelAt(0.41, true).kind === null, 'movies: back-out, reduced motion')
-  console.assert(near(chapterP('dive', 1), 0.4) && near(levelAt(chapterP('landing', 0.4)).p, 0.4), 'movies: chapterP')
-  // Every swap is under full cover: on either side of a seam's middle the cover is whole.
-  for (const s of SEAMS) console.assert(near(levelAt(s.at - 1e-4).cover, 1) && near(levelAt(s.at + 1e-4).cover, 1), 'movies: the cover holds over the swap')
+  const names = LEVELS.map(l => l.name).join()
+  console.assert(names === 'swing,dive,landing,chase,final,dance' && SEAMS.map(s => s.kind).join() === 'whip,storm,bats,flash,comic', 'movies: running order')
+  console.assert(PLATEAU[0] < 0.5 && PLATEAU[1] > 0.5 && SVH === 2392 && near(BACK, 1 - OUT / SVH), 'movies: plateau, height')
+  console.assert(Object.keys(GRADE).length === LEVELS.length && LEVELS.every(l => GRADE[l.name]), 'movies: a grade per world')
+  const IN = LEVELS[0].walk[0]
+  console.assert(levelAt(IN).level === 'swing' && levelAt(IN).p === 0 && levelAt(IN + 0.05).kind === null, 'movies: start')
+  LEVELS.forEach((L, i) => {
+    const mid = (L.walk[0] + L.walk[1]) / 2
+    console.assert(levelAt(mid).level === L.name && levelAt(mid).kind === null && near(levelAt(L.walk[1]).p, 1), `movies: ${L.name} walks clear and ends at 1`)
+    console.assert(near(levelAt(chapterP(L.name, 0.4)).p, 0.4) && CLEAR[L.name][0] < 0.11 && CLEAR[L.name][1] > 0.89, `movies: ${L.name} chapterP, CLEAR`)
+    if (i < SEAMS.length) {
+      const s = SEAMS[i]
+      // The world ends under its seam, the next starts at 0 there, and the swap is under full cover.
+      console.assert(L.walk[1] < s.at && LEVELS[i + 1].walk[0] > s.at && levelAt(L.walk[1]).kind === s.kind, `movies: ${L.name} ends under the ${s.kind}`)
+      console.assert(levelAt(s.at).level === LEVELS[i + 1].name && levelAt(s.at).p === 0 && levelAt(s.at - 1e-6).level === L.name, `movies: the ${s.kind} swap`)
+      console.assert(near(levelAt(s.at - 1e-4).cover, 1) && near(levelAt(s.at + 1e-4).cover, 1) && levelAt(s.at, true).kind === null, `movies: the ${s.kind} cover holds over the swap; cut when still`)
+      if (i) console.assert(SEAMS[i - 1].at + SEAMS[i - 1].half < s.at - s.half, 'movies: seams never overlap')
+    }
+  })
+  console.assert(levelAt(BACK).level === LAST && levelAt(BACK).p === 1 && levelAt(1).p === 1 && levelAt(BACK).kind === null, 'movies: back-out')
 }

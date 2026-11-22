@@ -193,6 +193,37 @@ export function holdIn(bone, obj) {
   return obj
 }
 
+/**
+ * Dress a made traveller in a skinned suit (public/cinema/suits/<name>.glb, from scripts/cinema/suit_skin.py):
+ * each skinned mesh is re-bound to his own bones by name, so his mixer drives it, and added under his root.
+ * The suit's scene is left as loaded (geometry and materials are shared), so one load can dress many of him.
+ */
+export function wearSuit(travellerRoot, suitScene) {
+  const bones = {}
+  travellerRoot.traverse(o => { if (o.isBone) bones[o.name] = o })
+  const meshes = []
+  suitScene.traverse(o => {
+    if (!o.isSkinnedMesh) return
+    const mine = o.skeleton.bones.map(b => bones[b.name] ?? (() => { throw new Error(`wearSuit: no bone ${b.name}`) })())
+    const m = new THREE.SkinnedMesh(o.geometry, o.material)
+    m.name = o.name
+    m.frustumCulled = false
+    m.castShadow = true
+    m.bind(new THREE.Skeleton(mine, o.skeleton.boneInverses), o.bindMatrix)
+    meshes.push(m)
+  })
+  for (const m of meshes) travellerRoot.add(m)
+  return { meshes, setVisible: v => meshes.forEach(m => { m.visible = v }) }
+}
+
+/**
+ * One parsed suit per name for the whole page: two worlds wearing the same suit (the swing and the dive)
+ * share its geometry and maps on the GPU. Safe because wearSuit leaves the scene as loaded and
+ * world.release() keeps any texture another built world still holds. A failed load is forgotten.
+ */
+const suits = {}
+export const loadSuit = (loader, name) => (suits[name] ??= loader.loadAsync(`/cinema/suits/${name}.glb`).catch(e => { delete suits[name]; throw e }))
+
 /** A sprite of text drawn on a canvas (numerals, labels, HUD lines). */
 export function textSprite(text, { font = '620 semi-expanded 170px "Archivo Variable", sans-serif', color = '#fff', size = 1, glow = null, width = 512, height = 256, bg = null } = {}) {
   const c = document.createElement('canvas')

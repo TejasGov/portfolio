@@ -94,3 +94,44 @@ const STOPS = [
   { id: 'nyc', when: '2026', place: 'New York', orgs: ['Daiwa Capital Markets America'] },
 ]
 export const JOURNEY = STOPS.map(s => ({ ...s, roles: ALL_ROLES.filter(r => s.orgs.includes(r.org)).reverse() }))
+
+/*
+ * The box office (boxoffice/): every showing, as a programme. A group is the front door's ticket; its
+ * `showings` are the box office's (a group without them is its own one showing). `go` is where a ticket
+ * jumps: { chapter, i | k } for Book.jsx goTo, or { id } for goToId, with `or` when the id may not exist
+ * yet. `worlds` are the 3D worlds warmed (Stage.jsx 'novel:warm') before the jump.
+ */
+const FIVE = { chapter: 'five' }
+export const PROGRAMME = [
+  { id: 'about', screen: 'Screen 1', time: '1 min', title: 'About me', line: 'A scrapbook: who I am, where I’m from.', go: { chapter: 'one' } },
+  {
+    id: 'work', screen: 'Screen 2', time: '5 min', title: 'Now Showing', line: 'Five films of things I built, then the lobby.', go: { chapter: 'two', i: 0 },
+    showings: [
+      ...PROJECTS.map((p, i) => ({ id: p.id, time: '1 min', title: p.title, line: p.line, go: { chapter: 'two', i } })),
+      { id: 'also', time: '1 min', title: 'Also showing', line: 'Four more projects, one poster each.', go: { id: 'also' } },
+      { id: 'lab', time: '2 min', title: 'In the lab', line: 'Machine-learning experiments, with their results.', go: { id: 'lab' } },
+    ],
+  },
+  { id: 'worked', screen: 'Screen 3', time: '3 min', title: 'Places I worked', line: 'Prayagraj to New York, in six stops.', go: { id: 'three' }, worlds: ['journey'] },
+  {
+    id: 'games', screen: 'Screen 4', time: '4 min', title: 'Press Start', line: 'An ode to the games I grew up on.', go: { id: 'four' }, worlds: ['arcade'],
+    showings: [
+      { id: 'arcade', time: '1 min', title: 'Neon coast', line: 'A boardwalk at dusk. Reach the arcade.', go: { id: 'scene-arcade' }, worlds: ['arcade'] },
+      { id: 'blocks', time: '1 min', title: 'Block world', line: 'A wave turns the coast to blocks.', go: { id: 'scene-blocks' }, worlds: ['arcade'] },
+      { id: 'village', time: '1 min', title: 'The village', line: 'Clouds part on a village to build.', go: { id: 'scene-village' }, worlds: ['village'] },
+      { id: 'ops', time: '1 min', title: 'Night ops', line: 'A night exercise. Reach the helicopter.', go: { id: 'scene-ops' }, worlds: ['ops'] },
+    ],
+  },
+  {
+    id: 'screen', screen: 'Screen 5', time: '6 min', title: 'The Big Screen', line: 'A fan’s tribute: the scenes I’d jump into.', go: FIVE, worlds: ['swing'],
+    showings: [
+      { id: 'swing', time: '1 min', title: 'Spider-Man', line: 'Golden hour on a copper dome. One leap, then the swing.', go: { id: 'scene-swing', or: FIVE }, worlds: ['swing'] },
+      { id: 'dive', time: '1 min', title: 'Iron Man', line: 'Off the tower’s landing pad and into the suit.', go: { id: 'scene-dive', or: FIVE }, worlds: ['dive'] },
+      { id: 'landing', time: '1 min', title: 'Thor', line: 'Out of the lightning, Stormbreaker in hand.', go: { id: 'scene-landing', or: FIVE }, worlds: ['landing'] },
+      { id: 'chase', time: '1 min', title: 'The Dark Knight', line: 'A night chase under the tracks.', go: { id: 'scene-chase', or: FIVE }, worlds: ['chase'] },
+      { id: 'final', time: '1 min', title: 'Argentina 2022', line: 'The final, 18 December 2022.', go: { id: 'scene-final', or: FIVE }, worlds: ['final'] },
+      { id: 'dance', time: '1 min', title: 'Deadpool & Wolverine', line: 'Bye Bye Bye, and a snowy clearing full of henchmen.', go: { id: 'scene-dance', or: FIVE }, worlds: ['dance'] },
+    ],
+  },
+  { id: 'contact', screen: 'The lobby', time: '1 min', title: 'Contact', line: 'House lights up, and how to reach me.', go: { id: 'epilogue' } },
+]

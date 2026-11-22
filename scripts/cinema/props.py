@@ -1,0 +1,373 @@
+"""Chapter Five's props from the Meshy models (Blender 5.2, run from E:/portfolio):
+  B="C:/Program Files/Blender Foundation/Blender 5.2/blender.exe"; M=<folder with the Meshy GLBs>
+  "$B" -b --factory-startup --python scripts/cinema/props.py -- axe   $M/axe1.glb $M/axe2.glb public/cinema/landing/axe.glb
+  "$B" -b --factory-startup --python scripts/cinema/props.py -- bike  $M/batpod.glb public/cinema/chase/bike.glb
+  "$B" -b --factory-startup --python scripts/cinema/props.py -- bones $M/skeleton.glb public/cinema/dance/bones.glb
+
+axe:   Stormbreaker. axe1's gnarled branch handle (its own blade and lanyard cut away), axe2's crescent blade on one
+       side of the head and its square hammer block turned to stand out on the other, a forged cap on top.
+       Procedural maps baked in numpy (1024 px): weathered silver-grey forged metal with engraved runes (in the
+       normal, roughness and colour), dark bark with leather strap wraps round the grip. Node 'stormbreaker',
+       origin at the grip, haft along +Y (glTF), blade towards +X, hammer towards -X.
+bike:  the armoured bike at ~2.6 m, +Z forward (glTF), tyres on the ground (y = 0). Wheels cut out as their own
+       nodes 'wheel_front' / 'wheel_back', each with its origin on its axle (spin about local X); the rest is 'bike'.
+bones: the silver metal skeleton, 1.75 m, with three straight claws per hand; node 'bones', origin between the
+       feet on the floor, and an empty 'grip' at its right ankle (where a hand would hold it to swing it).
+Every output: Draco geometry, WebP maps at most 1024 px.
+"""
+import bpy, bmesh, sys, math, numpy as np
+from mathutils import Vector, Matrix
+
+a = sys.argv[sys.argv.index('--') + 1:]
+KIND, ARGS = a[0], a[1:]
+rng = np.random.default_rng(7)
+
+
+def clear():
+    for o in list(bpy.data.objects): bpy.data.objects.remove(o, do_unlink=True)
+
+
+def load(path):
+    keep = set(bpy.data.objects)
+    bpy.ops.import_scene.gltf(filepath=path)
+    m = next(o for o in bpy.data.objects if o not in keep and o.type == 'MESH')
+    for o in [o for o in bpy.data.objects if o not in keep and o is not m]: bpy.data.objects.remove(o, do_unlink=True)
+    m.parent = None
+    for o in bpy.context.selected_objects: o.select_set(False)
+    bpy.context.view_layer.objects.active = m; m.select_set(True)
+    bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
+    bm = bmesh.new(); bm.from_mesh(m.data)  # weld the UV-seam splits
+    bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=0.0005); bm.to_mesh(m.data); bm.free()
+    return m
+
+
+def co(m):
+    v = np.empty(len(m.data.vertices) * 3); m.data.vertices.foreach_get('co', v); return v.reshape(-1, 3)
+
+
+def set_co(m, V):
+    m.data.vertices.foreach_set('co', V.astype(np.float32).ravel()); m.data.update()
+
+
+def keep_faces(m, mask_fn):
+    """Delete faces whose centre fails mask_fn(centres) -> bool array."""
+    bm = bmesh.new(); bm.from_mesh(m.data); bm.faces.ensure_lookup_table()
+    C = np.array([f.calc_center_median() for f in bm.faces])
+    ok = mask_fn(C)
+    bmesh.ops.delete(bm, geom=[f for f, k in zip(bm.faces, ok) if not k], context='FACES')
+    bmesh.ops.delete(bm, geom=[v for v in bm.verts if not v.link_faces], context='VERTS')
+    bm.to_mesh(m.data); bm.free(); m.data.update()
+
+
+def decimate(m, tris):
+    n = sum(len(p.vertices) - 2 for p in m.data.polygons)
+    if n <= tris: return
+    for o in bpy.context.selected_objects: o.select_set(False)
+    bpy.context.view_layer.objects.active = m; m.select_set(True)
+    d = m.modifiers.new('d', 'DECIMATE'); d.ratio = tris / n
+    bpy.ops.object.modifier_apply(modifier='d')
+
+
+def image(name, arr, color=True):
+    """A float HxWx3/4 array (0..1, row 0 at the bottom) as a packed Blender image."""
+    h, w = arr.shape[:2]
+    if arr.shape[2] == 3: arr = np.dstack([arr, np.ones((h, w))])
+    img = bpy.data.images.new(name, w, h, alpha=False, is_data=not color)  # colour space first: changing it later blanks the pixels
+    img.pixels.foreach_set(np.clip(arr, 0, 1).astype(np.float32).ravel())
+    img.pack()
+    return img
+
+
+def pbr(name, base, rough_metal=None, normal=None, metallic=0.0, roughness=0.5, color=(0.8, 0.8, 0.8)):
+    """A Principled material the glTF exporter reads: base colour, (G roughness, B metallic) and normal maps."""
+    mat = bpy.data.materials.new(name)
+    nt = mat.node_tree; P = nt.nodes['Principled BSDF']
+    P.inputs['Metallic'].default_value = metallic; P.inputs['Roughness'].default_value = roughness
+    P.inputs['Base Color'].default_value = (*color, 1)
+    if base is not None:
+        t = nt.nodes.new('ShaderNodeTexImage'); t.image = base; nt.links.new(t.outputs['Color'], P.inputs['Base Color'])
+    if rough_metal is not None:
+        t = nt.nodes.new('ShaderNodeTexImage'); t.image = rough_metal
+        s = nt.nodes.new('ShaderNodeSeparateColor'); nt.links.new(t.outputs['Color'], s.inputs['Color'])
+        nt.links.new(s.outputs['Green'], P.inputs['Roughness']); nt.links.new(s.outputs['Blue'], P.inputs['Metallic'])
+    if normal is not None:
+        t = nt.nodes.new('ShaderNodeTexImage'); t.image = normal
+        nm = nt.nodes.new('ShaderNodeNormalMap'); nt.links.new(t.outputs['Color'], nm.inputs['Color'])
+        nt.links.new(nm.outputs['Normal'], P.inputs['Normal'])
+    return mat
+
+
+def normal_from_height(H, k):
+    gy, gx = np.gradient(H)
+    n = np.dstack([-gx * k, -gy * k, np.ones_like(H)])
+    n /= np.linalg.norm(n, axis=2, keepdims=True)
+    return n * 0.5 + 0.5
+
+
+def noise(size, scale, octaves=4):
+    """Smooth value noise in 0..1 (tileable), by upsampling random grids."""
+    out = np.zeros((size, size))
+    for o in range(octaves):
+        g = max(2, int(scale * 2 ** o))
+        r = rng.random((g, g))
+        idx = np.arange(size) * g / size
+        i0 = np.floor(idx).astype(int) % g; i1 = (i0 + 1) % g; f = idx - np.floor(idx); f = f * f * (3 - 2 * f)
+        rows = r[i0] * (1 - f)[:, None] + r[i1] * f[:, None]
+        out += (rows[:, i0] * (1 - f)[None, :] + rows[:, i1] * f[None, :]) / 2 ** o
+    out -= out.min(); return out / out.max()
+
+
+def set_uv(m, fn):
+    """Per-loop UVs from fn(vertex coords) -> Nx2."""
+    me = m.data
+    if not me.uv_layers: me.uv_layers.new(name='UVMap')
+    uv = me.uv_layers.active.data
+    li = np.empty(len(me.loops), int); me.loops.foreach_get('vertex_index', li)
+    U = fn(co(m))[li]
+    uv.foreach_set('uv', U.astype(np.float32).ravel())
+
+
+def export(objs, out):
+    for o in bpy.data.objects: o.select_set(o in objs)
+    bpy.ops.export_scene.gltf(filepath=out, export_format='GLB', use_selection=True, export_animations=False,
+        export_draco_mesh_compression_enable=True, export_draco_mesh_compression_level=6,
+        export_image_format='WEBP', export_image_quality=82)
+    print('PROP', out, [(o.name, sum(len(p.vertices) - 2 for p in o.data.polygons) if o.type == 'MESH' else 0) for o in objs])
+
+
+# ---------------------------------------------------------------------------------------------- Stormbreaker
+RUNES = [  # Elder-Futhark-like strokes in a 0..1 cell
+    [((0.3, 0), (0.3, 1)), ((0.3, 0.75), (0.7, 1)), ((0.3, 0.5), (0.7, 0.75))],
+    [((0.5, 0), (0.5, 1)), ((0.5, 0.65), (0.15, 0.95)), ((0.5, 0.65), (0.85, 0.95))],
+    [((0.3, 0), (0.3, 1)), ((0.3, 1), (0.7, 0.75)), ((0.7, 0.75), (0.3, 0.5)), ((0.3, 0.5), (0.7, 0.25)), ((0.7, 0.25), (0.3, 0))],
+    [((0.2, 0), (0.2, 1)), ((0.8, 0), (0.8, 1)), ((0.2, 1), (0.8, 0.5)), ((0.8, 1), (0.2, 0.5))],
+    [((0.5, 0), (0.5, 1)), ((0.2, 0.7), (0.8, 0.3))],
+    [((0.25, 1), (0.75, 0)), ((0.75, 1), (0.25, 0))],
+    [((0.5, 1), (0.2, 0.5)), ((0.2, 0.5), (0.5, 0)), ((0.5, 1), (0.8, 0.5)), ((0.8, 0.5), (0.5, 0))],
+    [((0.3, 0), (0.3, 1)), ((0.3, 1), (0.75, 0.7)), ((0.75, 0.7), (0.3, 0.45)), ((0.3, 0.45), (0.75, 0))],
+    [((0.5, 0), (0.5, 1)), ((0.5, 1), (0.85, 0.7)), ((0.5, 0.6), (0.15, 0.3))],
+]
+
+
+def engrave(H, x0, y0, cell, rune, width):
+    """Cut a rune's strokes into the height field H (pixels; y up)."""
+    ys, xs = np.mgrid[0:H.shape[0], 0:H.shape[1]]
+    sl = (slice(max(0, int(y0 - width)), int(y0 + cell * 1.6 + width)), slice(max(0, int(x0 - width)), int(x0 + cell + width)))
+    py, px = ys[sl], xs[sl]
+    d = np.full(py.shape, 1e9)
+    for (ax, ay), (bx, by) in rune:
+        A = np.array([x0 + ax * cell, y0 + ay * cell * 1.6]); Bp = np.array([x0 + bx * cell, y0 + by * cell * 1.6])
+        ab = Bp - A; t = np.clip(((px - A[0]) * ab[0] + (py - A[1]) * ab[1]) / (ab @ ab), 0, 1)
+        d = np.minimum(d, np.hypot(px - A[0] - t * ab[0], py - A[1] - t * ab[1]))
+    H[sl] = np.minimum(H[sl], np.clip(d / width, 0, 1) ** 0.6 - 1 + 1)  # 0 in the groove, 1 outside
+
+
+def axe(p1, p2, out):
+    S = 1024
+    # The handle: axe1 minus its blade (x < -0.07) and its hanging lanyard; its axis from pommel to head.
+    h = load(p1)
+    zc = lambda x: 0.12 + (x + 0.07) * (0.45 - 0.12) / 1.02  # the branch's centre line (it rises towards the pommel)
+    keep_faces(h, lambda C: (C[:, 0] > -0.07) & ~((C[:, 0] > 0.5) & (C[:, 0] < 0.8) & (C[:, 2] < zc(C[:, 0]) - 0.11)))
+    V = co(h)
+    top, bot = V[V[:, 0] < -0.04].mean(0), V[V[:, 0] > 0.92].mean(0)
+    ax = Vector(top - bot).normalized()
+    R = ax.rotation_difference(Vector((0, 0, 1))).to_matrix().to_4x4()
+    h.data.transform(R @ Matrix.Translation(-Vector(bot)))
+    V = co(h); L = V[:, 2].max()
+    # 0.70 m long, ~4.5 cm thick: a branch, not a log.
+    s = 0.70 / L; V[:, 2] *= s; V[:, :2] *= s * 0.5
+    set_co(h, V)
+    decimate(h, 6000)
+
+    # The head: axe2 above its grip (blade, haft collar with straps, block), scaled to the handle.
+    hd = load(p2)
+    keep_faces(hd, lambda C: C[:, 2] > -0.14)
+    V = co(hd)
+    blk = V[:, 2] > 0.69
+    # Turn the hammer block a quarter about Y so it stands out on the side opposite the blade, level with it.
+    piv = np.array([0.11, 0, 0.69])
+    d = V[blk] - piv; V[blk] = piv + np.c_[d[:, 2], d[:, 1], -d[:, 0]] + [0.08 + 0.0, 0, -0.30]
+    V[:, 0] -= 0.10  # haft on the axis
+    k = 0.40  # axe2 units -> metres
+    V *= k; V[:, 0] *= -1  # blade towards +X (Blender), block towards -X
+    V[:, 2] += 0.70 - (-0.14 * k) - 0.06 * k * 0  # the head sits on top of the branch
+    V[:, 2] -= 0.05
+    set_co(hd, V)
+    decimate(hd, 9000)
+
+    # A forged cap where the block used to sit.
+    Vt = co(hd); top = Vt[np.abs(Vt[:, 0]) < 0.03]; ztop = top[:, 2].max()
+    rtop = np.hypot(*top[top[:, 2] > ztop - 0.01][:, :2].T).max() + 0.004
+    bpy.ops.mesh.primitive_cylinder_add(vertices=24, radius=rtop, depth=0.024, location=(0, 0, ztop))
+    cap = bpy.context.object
+    print('HEAD', co(hd).min(0).round(3), co(hd).max(0).round(3), 'HANDLE', co(h).min(0).round(3), co(h).max(0).round(3))
+
+    # ---- maps
+    # Metal: planar UVs seen from the side (x, z), so the runes lie flat on the blade's faces.
+    Vh = np.concatenate([co(hd), co(cap)])
+    lo, size = Vh.min(0), (Vh.max(0) - Vh.min(0))[[0, 2]].max()
+    planar = lambda P: np.c_[(P[:, 0] - lo[0]) / size, (P[:, 2] - lo[2]) / size]
+    set_uv(hd, planar); set_uv(cap, planar)
+    Hm = np.ones((S, S))
+    # A column of runes down the blade's broad face, near the haft, and a short one on the block.
+    blade_u = lambda x: (x - lo[0]) / size * S
+    zr = lambda z: (z - lo[2]) / size * S
+    BV = co(hd)
+    bz = BV[BV[:, 0] > 0.04 * 1][:, 2]
+    cell = S * 0.028
+    y = zr(bz.max()) - cell * 2.6
+    i = 0
+    while y > zr(bz.min()) + cell * 1.5:
+        engrave(Hm, blade_u(0.06), y, cell, RUNES[i % len(RUNES)], 2.2); y -= cell * 1.9; i += 1
+    kz = BV[BV[:, 0] < -0.05][:, 2]
+    y = zr(kz.mean()) + cell * 0.8
+    for j in range(2):
+        engrave(Hm, blade_u(-0.085), y, cell * 0.8, RUNES[(i + j * 3) % len(RUNES)], 1.8); y -= cell * 1.6
+    rune = 1 - Hm
+    scratches = np.zeros((S, S))
+    for _ in range(220):
+        x0, y0 = rng.random(2) * S; ang = rng.random() * math.pi; ln = rng.random() * 60 + 10
+        t = np.linspace(0, 1, int(ln)); xs = (x0 + np.cos(ang) * ln * t).astype(int) % S; ys = (y0 + np.sin(ang) * ln * t).astype(int) % S
+        scratches[ys, xs] = rng.random() * 0.6 + 0.4
+    wear = noise(S, 6)
+    hammer = noise(S, 40, 2)  # forge-hammered dimples
+    Hmetal = Hm * 1.0 + hammer * 0.25 - scratches * 0.15
+    grey = 0.55 + 0.12 * (wear - 0.5) - 0.18 * rune - 0.05 * (1 - hammer) + 0.06 * scratches
+    mbase = np.dstack([grey * 0.97, grey * 0.98, grey * 1.02])
+    mrm = np.dstack([np.zeros((S, S)), np.clip(0.32 + 0.25 * wear + 0.35 * rune - 0.1 * scratches, 0.15, 0.9), np.clip(1 - 0.6 * rune, 0, 1)])
+    metal = pbr('stormbreaker_metal', image('sb_metal_base', mbase), image('sb_metal_rm', mrm, False), image('sb_metal_n', normal_from_height(Hmetal, 3.5), False))
+
+    # Wood: cylindrical UVs (round the haft, along it); bark grooves along the grain, leather wraps over the grip.
+    Vw = co(h); zl = Vw[:, 2].max()
+    set_uv(h, lambda P: np.c_[(np.arctan2(P[:, 1], P[:, 0]) / (2 * math.pi)) % 1.0, P[:, 2] / zl])
+    u = np.linspace(0, 1, S)[None, :].repeat(S, 0); v = np.linspace(0, 1, S)[:, None].repeat(S, 1)
+    grain = noise(S, 3, 3)[:, ::1]
+    streak = np.sin((u * 26 + noise(S, 4, 2) * 3.0) * 2 * math.pi) * 0.5 + 0.5
+    Hb = 0.55 * streak ** 3 + 0.3 * grain + 0.15 * noise(S, 30, 2)
+    bark = np.dstack([0.20 + 0.10 * Hb, 0.12 + 0.07 * Hb, 0.07 + 0.04 * Hb]) * (0.75 + 0.25 * noise(S, 5, 3))[..., None]
+    rough = 0.82 - 0.15 * Hb
+    # Wraps: diagonal leather bands from 0.08 to 0.42 of the haft (the grip), with a dark seam between turns.
+    zone = (v > 0.08) & (v < 0.42)
+    turn = ((u + v * 0.70 / 0.03) % 1.0)
+    band = zone & (turn < 0.82)
+    leather = np.dstack([0.13 + 0 * u, 0.075 + 0 * u, 0.045 + 0 * u]) * (0.85 + 0.3 * noise(S, 12, 2))[..., None]
+    base = np.where(band[..., None], leather, bark)
+    Hw = np.where(band, 0.9 + 0.1 * np.sin(turn / 0.82 * math.pi), np.where(zone, 0.2, Hb * 0.8))
+    rough = np.where(band, 0.55, rough)
+    wrm = np.dstack([np.zeros((S, S)), rough, np.zeros((S, S))])
+    wood = pbr('stormbreaker_wood', image('sb_wood_base', base), image('sb_wood_rm', wrm, False), image('sb_wood_n', normal_from_height(Hw, 6.0), False))
+
+    for o, mt in ((hd, metal), (cap, metal), (h, wood)):
+        o.data.materials.clear(); o.data.materials.append(mt)
+    # The head's haft collar (straps round it in axe2) is wood too: faces near the axis between blade and block.
+    bm = bmesh.new(); bm.from_mesh(hd.data)
+    hd.data.materials.append(wood)
+    for f in bm.faces:
+        c = f.calc_center_median()
+        if abs(c.x) < 0.075 * k * 1.05 * 1.0 + 0.004: f.material_index = 1
+    bm.to_mesh(hd.data); bm.free()
+
+    for o in bpy.context.selected_objects: o.select_set(False)
+    for o in (h, hd, cap): o.select_set(True)
+    bpy.context.view_layer.objects.active = h
+    bpy.ops.object.join()
+    h.name = h.data.name = 'stormbreaker'
+    # Origin at the grip: 0.13 m up the haft from the pommel.
+    h.data.transform(Matrix.Translation((0, 0, -0.13)))
+    export([h], out)
+
+
+# ---------------------------------------------------------------------------------------------- the bike
+def bike(src, out):
+    m = load(src)
+    V = co(m)
+    # Front (the long fork) is -X in the Meshy file; turn it to -Y (glTF +Z), scale to 2.6 m, tyres on the floor.
+    s = 2.6 / np.ptp(V[:, 0])
+    m.data.transform(Matrix.Rotation(math.pi / 2, 4, 'Z') @ Matrix.Scale(s, 4))
+    V = co(m); V[:, 2] -= V[:, 2].min(); V[:, 0] -= (V[:, 0].max() + V[:, 0].min()) / 2; set_co(m, V)
+    for img in bpy.data.images:
+        if img.size[0] > 1024: img.scale(1024, 1024)
+    V = co(m)
+    ys = V[:, 1]
+    objs = [m]
+    for name, sign in (('wheel_front', -1), ('wheel_back', 1)):
+        end = ys.min() if sign < 0 else ys.max()
+        r = V[(ys - end) * sign > -0.45][:, 2].max() / 2  # the tyre's top over two (tyres sit on the floor)
+        hub = np.array([0, end - sign * r, r])
+        C = np.array([p.center for p in m.data.polygons])
+        d = np.hypot(C[:, 1] - hub[1], C[:, 2] - hub[2])
+        far = np.zeros(len(m.data.vertices), bool)  # a face reaching outside the tyre belongs to the frame
+        P = co(m); far[np.hypot(P[:, 1] - hub[1], P[:, 2] - hub[2]) > 1.03 * r] = True
+        lv = np.empty(len(m.data.loops), int); m.data.loops.foreach_get('vertex_index', lv)
+        ls = np.empty(len(m.data.polygons), int); m.data.polygons.foreach_get('loop_start', ls)
+        out_f = np.maximum.reduceat(far[lv].astype(int), ls).astype(bool)
+        sel = (d > 0.56 * r) & (d < 1.03 * r) & (np.abs(C[:, 0]) < 0.22) & ~out_f  # tyre and rim; forks ride outside
+        print(name, 'hub', hub.round(3), 'r', round(r, 3), 'faces', int(sel.sum()))
+        for o in bpy.context.selected_objects: o.select_set(False)
+        bpy.context.view_layer.objects.active = m; m.select_set(True)
+        before = set(bpy.data.objects)
+        bpy.ops.object.mode_set(mode='EDIT'); bpy.ops.mesh.select_mode(type='FACE'); bpy.ops.mesh.select_all(action='DESELECT')
+        bpy.ops.object.mode_set(mode='OBJECT')
+        m.data.polygons.foreach_set('select', sel); m.data.update()
+        bpy.ops.object.mode_set(mode='EDIT'); bpy.ops.mesh.separate(type='SELECTED'); bpy.ops.object.mode_set(mode='OBJECT')
+        w = next(o for o in bpy.data.objects if o not in before)
+        w.name = w.data.name = name
+        # Origin on the axle, so the wheel spins about its local X.
+        w.data.transform(Matrix.Translation(-Vector(hub))); w.location = Vector(hub)
+        decimate(w, 3000)
+        objs.append(w)
+    decimate(m, 18000)
+    m.name = m.data.name = 'bike'
+    export(objs, out)
+
+
+# ---------------------------------------------------------------------------------------------- the skeleton
+def bones(src, out):
+    m = load(src)
+    V = co(m)
+    s = 1.75 / np.ptp(V[:, 2]); V *= s; V[:, 2] -= V[:, 2].min(); V[:, :2] -= V[:, :2].mean(0) * [1, 0]; set_co(m, V)
+    decimate(m, 16000)
+    V = co(m)
+    claws = []
+    for side in (1, -1):
+        arm = V[(V[:, 0] * side > 0.2) & (V[:, 2] > 0.5) & (V[:, 2] < 1.1)]
+        tip = arm[arm[:, 2].argmin()]  # the fingertips (the hands hang at his sides)
+        hand = arm[arm[:, 2] < tip[2] + 0.2]
+        wrist = hand[hand[:, 2] > tip[2] + 0.15].mean(0)
+        knuck = hand[(hand[:, 2] > tip[2] + 0.06) & (hand[:, 2] < tip[2] + 0.1)].mean(0)
+        dirv = Vector(tip - wrist).normalized()
+        print('HAND', side, tip.round(3), knuck.round(3), wrist.round(3))
+        for j in (-1, 0, 1):
+            bm = bmesh.new()
+            L, w, t = 0.30, 0.014, 0.004
+            prof = [(-w / 2, -t / 2), (w / 2, -t / 2), (w / 2, t / 2), (-w / 2, t / 2)]
+            base = [bm.verts.new((x, y, 0)) for x, y in prof]
+            mid = [bm.verts.new((x, y, L * 0.85)) for x, y in prof]
+            pt = bm.verts.new((0, 0, L))
+            for i in range(4):
+                bm.faces.new((base[i], base[(i + 1) % 4], mid[(i + 1) % 4], mid[i]))
+                bm.faces.new((mid[i], mid[(i + 1) % 4], pt))
+            bm.faces.new(list(reversed(base)))
+            me = bpy.data.meshes.new('claw'); bm.to_mesh(me); bm.free()
+            o = bpy.data.objects.new('claw', me); bpy.context.collection.objects.link(o)
+            # Along the hand, from the knuckles, the three side by side across the knuckle line (front to back).
+            rot = Vector((0, 0, 1)).rotation_difference(dirv).to_matrix().to_4x4()
+            o.matrix_world = Matrix.Translation(Vector(knuck) + Vector((0, j * 0.022, 0)) - dirv * 0.03) @ rot
+            claws.append(o)
+    silver = pbr('adamantium', None, metallic=1.0, roughness=0.3, color=(0.78, 0.8, 0.84))
+    for o in [m] + claws:
+        o.data.materials.clear(); o.data.materials.append(silver)
+    for o in bpy.context.selected_objects: o.select_set(False)
+    for o in [m] + claws: o.select_set(True)
+    bpy.context.view_layer.objects.active = m
+    bpy.ops.object.join(); bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
+    m.name = m.data.name = 'bones'
+    V = co(m)
+    foot = V[(V[:, 0] < -0.03) & (V[:, 2] < 0.14) & (V[:, 2] > 0.08)].mean(0)  # his right ankle (-X)
+    g = bpy.data.objects.new('grip', None); bpy.context.collection.objects.link(g)
+    g.location = Vector(foot); g.parent = m
+    export([m, g], out)
+
+
+clear()
+{'axe': axe, 'bike': bike, 'bones': bones}[KIND](*ARGS)

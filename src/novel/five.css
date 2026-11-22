@@ -18,18 +18,40 @@
   pointer-events: none;
   background: radial-gradient(closest-side, rgb(4 6 12 / 0.7), rgb(4 6 12 / 0.55) 55%, rgb(4 6 12 / 0));
 }
-.five-kicker {
+.five-kicker,
+.five-fan {
   text-shadow: 0 4px 50px rgb(3 5 11 / 0.95), 0 1px 3px rgb(3 5 11 / 0.8);
 }
 /* A phone: the title stays low, under the tower's crown and blade; the slates go low too, under him on
-   the roof edge; the caption clears the folio pill. */
+   the roof edge (but the swing's stays up, under the header: he crouches low in that frame); the caption
+   clears the folio pill. */
 @media (max-width: 760px) and (orientation: portrait) {
-  .five-slate {
+  .five-slate:not(.five-top) {
     align-self: end;
     margin-bottom: 40px;
   }
   .five-caption {
     margin-bottom: 40px;
+  }
+  /* The swing's slate: just under the header and compact (the skip link beside the name), so it ends
+     above his head on the finial on tall and short phones alike. */
+  .five-slate.five-top {
+    margin-top: calc(72px - 13svh);
+    padding: 12px 16px;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: center;
+    column-gap: 12px;
+  }
+  .five-top > :first-child {
+    grid-column: 1 / -1;
+  }
+  .five-top > :nth-child(2) {
+    font-size: 1.5rem; /* "Spider-Man" on one line beside the link */
+    white-space: nowrap;
+  }
+  .five-top > a {
+    margin-top: 0;
   }
 }
 

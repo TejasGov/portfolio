@@ -2,21 +2,12 @@ import { useEffect, useRef, useState } from 'react'
 import { store } from './lib/store'
 import { sound } from './lib/sound'
 import { reducedMotion } from './lib/scroll'
-import { ALSO_BUILT, ALSO_SHOWING, CONTACT, JOURNEY, LAB, PROJECTS, RESUME } from './content'
+import { BoxOffice, DOOR, openBoxOffice } from './boxoffice/BoxOffice'
+import { UNIT } from './cinema/movies'
+import { ALSO_BUILT, ALSO_SHOWING, CONTACT, JOURNEY, LAB, RESUME } from './content'
 
-export const CONTENTS = [
-  { id: 'prologue', n: '—', title: 'Prologue', sub: 'Lights down' },
-  { id: 'one', n: 'I', title: 'About me', sub: 'Who I am, where I’m from' },
-  { id: 'two', n: 'II', title: 'Now Showing', sub: 'Five films, and more' },
-  { id: 'three', n: 'III', title: 'Places I Worked', sub: 'Prayagraj to New York' },
-  { id: 'four', n: 'IV', title: 'Press Start', sub: 'An ode to games' },
-  { id: 'five', n: 'V', title: 'The Big Screen', sub: 'Heroes, and a final' },
-  { id: 'epilogue', n: '—', title: 'Epilogue', sub: 'House lights' },
-]
-
-// Deep links for the Contents: every film, and every role newest first (Daiwa first).
-const FILMS_TOC = PROJECTS.map((p, i) => ({ key: p.id, label: p.title, chapter: 'two', i }))
-// ...then the lobby after the films: the poster wall and the lab's index.
+// The box office's "Full contents": only what its tickets don't cover. Every role newest first (Daiwa first),
+// then the lobby after the films: each poster on the wall and each entry in the lab's index.
 const LOBBY_TOC = [['Also showing', ALSO_SHOWING.map(p => ({ id: `also-${p.id}`, label: p.title }))], ['In the lab', LAB.map(p => ({ id: `lab-${p.id}`, label: p.title }))]]
 const ROLES_TOC = [...JOURNEY].reverse().flatMap((s, r) => [...s.roles].reverse().map(x => ({ key: `${x.org}·${x.role}`, label: `${x.role} · ${x.org} · ${x.period}`, chapter: 'three', k: JOURNEY.length - 1 - r })))
 
@@ -37,10 +28,10 @@ function land(el) {
 }
 const jumpKey = ({ chapter, i, k }) => `${chapter}${i ?? k ?? ''}`
 
-export function goToId(id) {
+export function goToId(id, behavior = glide()) {
   closeContents()
   const el = document.getElementById(id)
-  el?.scrollIntoView({ behavior: glide() })
+  el?.scrollIntoView({ behavior })
   land(el)
 }
 // The exact scroll where an item's card is opaque, from each chapter's progress range (lib/chapters useProgress).
@@ -55,7 +46,7 @@ export function goTo(to, behavior = glide()) {
     : chapter === 'two'
     ? top + (h - innerHeight) * (0.15 + (i + 0.5) * 0.14) // 'top top' → 'bottom bottom'; the middle of film i
     : chapter === 'five'
-    ? top - innerHeight + h * 0.035 // 'top bottom' → 'bottom bottom'; the title card over the push into the screen, before the tower's wide shot
+    ? top - innerHeight + h * 0.03 * UNIT // 'top bottom' → 'bottom bottom'; the middle of the title card's opaque window (ChapterFive.jsx BEATS[0]), before the perch
     : top - innerHeight + h * ((k + (k ? 0.6 : 0.85)) / JOURNEY.length) // 'top bottom' → 'bottom bottom'; inside every stop's opaque window, the last one's too; the first lands after the chapter sticks (a phone's sheet is still rising before)
   scrollTo({ top: y, behavior })
   // The item's Jump (its next Tab enters the card's links), else the chapter itself.
@@ -104,6 +95,7 @@ export default function Book() {
   useEffect(() => sound.subscribe(setAudible), [])
   const page = useRef(null)
   const dialog = useRef(null)
+  const box = useRef(null)
   // Paper: a paper chapter covers the screen (store.night), or Chapter Three's paper-coloured world is up.
   const sheet = !night || label.endsWith('Also showing') // a paper page in the DOM (the lobby is a paper sheet over a live stage)
   const paper = sheet || label.startsWith('Chapter Three')
@@ -113,9 +105,15 @@ export default function Book() {
   useEffect(() => {
     const fn = (key, value) => (key === 'chapterLabel' ? setLabel(value) : key === 'night' ? setNight(value) : key === 'bright' && setBright(!!value))
     store.listeners.add(fn)
-    let raf, land = true
+    let raf, land = true, pulse = 0
     const tick = () => {
       if (land !== store.prologue < 0.09) setLanding((land = !land)) // once the poster has wiped out (Prologue.jsx BEATS[0])
+      // Scrolled down past the front door: one brass pulse on the header's Box office, where it lives from now on.
+      if (pulse === 0 && store.prologue < DOOR[0]) pulse = 1
+      else if (pulse === 1 && store.prologue > DOOR[1]) {
+        pulse = 2
+        box.current?.classList.add('bo-pulse')
+      }
       const max = document.documentElement.scrollHeight - innerHeight
       const n = 1 + Math.round((scrollY / Math.max(1, max)) * 95)
       if (page.current && page.current.dataset.n !== String(n)) {
@@ -152,15 +150,15 @@ export default function Book() {
             {/* On a phone the icon alone says it. */}
             <span className="hidden md:inline" aria-hidden="true">Sound {audible ? 'on' : 'off'}</span>
           </button>
-          {/* Desktop only: a phone's header has room for four pills, and its Contents carries the résumé. */}
+          {/* Desktop only: a phone's header has room for four pills, and its Box office carries the résumé. */}
           <a href={RESUME} target="_blank" rel="noreferrer" className={`kicker pointer-events-auto hidden min-h-11 items-center underline-offset-4 hover:underline lg:inline-flex ${PILL}`}>
             Résumé
           </a>
           <a href={`mailto:${CONTACT.email}`} className={`kicker pointer-events-auto underline-offset-4 hover:underline ${TAP}`}>
             Email
           </a>
-          <button type="button" data-contents onClick={() => dialog.current?.showModal()} className={`kicker pointer-events-auto underline-offset-4 hover:underline ${TAP}`}>
-            Contents
+          <button ref={box} type="button" aria-haspopup="dialog" onClick={openBoxOffice} className={`kicker pointer-events-auto underline-offset-4 hover:underline ${TAP}`}>
+            Box office
           </button>
         </div>
       </header>
@@ -168,67 +166,12 @@ export default function Book() {
         p. 01 / 96
       </p>
 
-      <dialog
-        ref={dialog}
-        aria-label="Contents"
-        onClick={e => e.target === dialog.current && dialog.current.close()}
-        className="paper m-auto w-[min(34rem,calc(100vw-2rem))] p-0 shadow-[0_30px_80px_rgb(0_0_0/0.45)] backdrop:bg-black/50"
-      >
-        <div className="p-8 md:p-10">
-          <div className="flex items-baseline justify-between">
-            <p className="font-display text-3xl tracking-[-0.01em]">Contents</p>
-            <button type="button" autoFocus onClick={() => dialog.current?.close()} className="kicker inline-flex min-h-11 items-center px-2 underline-offset-4 hover:underline">
-              Close
-            </button>
-          </div>
-          <ol className="mt-8 space-y-1">
-            {CONTENTS.map(c => (
-              <li key={c.id}>
-                {/* Under 480px the subtitle stacks under the title instead of squeezing the leader to a stub. */}
-                <button type="button" onClick={() => (c.id === 'five' ? goTo({ chapter: 'five' }) : goToId(c.id))} className="group flex w-full flex-wrap items-baseline gap-x-4 py-2 text-left min-[480px]:flex-nowrap">
-                  <span className="kicker w-8 opacity-60">{c.n}</span>
-                  <span className="font-display text-xl whitespace-nowrap group-hover:text-stamp">{c.title}</span>
-                  <span className="mx-2 hidden flex-1 border-b border-dotted border-ink/30 min-[480px]:block" aria-hidden="true" />
-                  <span className="block basis-full pl-12 font-serif text-sm opacity-70 min-[480px]:basis-auto min-[480px]:pl-0">{c.sub}</span>
-                </button>
-                {(c.id === 'two' || c.id === 'three') && (
-                  <ul className="mb-2 ml-12">
-                    {(c.id === 'two' ? FILMS_TOC : ROLES_TOC).map(t => (
-                      <li key={t.key}>
-                        <button type="button" onClick={() => goTo(t)} className="flex min-h-11 w-full items-center text-left font-serif text-[15px] leading-snug underline-offset-4 hover:underline">
-                          {t.label}
-                        </button>
-                      </li>
-                    ))}
-                    {c.id === 'two' && LOBBY_TOC.map(([name, items]) => (
-                      <li key={name} className="flex flex-wrap items-center gap-x-3 font-serif text-[15px] leading-snug">
-                        <span className="basis-full pt-2 opacity-60">{name}</span>
-                        {items.map(t => (
-                          <button key={t.id} type="button" onClick={() => goToId(t.id)} className="inline-flex min-h-11 items-center text-left underline underline-offset-4 hover:opacity-70">
-                            {t.label}
-                          </button>
-                        ))}
-                      </li>
-                    ))}
-                    {c.id === 'two' && (
-                      <li className="flex min-h-11 flex-wrap items-center gap-x-3 font-serif text-[15px] leading-snug">
-                        {/* Under 480px the label takes its own line, so the two links never split across rows. */}
-                        <span className="basis-full pt-2 opacity-60 min-[480px]:basis-auto min-[480px]:pt-0">Also built</span>
-                        {ALSO_BUILT.map(p => (
-                          <a key={p.title} href={p.href} target="_blank" rel="noreferrer" className="inline-flex min-h-11 items-center underline underline-offset-4 hover:opacity-70">
-                            {p.title} ↗
-                          </a>
-                        ))}
-                      </li>
-                    )}
-                  </ul>
-                )}
-              </li>
-            ))}
-          </ol>
-          <div className="mt-8 border-t border-ink/15 pt-5">
+      {/* The box office (boxoffice/): the tickets, then a way to write, then a quiet collapsed "Full contents". */}
+      <BoxOffice dialogRef={dialog}>
+        <div className="p-6 md:p-10">
+          <div>
             <p className="kicker opacity-60">Write to me</p>
-            <a href={`mailto:${CONTACT.email}`} className="mt-3 flex min-h-11 w-full items-center justify-center border border-ink/30 px-4 py-2 font-display text-lg break-all hover:bg-ink min-[480px]:text-2xl hover:text-paper">
+            <a href={`mailto:${CONTACT.email}`} className="mt-3 flex min-h-11 w-full items-center justify-center border border-ink/30 px-4 py-2 font-display text-[clamp(14px,4.6vw,18px)] whitespace-nowrap hover:bg-ink min-[480px]:text-2xl hover:text-paper">
               {CONTACT.email}
             </a>
             <ul className="kicker mt-2 flex flex-wrap gap-x-4">
@@ -241,11 +184,46 @@ export default function Book() {
               ))}
             </ul>
           </div>
-          <p className="mt-6 border-t border-ink/15 pt-5 font-serif opacity-80">
+          <details className="mt-6 border-t border-ink/15 pt-3">
+            <summary className="flex min-h-11 cursor-pointer items-center font-display text-xl tracking-[-0.01em] hover:text-stamp">Full contents</summary>
+            <div className="space-y-4 pb-2 font-serif text-[15px] leading-snug">
+              <div>
+                <p className="kicker pt-2 opacity-60">Places I worked</p>
+                <ul>
+                  {ROLES_TOC.map(t => (
+                    <li key={t.key}>
+                      <button type="button" onClick={() => goTo(t)} className="flex min-h-11 w-full items-center text-left underline-offset-4 hover:underline">
+                        {t.label}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              {LOBBY_TOC.map(([name, items]) => (
+                <div key={name} className="flex flex-wrap items-center gap-x-3">
+                  <p className="kicker basis-full pt-2 opacity-60">{name}</p>
+                  {items.map(t => (
+                    <button key={t.id} type="button" onClick={() => goToId(t.id)} className="inline-flex min-h-11 items-center text-left underline underline-offset-4 hover:opacity-70">
+                      {t.label}
+                    </button>
+                  ))}
+                </div>
+              ))}
+              <div className="flex flex-wrap items-center gap-x-3">
+                <p className="kicker basis-full pt-2 opacity-60">Also built</p>
+                {ALSO_BUILT.map(p => (
+                  <a key={p.title} href={p.href} target="_blank" rel="noreferrer" className="inline-flex min-h-11 items-center underline underline-offset-4 hover:opacity-70">
+                    {p.title} ↗
+                  </a>
+                ))}
+              </div>
+            </div>
+          </details>
+          <p className="mt-3 border-t border-ink/15 pt-5 font-serif opacity-80">
             Also available: <a href="/os/" className="underline underline-offset-4 hover:opacity-70">the 2023 edition, as a desktop OS →</a>
           </p>
         </div>
-      </dialog>
+      </BoxOffice>
     </>
   )
 }
