@@ -8,9 +8,10 @@ import './boxoffice.css'
 /*
  * The box office: the way a visitor chooses what to watch instead of scrolling the whole feature.
  * One programme (content.js PROGRAMME), shown twice: as the front door right after the poster
- * (Prologue.jsx, one ticket per screen) and as the header's dialog (every showing). Picking a ticket
- * tears its stub, prints while the target's 3D warms (Stage.jsx 'novel:warm' / 'novel:warmed', capped
- * at 2.5 s: world.js holds a cover past that), then jumps straight there. A ticket starts warming at the
+ * (Prologue.jsx: a counter with a showtimes board, one line per screen) and as the header's dialog
+ * (every showing, as tickets). Picking one feeds a ticket out of the counter's slot (or tears the dialog
+ * ticket's stub), prints while the target's 3D warms (Stage.jsx 'novel:warm' / 'novel:warmed', capped
+ * at 2.5 s: world.js holds a cover past that), then jumps straight there. A showing starts warming at the
  * first sign of intent (hover, focus, touch). Reduced motion: no tearing or printing, the status text
  * while it warms, then an instant jump.
  */
@@ -81,26 +82,22 @@ export const Marquee = ({ id, small }) => (
 )
 
 const STATUS = { print: 'Printing your ticket', admit: 'Admitted' }
+const pad = n => String(n).padStart(3, '0')
+// Warm a showing at the first sign of intent: focus, a touch, or a pointer that pauses (not one passing over).
+const intent = (s, dwell) => ({
+  onFocus: () => hint(s),
+  onTouchStart: () => hint(s),
+  onPointerEnter: () => (dwell.current = setTimeout(() => hint(s), 120)),
+  onPointerLeave: () => clearTimeout(dwell.current),
+})
 
-/**
- * A ticket: the showing, then a stub past the perforation that tears off when it is picked. `wall` is the
- * front door's portrait ticket, pinned to the lit wall (stub at its foot); otherwise the dialog's, stub at its side.
- */
-function Ticket({ s, no, picked, pick, wall, style }) {
+/** The dialog's ticket: the showing, then a stub past the perforation that tears off when it is picked. */
+function Ticket({ s, no, picked, pick }) {
   const phase = picked?.id === s.id ? picked.phase : null
   const dwell = useRef(0)
   return (
-    <li className={`bt ${wall ? 'bt-wall' : ''}`} data-phase={phase ?? undefined} style={style}>
-      <button
-        type="button"
-        className="bt-face"
-        aria-disabled={!!picked && !phase}
-        onClick={() => pick(s)}
-        onFocus={() => hint(s)}
-        onTouchStart={() => hint(s)}
-        onPointerEnter={() => (dwell.current = setTimeout(() => hint(s), 120))} // a pause, not a pointer passing over
-        onPointerLeave={() => clearTimeout(dwell.current)}
-      >
+    <li className="bt" data-phase={phase ?? undefined}>
+      <button type="button" className="bt-face" aria-disabled={!!picked && !phase} onClick={() => pick(s)} {...intent(s, dwell)}>
         <span className="bt-body paper">
           <span className="bt-title">{s.title}</span>
           <span className="bt-line">{s.line}</span>
@@ -110,7 +107,7 @@ function Ticket({ s, no, picked, pick, wall, style }) {
         </span>
         <span className="bt-stub paper" aria-hidden="true">
           <span className="kicker">Admit one</span>
-          <span className="bt-no">{String(no).padStart(3, '0')}</span>
+          <span className="bt-no">{pad(no)}</span>
         </span>
       </button>
     </li>
@@ -125,14 +122,40 @@ const Status = ({ picked }) => (
 let n = 0
 const GROUPS = PROGRAMME.map(g => ({ ...g, showings: (g.showings ?? [g]).map(s => ({ screen: g.screen, ...s, no: ++n })) }))
 const DOOR_TICKETS = PROGRAMME.map((g, i) => ({ ...g, no: i + 1 }))
-// Pinned by hand: each ticket's own lean and height on the wall.
-const PINNED = [[-2.4, 6], [1.6, 22], [-0.8, 0], [2.2, 16], [-1.6, 4], [1.1, 20]]
+
+/** A line on the counter's showtimes board: screen, title, logline, runtime, and a lamp that lights for it. */
+function Showtime({ s, picked, pick }) {
+  const phase = picked?.id === s.id ? picked.phase : null
+  const dwell = useRef(0)
+  const n = s.showings?.length
+  return (
+    <li className="st" data-phase={phase ?? undefined}>
+      <button type="button" className="st-row" aria-disabled={!!picked && !phase} onClick={() => pick(s)} {...intent(s, dwell)}>
+        <span className="st-title">{s.title}</span>
+        <span className="st-line">{s.line}</span>
+        <span className="st-screen kicker">{s.screen}</span>
+        <span className="st-time kicker">{phase ? STATUS[phase] : n ? <>{n} showings<span className="st-dot"> · {s.time}</span></> : s.time}</span>
+        <span className="st-lamp" aria-hidden="true" />
+      </button>
+    </li>
+  )
+}
+
+/** The ticket the counter issues: it feeds out of the slot onto the ledge, then takes the stamp. */
+const Issued = ({ s, phase }) => (
+  <span className="issued paper" data-phase={phase}>
+    <span className="issued-head kicker"><span>{s.screen}</span><span>Admit one</span></span>
+    <span className="issued-title">{s.title}</span>
+    <span className="issued-no">No. {pad(s.no)}</span>
+    <span className="bt-stamp kicker">Admitted</span>
+  </span>
+)
 
 const MID = (DOOR[0] + DOOR[1]) / 2
 const SCROLL_KEYS = ['ArrowDown', 'ArrowUp', 'PageDown', 'PageUp', 'Home', 'End']
 let caught = false // once a visit (with sessionStorage across reloads)
 
-/** The front door (Prologue.jsx): one ticket per screen, every showing behind a button, or keep scrolling. */
+/** The front door (Prologue.jsx): the counter, one line per screen on its board, every showing behind a button, or keep scrolling. */
 export function FrontDoor({ section }) {
   const [picked, pick, cancel] = useAdmit()
   const at = p => section.current.offsetTop + (section.current.offsetHeight - innerHeight) * p // the prologue's progress (useProgress 'top top' → 'bottom bottom')
@@ -214,31 +237,33 @@ export function FrontDoor({ section }) {
   }, [picked]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const onScrollOn = () => scrollTo({ top: at(DOOR[1] + 0.03), behavior: reducedMotion() ? 'instant' : 'smooth' })
-  // The wall leans a few degrees toward a mouse (CSS vars only; no tilt for touch or reduced motion).
-  const wall = useRef(null)
-  const lean = (x, y) => {
-    wall.current.style.setProperty('--px', x.toFixed(3))
-    wall.current.style.setProperty('--py', y.toFixed(3))
-  }
+  // The window's glare slides with a mouse (a CSS var only; still for touch and reduced motion).
+  const booth = useRef(null)
   const onMove = e => {
     if (e.pointerType !== 'mouse' || reducedMotion()) return
-    const r = wall.current.getBoundingClientRect()
-    lean(((e.clientX - r.left) / r.width) * 2 - 1, ((e.clientY - r.top) / r.height) * 2 - 1)
+    const r = booth.current.getBoundingClientRect()
+    booth.current.style.setProperty('--px', (((e.clientX - r.left) / r.width) * 2 - 1).toFixed(3))
   }
+  const issued = picked && DOOR_TICKETS.find(g => g.id === picked.id)
   return (
-    <div className="door" onPointerMove={onMove} onPointerLeave={() => lean(0, 0)}>
-      <Marquee small />
-      <p className="door-lede">Choose a showing, or keep scrolling to watch the whole feature.</p>
-      <div ref={wall} className="wall">
-        <ul className="wall-plane" aria-label="The programme">
-          {DOOR_TICKETS.map((g, i) => (
-            <Ticket key={g.id} s={g} no={g.no} picked={picked} pick={pick} wall style={{ '--tilt': `${PINNED[i % 6][0]}deg`, '--y': `${PINNED[i % 6][1]}px` }} />
-          ))}
-        </ul>
-      </div>
-      <div className="door-actions">
-        <button type="button" className="door-all kicker" onClick={openBoxOffice}>Every showing</button>
-        <button type="button" className="door-on kicker" onClick={onScrollOn}>Keep scrolling <span aria-hidden="true">↓</span></button>
+    <div className="door" onPointerMove={onMove} onPointerLeave={() => booth.current.style.setProperty('--px', 0)}>
+      <p className="door-lede">Step up to the window: pick a showing from the board, or keep scrolling for the whole feature.</p>
+      <div ref={booth} className="booth" data-busy={picked ? '' : undefined}>
+        <Marquee small />
+        <div className="booth-window">
+          <ul className="board" aria-label="The programme">
+            {DOOR_TICKETS.map(g => <Showtime key={g.id} s={g} picked={picked} pick={pick} />)}
+          </ul>
+          <span className="booth-glare" aria-hidden="true" />
+          <span className="booth-grille" aria-hidden="true" />
+        </div>
+        <div className="booth-ledge">
+          <button type="button" className="door-all kicker" onClick={openBoxOffice}>Every showing</button>
+          <span className="booth-slot" aria-hidden="true">
+            <span className="booth-tray">{issued && <Issued s={issued} phase={picked.phase} />}</span>
+          </span>
+          <button type="button" className="door-on kicker" onClick={onScrollOn}>Keep scrolling <span aria-hidden="true">↓</span></button>
+        </div>
       </div>
       <Status picked={picked} />
     </div>

@@ -1,15 +1,17 @@
 import * as THREE from 'three'
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js'
 import { loadTraveller, wearSuit, toon, outline } from './films/kit'
+import { DANCE_SPAN } from './movies'
+import { store } from '../lib/store'
 
 /*
  * Chapter Five, world 6: the dance (Deadpool & Wolverine, a fan's tribute). A snowy clearing by day, as in
  * the film's graveside fight, printed like a comic: trampled snow, an open grave with its mound and a plain
  * unmarked headstone, snow-laden pines fading into a pale overcast halftone sky, snow falling. In the
  * red-and-black suit (public/cinema/suits/deadpool.glb, katanas on his back) he dances the "Bye Bye Bye"
- * routine (public/cinema/dance/routine.glb, made by scripts/cinema/pose_retarget.py from pose landmarks)
- * swinging a silver metal skeleton (public/cinema/dance/bones.glb, held by its ankle, three claws per hand)
- * through a crowd of twelve generic masked henchmen, who charge in from the trees and get knocked flying in
+ * routine and its fight, bare-handed (public/cinema/dance/routine.glb: scripts/cinema/pose_splice.py joins the
+ * owner's clip's shots on the music's beat, pose_retarget.py makes the clip), through a crowd of twelve generic
+ * masked henchmen, who charge in from the trees and get knocked flying in
  * spinning arcs to land in puffs of snow. Each hit pops a sound-effect word in a comic starburst; the title
  * phrase "Bye Bye Bye" pops in a caption box on each of the routine's "bye" pushes and over the last pose.
  * Words on the page: only the title phrase and sound-effect words, never a lyric line.
@@ -75,7 +77,7 @@ let seed = 11
 const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647
 
 // The routine plays over p 0.075..0.93 (it starts as the comic panels slide off) and holds its last pose.
-const P0 = 0.075, P1 = 0.93
+const [P0, P1] = DANCE_SPAN
 const FOES = 12
 const WORDS = ['THWACK', 'SNIKT', 'POW', 'CRACK', 'WHAM', 'BOOM', 'KRAK', 'BAM', 'SNIKT', 'THWACK', 'POW', 'CRUNCH']
 const INK = '#0b0710'
@@ -340,6 +342,8 @@ export function createDance(renderer, { loader, mobile = false }) {
   const cam = new THREE.Vector3(), look = new THREE.Vector3(), right = new THREE.Vector3()
   let end = 34.7 // the routine's last pose (seconds), from its extras once loaded
   const timeAt = p => end * clamp01((p - P0) / (P1 - P0))
+  // The routine's clock for the music (sound.js keeps its cue in step with T) and the play button (ChapterFive.jsx).
+  const clock = (store.danceClock = { T: 0, end, seen: 0 })
   // The camera from his place (here), the routine's time and p; shake from the hits (none when still).
   const shake = { x: 0, y: 0 }
   let camAz = 0
@@ -381,7 +385,7 @@ export function createDance(renderer, { loader, mobile = false }) {
       t0 = performance.now()
     }
     const traveller = loadTraveller(loader)
-    const suitFile = loader.loadAsync('/cinema/suits/deadpool.glb'), bonesFile = loader.loadAsync('/cinema/dance/bones.glb')
+    const suitFile = loader.loadAsync('/cinema/suits/deadpool.glb')
     const routineFile = loader.loadAsync('/cinema/dance/routine.glb')
     const fonts = document.fonts?.load('900 100px "Archivo Variable"').catch(() => {})
     const U = { cell: { value: 5 }, ink: { value: 0.55 }, t: { value: 0 } }
@@ -585,7 +589,7 @@ export function createDance(renderer, { loader, mobile = false }) {
     scene.add(dust)
     await step()
 
-    // ------------------------------------------------------------ him: the suit, the skeleton, the routine
+    // ------------------------------------------------------------ him: the suit and the routine
     const kit = await traveller
     const you = kit.make({ look: 'pbr' })
     const body = []
@@ -618,30 +622,15 @@ export function createDance(renderer, { loader, mobile = false }) {
     const gltf = await routineFile
     const clip = gltf.animations[0]
     const extras = gltf.parser.json.animations?.[0]?.extras ?? {}
-    end = Math.min(clip.duration, extras.end ?? clip.duration)
+    end = clock.end = Math.min(clip.duration, extras.end ?? clip.duration)
     you.add([clip])
     const act = you.actions[clip.name]
     act.play()
-    const hipsBone = you.bone('Hips'), hand = you.bone('RightHand'), fore = you.bone('RightForeArm')
+    const hipsBone = you.bone('Hips'), fists = [you.bone('LeftHand'), you.bone('RightHand')]
     await step()
 
-    // The skeleton: held by its ankle (the GLB's `grip`), its length running on from his fist.
-    const bones = (await bonesFile).scene
-    const grip = bones.getObjectByName('grip')
-    bones.updateMatrixWorld(true)
-    const gripAt = grip.getWorldPosition(new THREE.Vector3())
-    const prop = new THREE.Group()
-    bones.position.copy(gripAt).negate()
-    prop.add(bones)
-    bones.traverse(o => {
-      if (!o.isMesh) return
-      o.castShadow = true
-      o.material.envMapIntensity = 1.5
-      o.material.roughness = 0.24
-    })
-    scene.add(prop)
-    // Claw glints: where the claws are (on the prop, in its frame), flaring at each hit.
-    const NGL = 4, glP = new Float32Array(NGL * 3), glA = new Float32Array(NGL)
+    // Glints at his fists, flaring on the one that lands each hit.
+    const NGL = 2, glP = new Float32Array(NGL * 3), glA = new Float32Array(NGL)
     const glintMat = new THREE.ShaderMaterial({
       vertexShader: /* glsl */ `
         attribute vec3 iP; attribute float iS; varying vec2 vQ; varying float vA;
@@ -659,11 +648,12 @@ export function createDance(renderer, { loader, mobile = false }) {
     glints.frustumCulled = false
     glints.renderOrder = 9
     scene.add(glints)
-    const CLAWS = [[-0.24, 0.62, 0.05], [0.24, 0.62, 0.05], [-0.24, 0.72, 0.08], [0.24, 0.72, 0.08]].map(a => new THREE.Vector3(...a).sub(gripAt))
     await step()
 
     // ------------------------------------------------------------ the henchmen
-    const hits = (extras.hits?.length ? extras.hits : [3, 6, 12, 14, 16, 17, 21, 22, 23, 28, 29, 33].map(t => ({ t, side: 'right' }))).slice(0, 24)
+    // A henchman for each of twelve of his blows, spread through the whole fight (the clip finds more blows than that).
+    const found = extras.hits?.length ? extras.hits : [3, 6, 12, 14, 16, 17, 21, 22, 23, 28, 29, 33].map(t => ({ t, side: 'right' }))
+    const hits = found.length <= FOES ? found : Array.from({ length: FOES }, (_, i) => found[Math.round((i * (found.length - 1)) / (FOES - 1))])
     const byes = extras.byes ?? []
     const SLATE_T = timeAt(0.32) // the routine's time as the top-left slate (ChapterFive.jsx: p 0.1..0.3) has gone
     byeTimes = byes
@@ -815,9 +805,8 @@ export function createDance(renderer, { loader, mobile = false }) {
     await step()
 
     // ------------------------------------------------------------ each frame
-    const strike = new THREE.Vector3(), pos = new THREE.Vector3(), from = new THREE.Vector3(), tmp = new THREE.Vector3()
+    const strike = new THREE.Vector3(), pos = new THREE.Vector3(), tmp = new THREE.Vector3()
     const qa = new THREE.Quaternion(), qb = new THREE.Quaternion(), qc = new THREE.Quaternion(), mtx = new THREE.Matrix4()
-    const dir = new THREE.Vector3(), side = new THREE.Vector3(), up = new THREE.Vector3()
     const size = new THREE.Vector2()
     const home = new THREE.Vector3() // where he stands at a moment (his hips' track), for a henchman's aim
     const hipsTrack = clip.tracks.find(k => k.name === 'Hips.position')
@@ -852,6 +841,8 @@ export function createDance(renderer, { loader, mobile = false }) {
       const dt = lastT === null ? 0 : Math.min(0.1, Math.max(0, t - lastT))
       lastT = t
       const T = timeAt(p)
+      clock.T = T
+      clock.seen = performance.now()
       const Tfx = T + 1.2 * ss(P1, 0.98, p) // through the held last pose the dust settles and the words go, for a clean final frame
       U.t.value = t
       renderer.getDrawingBufferSize(size)
@@ -864,28 +855,8 @@ export function createDance(renderer, { loader, mobile = false }) {
       you.root.updateMatrixWorld(true)
       hipsBone.getWorldPosition(here)
 
-      // The skeleton in his right fist, running on along his forearm; never through the floor.
-      hand.getWorldPosition(from)
-      fore.getWorldPosition(tmp)
-      dir.subVectors(from, tmp).normalize()
-      const reachY = (0.12 - from.y) / 1.7
-      if (dir.y < reachY) {
-        const h = Math.sqrt(Math.max(0, 1 - reachY * reachY)), xz = Math.hypot(dir.x, dir.z) || 1
-        dir.set((dir.x / xz) * h, reachY, (dir.z / xz) * h)
-      }
-      // Held up, it leans back over his right shoulder like a bat on the shoulder, not straight up.
-      const lean = ss(0.35, 0.9, dir.y)
-      if (lean > 0) dir.x -= lean * 0.45, dir.z -= lean * 0.75, dir.normalize()
-      side.set(0, 1, 0).applyQuaternion(fore.getWorldQuaternion(qc)) // his forearm's own up turns the skull
-      up.crossVectors(dir, side).normalize()
-      side.crossVectors(up, dir)
-      mtx.makeBasis(up, dir, side)
-      prop.quaternion.setFromRotationMatrix(mtx)
-      prop.position.copy(from)
-      prop.updateMatrixWorld(true)
-
       // The henchmen.
-      let flash = 0, shook = 0
+      let flash = 0, shook = 0, fist = 1
       for (let i = 0; i < FOES; i++) {
         if (i >= NF) {
           mtx.makeScale(0, 0, 0)
@@ -935,7 +906,7 @@ export function createDance(renderer, { loader, mobile = false }) {
             puffAt(i * 2 * PUFFS + k, strike.x + Math.cos(a) * 0.35 * hitAge * 3, 1.25 + Math.sin(a) * 0.3 * hitAge * 2.5, strike.z + Math.sin(a * 1.3) * 0.2, hitAge * 1.6, 0.32)
             puffAt(i * 2 * PUFFS + PUFFS + k, pos.x + Math.cos(a) * (0.3 + landAge * 1.2), 0.18 + landAge * 0.35 * (k % 2 + 0.5), pos.z + Math.sin(a) * (0.3 + landAge * 1.2), landAge, 0.55)
           }
-          if (hitAge < 0.3) flash = Math.max(flash, 1 - hitAge / 0.3)
+          if (hitAge < 0.3 && 1 - hitAge / 0.3 > flash) flash = 1 - hitAge / 0.3, fist = f.kind === 'left' ? 0 : 1
           if (hitAge < 0.25) shook = Math.max(shook, 1 - hitAge / 0.25)
         }
         if (T < tHit) for (let k = 0; k < 2 * PUFFS; k++) puffAt(i * 2 * PUFFS + k, 0, 0, 0, -1, 0)
@@ -966,11 +937,10 @@ export function createDance(renderer, { loader, mobile = false }) {
       armA.needsUpdate = legA.needsUpdate = true
       puffs.geometry.attributes.iP.needsUpdate = puffs.geometry.attributes.iS.needsUpdate = true
 
-      // Claw glints: flaring on each hit, a slow shimmer otherwise.
+      // Fist glints: only the fist that lands, as it lands.
       for (let k = 0; k < NGL; k++) {
-        tmp.copy(CLAWS[k]).applyMatrix4(prop.matrixWorld)
-        tmp.toArray(glP, k * 3)
-        glA[k] = Math.max(flash * (0.6 + 0.4 * ((k + 1) % 2)), still ? 0.12 : 0.1 + 0.1 * Math.sin(t * 3 + k * 1.7))
+        fists[k].getWorldPosition(tmp).toArray(glP, k * 3)
+        glA[k] = k === fist ? flash : 0
       }
       glints.geometry.attributes.iP.needsUpdate = glints.geometry.attributes.iS.needsUpdate = true
 

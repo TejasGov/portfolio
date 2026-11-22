@@ -158,6 +158,11 @@ ls, lt, i = Ds.argmin(0), Dt.argmin(0), names.index('Head')
 rs, rt = np.percentile(Ds[i][ls == i], 40), np.percentile(Dt[i][lt == i], 40)
 SEG['Head'][4] = SEG['neck'][4] = float(np.clip(1.04 * rt / rs, k, 1.3))
 if NAME == 'spider':
+    # A lean build: Meshy's suit is a bodybuilder's, so take every girth in (the length along each bone stays his).
+    # His own body is hidden under the suit (swing.js dissolves it where the suit has spread), so nothing pokes through.
+    LEAN = {'Hips': 0.86, 'Spine02': 0.84, 'Spine01': 0.84, 'Spine': 0.86, 'Head': 0.82,
+            'Shoulder': 0.8, 'Arm': 0.84, 'ForeArm': 0.88, 'Hand': 1, 'UpLeg': 0.86, 'Leg': 0.9, 'Foot': 1}
+    for n in names: SEG[n][4] *= LEAN.get(n.replace('Left', '').replace('Right', ''), 1)
     # A fitted mask, not a hood: scale the mask evenly by his head's girth (rather than stretching it up to the
     # top of his hair into an egg), and give the neck its own, slimmer girth so it narrows under the jaw.
     sa, sb, ba = SEG['Head'][0], SEG['Head'][1], SEG['Head'][2]
