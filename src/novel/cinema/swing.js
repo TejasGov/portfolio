@@ -326,14 +326,15 @@ const POSES = {
   },
   // On the web: his right arm up along it, the left out ahead, knees bent and together.
   swing: {
-    Spine02: v(0, 0.99, -0.12), Spine: v(0, 0.98, -0.16), Head: v(0, 0.94, 0.33),
-    RightShoulder: v(-0.85, 0.5, 0), RightArm: v(-0.18, 0.98, 0.06), RightForeArm: v(-0.1, 0.99, 0.08), RightHand: v(-0.05, 1, 0.05),
+    // neck and head carried straight on the spine, eyes ahead (not hung forward), the shoulder only a little raised
+    Spine02: v(0, 0.99, -0.12), Spine: v(0, 0.98, -0.16), neck: v(0, 0.99, 0.02), Head: v(0, 0.98, 0.18),
+    RightShoulder: v(-0.96, 0.27, 0), RightArm: v(-0.18, 0.98, 0.06), RightForeArm: v(-0.1, 0.99, 0.08), RightHand: v(-0.05, 1, 0.05),
     LeftArm: v(0.78, -0.3, 0.55), LeftForeArm: v(0.55, -0.05, 0.83), LeftHand: v(0.5, 0, 0.86),
     LeftUpLeg: v(0.06, -0.78, 0.62), RightUpLeg: v(-0.06, -0.82, 0.57), LeftLeg: v(0.03, -0.86, -0.5), RightLeg: v(-0.03, -0.9, -0.42),
   },
   // Between swings: arms spread, one leg drawn up.
   fly: {
-    Spine02: v(0, 0.96, -0.28), Spine: v(0, 0.95, -0.3), Head: v(0, 0.88, 0.47),
+    Spine02: v(0, 0.96, -0.28), Spine: v(0, 0.95, -0.3), neck: v(0, 0.99, -0.08), Head: v(0, 0.97, 0.22),
     LeftArm: v(0.9, 0.28, 0.33), LeftForeArm: v(0.84, 0.45, 0.3), RightArm: v(-0.9, 0.28, 0.33), RightForeArm: v(-0.84, 0.45, 0.3),
     LeftUpLeg: v(0.2, -0.6, 0.77), LeftLeg: v(0.1, -0.9, -0.42), RightUpLeg: v(-0.1, -0.95, -0.3), RightLeg: v(-0.05, -0.95, -0.3),
   },

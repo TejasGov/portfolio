@@ -1,4 +1,5 @@
 import { store } from './store'
+import { CUES, playCue } from './score'
 
 /*
  * The soundtrack of the cinema, synthesized live (no audio files): a projector's 24 fps sprocket
@@ -6,8 +7,12 @@ import { store } from './store'
  * Off until the reader turns it on (browsers only allow audio after a gesture). It reads the store
  * every frame: the projector gets louder the closer the camera is to the lens, and everything in the
  * cinema falls silent while a paper chapter covers the screen.
+ * In the dance (cinema/dance.js) the score's dance cue (score.js) plays in step with the routine: it follows the
+ * routine's clock (store.danceClock) while the reader scrolls it forward, starts where the routine is, re-syncs
+ * when the two drift apart, and goes quiet when the scroll stops. ChapterFive.jsx's play button scrolls the
+ * routine in real time, so then the two never drift at all.
  */
-let ctx, master, proj, room, rush, rushFilter, raf
+let ctx, master, proj, room, rush, rushFilter, music, raf
 let on = false
 const listeners = new Set()
 
@@ -82,6 +87,31 @@ function build() {
   rush.connect(master)
   rushFilter = filter('bandpass', 300, 1.1)
   loop(noise(2), rushFilter, rush)
+
+  music = gain(0.8)
+  music.connect(master)
+}
+
+// The dance cue, kept in step with the routine's clock.
+const dance = { player: null, lastT: -1, moved: 0, synced: 0 }
+function follow(now) {
+  const c = store.danceClock
+  const live = on && c && now - c.seen < 250 && c.T > 0.05 && c.T < c.end - 0.05
+  if (live && c.T !== dance.lastT) dance.moved = now
+  if (live) dance.lastT = c.T
+  const moving = live && now - dance.moved < 350 // scrolled within the last third of a second
+  if (!moving) {
+    if (dance.player) dance.player.stop(0.3), (dance.player = null)
+    return
+  }
+  const drift = dance.player ? Math.abs(dance.player.t - c.T) : Infinity
+  // Start where the routine is; re-sync on a drift a listener would hear, at most every 0.6 s (a fast scroll
+  // re-syncs in steps rather than stuttering every frame).
+  if (drift > 0.25 && now - dance.synced > 600) {
+    dance.player?.stop(0.06)
+    dance.player = playCue(ctx, music, CUES.bye, c.T)
+    dance.synced = now
+  }
 }
 
 const clamp01 = x => Math.min(1, Math.max(0, x))
@@ -96,6 +126,7 @@ function tick() {
   room.gain.setTargetAtTime(night * 0.06, t, 0.3)
   rush.gain.setTargetAtTime(night * Math.sin(Math.PI * clamp01(flood * 0.85 + sweep * 0.4)) * 0.32, t, 0.06)
   rushFilter.frequency.setTargetAtTime(250 + 5200 * flood * flood, t, 0.06)
+  follow(performance.now())
 }
 
 export const sound = {
@@ -117,6 +148,8 @@ export const sound = {
     } else if (ctx) {
       master.gain.setTargetAtTime(0, ctx.currentTime, 0.15)
       cancelAnimationFrame(raf)
+      dance.player?.stop(0.15)
+      dance.player = null
       setTimeout(() => !on && ctx.suspend(), 600)
     }
     listeners.forEach(fn => fn(on))

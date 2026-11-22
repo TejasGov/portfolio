@@ -412,11 +412,11 @@ def main(src, dst):
     rig = Rig(TRAVELLER)
     d, t, W, I = load_landmarks(src)
     W = fill(W, t)
-    cuts = rejoin_cuts(W)
-    # Resample to FPS, then smooth (about a fifth of a second either way).
+    cuts = 0 if d.get('faced') else rejoin_cuts(W)  # pose_splice.py already turns each shot to face front
+    # Resample to FPS, then smooth (about a sixth of a second either way: jitter out, a punch still snaps).
     T = np.arange(0, t[-1] + 1e-9, 1 / FPS)
     rs = lambda A: np.stack([np.interp(T, t, c) for c in A.reshape(len(A), -1).T], 1).reshape((len(T),) + A.shape[1:])
-    W = savgol(rs(W), 9, 3)
+    W = savgol(rs(W), 11, 3)
     I = rs(I) if not np.isnan(I).all() else np.full((len(T), 33, 3), np.nan)
     locs = retarget(rig, W)
     root, gy = root_path(rig, locs, I, FPS)

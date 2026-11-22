@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Score audition</title>
+  <!-- Dev only (not a build input in vite.config.js): `npx vite`, then open /audition.html to hear each cue. -->
+  <style>
+    :root { color-scheme: dark; --ink: #f3ecdf; --dim: #a59c8c; --line: #3a3128; --brass: #d8b35c; }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100svh; background: #120d0a; color: var(--ink); font: 16px/1.45 system-ui, sans-serif; display: grid; place-items: center; padding: 32px 16px; }
+    main { width: min(40rem, 100%); }
+    h1 { font-size: 1.5rem; margin: 0 0 6px; letter-spacing: 0.01em; }
+    p { color: var(--dim); margin: 0 0 24px; }
+    ul { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--line); }
+    li { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px 0; border-bottom: 1px solid var(--line); }
+    button { min-height: 44px; min-width: 6.5rem; padding: 0 16px; border: 1px solid var(--brass); border-radius: 4px; background: none; color: var(--ink); font: inherit; cursor: pointer; }
+    button[aria-pressed="true"] { background: var(--brass); color: #120d0a; }
+    button:focus-visible { outline: 2px solid var(--brass); outline-offset: 3px; }
+    .meta { color: var(--dim); font-size: 0.85rem; font-variant-numeric: tabular-nums; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Score audition</h1>
+    <p>Original cues, synthesized live (src/novel/lib/score.js). One plays at a time; the themes loop.</p>
+    <ul id="cues"></ul>
+  </main>
+  <script type="module">
+    import { CUES, CUE_NAMES, playCue } from '/src/novel/lib/score.js'
+    let ctx, out, now = null
+    const list = document.getElementById('cues')
+    for (const [key, name] of Object.entries(CUE_NAMES)) {
+      const c = CUES[key]
+      const li = document.createElement('li')
+      li.innerHTML = `<div><div>${name}</div><div class="meta">${c.bpm} BPM · ${c.loop ? 'loops' : Math.round((c.beats * 60) / c.bpm) + ' s'}</div></div>`
+      const b = document.createElement('button')
+      b.type = 'button'
+      b.textContent = 'Play'
+      b.setAttribute('aria-pressed', 'false')
+      b.onclick = async () => {
+        ctx ??= new AudioContext()
+        if (!out) { out = new DynamicsCompressorNode(ctx, { threshold: -14, ratio: 3 }); out.connect(ctx.destination) }
+        await ctx.resume()
+        const was = now?.key
+        now?.player.stop(0.2)
+        now?.button.setAttribute('aria-pressed', 'false')
+        now && (now.button.textContent = 'Play')
+        now = null
+        if (was === key) return
+        now = { key, button: b, player: playCue(ctx, out, c) }
+        b.setAttribute('aria-pressed', 'true')
+        b.textContent = 'Stop'
+      }
+      li.append(b)
+      list.append(li)
+    }
+  </script>
+</body>
+</html>

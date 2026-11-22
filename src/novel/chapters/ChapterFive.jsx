@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useBeats } from '../lib/Beats'
 import { useProgress, useRunningHead } from '../lib/chapters'
 import { store } from '../lib/store'
+import { sound } from '../lib/sound'
 import Assemble from '../lib/Assemble'
-import { BACK, CLEAR, LEVELS, SVH, UNIT, chapterP } from '../cinema/movies'
+import { BACK, CLEAR, DANCE_SPAN, LEVELS, SVH, UNIT, chapterP } from '../cinema/movies'
 import '../five.css'
 
 const TITLE = [['The big ', false], ['screen', true]]
@@ -38,6 +39,7 @@ const BEATS = [
   { at: [0.006 * UNIT, 0.054 * UNIT], edge: [0.004 * UNIT, 0.012 * UNIT], kind: 'title' }, // over the new reel and the push; gone before the perch
   ...LEVELS.map(l => ({ kind: 'slate', ...SLATES[l.name] })),
   { at: [D(0.355), D(0.75)], edge: 0.006 * UNIT, kind: 'prompt', text: 'Suit up' }, // with the first plates, gone at the visor,
+  { at: [X(0.09), X(0.9)], kind: 'play' }, // bottom left, clear of the slate (top left), from the first step to the last pose
   { at: [F(0.55), F(0.88)], kind: 'caption', label: '18 December 2022', text: 'Argentina. World champions.' },
 ].map(b => ({ edge: EDGE, ...b }))
 /*
@@ -50,6 +52,55 @@ const ANCHORS = LEVELS.map(l => {
   const P = Math.max(chapterP(l.name, CLEAR[l.name][0]), SLATES[l.name].anchor ?? SLATES[l.name].at[0]) + EDGE + 2 / SVH
   return { id: `scene-${l.name}`, label: `${SLATES[l.name].label}: ${SLATES[l.name].text}`, top: `calc(${(P * SVH).toFixed(2)}svh - 100svh)` }
 })
+
+/**
+ * The dance's play button: scrolls the routine at its own speed (one second of routine a second) with the score's
+ * dance cue on, so the music and his steps stay locked (sound.js follows the routine's clock). Any wheel, touch or
+ * key of the reader's stops it where it is; it turns the sound on if it was off (the click is the gesture).
+ */
+const STOPS = ['wheel', 'touchstart', 'keydown']
+function PlayDance() {
+  const [playing, setPlaying] = useState(false)
+  const stopRef = useRef(null), button = useRef(null)
+  useEffect(() => () => stopRef.current?.(), [])
+  const toggle = async () => {
+    if (stopRef.current) return stopRef.current()
+    const c = store.danceClock
+    if (!c) return
+    if (!sound.on) await sound.toggle()
+    const sec = document.getElementById('five')
+    const top = sec.getBoundingClientRect().top + scrollY, h = sec.offsetHeight, vh = innerHeight
+    const [a, z] = DANCE_SPAN
+    // Five's P runs 'top bottom' -> 'bottom bottom': the scroll that puts the routine at time T.
+    const y = T => top - vh + chapterP('dance', a + ((z - a) * T) / c.end) * h
+    const from = c.T > c.end - 1 ? 0 : c.T
+    const t0 = performance.now()
+    let raf
+    const interrupt = e => e.target !== button.current && stop()
+    const stop = () => {
+      cancelAnimationFrame(raf)
+      for (const k of STOPS) removeEventListener(k, interrupt, true)
+      stopRef.current = null
+      setPlaying(false)
+    }
+    const step = () => {
+      const T = Math.min(c.end, from + (performance.now() - t0) / 1000)
+      scrollTo(0, y(T))
+      if (T >= c.end) return stop()
+      raf = requestAnimationFrame(step)
+    }
+    for (const k of STOPS) addEventListener(k, interrupt, { capture: true, passive: true })
+    stopRef.current = stop
+    setPlaying(true)
+    step()
+  }
+  return (
+    <button ref={button} type="button" onClick={toggle} aria-pressed={playing} className="kicker inline-flex min-h-11 items-center gap-3 rounded-sm bg-[rgb(6_10_20/0.85)] px-5 text-white hover:bg-[rgb(6_10_20/0.95)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white">
+      <span aria-hidden="true">{playing ? '■' : '▶'}</span>
+      {playing ? 'Stop' : 'Play it with music'}
+    </button>
+  )
+}
 
 export default function ChapterFive() {
   const ref = useRef(null)
@@ -82,7 +133,11 @@ export default function ChapterFive() {
         </div>
         <div className="absolute inset-0 grid px-6 pt-[13svh] pb-[12svh] md:px-[6vw]">
           {beats.map((b, k) =>
-            b.kind === 'title' ? null : b.kind === 'prompt' ? (
+            b.kind === 'title' ? null : b.kind === 'play' ? (
+              <div key={k} ref={bind(k)} className="pointer-events-auto col-start-1 row-start-1 self-end justify-self-start opacity-0">
+                <PlayDance />
+              </div>
+            ) : b.kind === 'prompt' ? (
               // On a dark pill in the lower third, clear of him; the words' glow pulses like a heads-up line, the letters hold.
               <p key={k} ref={bind(k)} className="kicker pointer-events-none col-start-1 row-start-1 mb-[2svh] self-end justify-self-center rounded-sm bg-[rgb(6_10_20/0.85)] px-5 py-3 text-[clamp(1rem,1.6vw,1.25rem)] leading-[1.6] tracking-[0.42em] text-white opacity-0 [text-shadow:0_0_18px_#6fb8ff]">
                 <span className="five-pulse">{b.text}</span>
