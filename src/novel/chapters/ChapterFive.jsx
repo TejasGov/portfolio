@@ -54,8 +54,8 @@ const ANCHORS = LEVELS.map(l => {
 })
 
 /**
- * The dance's play button: scrolls the routine at its own speed (one second of routine a second) with the score's
- * dance cue on, so the music and his steps stay locked (sound.js follows the routine's clock). Any wheel, touch or
+ * The dance's play button: scrolls the routine at its own speed (one second of routine a second) with the song
+ * on, so the music and his steps stay locked (sound.js follows the routine's clock). Any wheel, touch or
  * key of the reader's stops it where it is; it turns the sound on if it was off (the click is the gesture).
  */
 const STOPS = ['wheel', 'touchstart', 'keydown']
@@ -134,8 +134,11 @@ export default function ChapterFive() {
         <div className="absolute inset-0 grid px-6 pt-[13svh] pb-[12svh] md:px-[6vw]">
           {beats.map((b, k) =>
             b.kind === 'title' ? null : b.kind === 'play' ? (
-              <div key={k} ref={bind(k)} className="pointer-events-auto col-start-1 row-start-1 self-end justify-self-start opacity-0">
+              <div key={k} ref={bind(k)} className="pointer-events-auto col-start-1 row-start-1 grid justify-items-start gap-2 self-end justify-self-start opacity-0">
                 <PlayDance />
+                <p className="max-w-[34ch] rounded-sm bg-[rgb(6_10_20/0.7)] px-3 py-1.5 text-[0.8rem] leading-snug text-white/85">
+                  Music: “Bye Bye Bye”, *NSYNC (2000). A fan tribute; the song belongs to its owners.
+                </p>
               </div>
             ) : b.kind === 'prompt' ? (
               // On a dark pill in the lower third, clear of him; the words' glow pulses like a heads-up line, the letters hold.

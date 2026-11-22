@@ -4,7 +4,7 @@
   "$B" -b --factory-startup --python scripts/cinema/props.py -- stormbreaker $M/stormbreaker.glb public/cinema/landing/axe.glb  (replaces 'axe')
   "$B" -b --factory-startup --python scripts/cinema/props.py -- bike  $M/batpod.glb public/cinema/chase/bike.glb
   "$B" -b --factory-startup --python scripts/cinema/props.py -- rifle $M/rifle.glb public/cinema/ops/rifle.glb
-  "$B" -b --factory-startup --python scripts/cinema/props.py -- bones $M/skeleton.glb public/cinema/dance/bones.glb
+  "$B" -b --factory-startup --python scripts/cinema/props.py -- relics $M/skeleton.glb public/cinema/dance/relics.glb
 
 axe:   Stormbreaker. axe1's gnarled branch handle (its own blade and lanyard cut away), axe2's crescent blade on one
        side of the head and its square hammer block turned to stand out on the other, a forged cap on top.
@@ -13,8 +13,10 @@ axe:   Stormbreaker. axe1's gnarled branch handle (its own blade and lanyard cut
        origin at the grip, haft along +Y (glTF), blade towards +X, hammer towards -X.
 bike:  the armoured bike at ~2.6 m, +Z forward (glTF), tyres on the ground (y = 0). Wheels cut out as their own
        nodes 'wheel_front' / 'wheel_back', each with its origin on its axle (spin about local X); the rest is 'bike'.
-bones: the silver metal skeleton, 1.75 m, with three straight claws per hand; node 'bones', origin between the
-       feet on the floor, and an empty 'grip' at its right ankle (where a hand would hold it to swing it).
+relics: the film's credit props, bare (dance.js writes the credits on them): nodes 'femur' (0.46 m, built from
+       spheres and cylinders, voxel-welded), 'skull' and 'claws' (the skeleton's right forearm and hand, with three
+       straight claws from the knuckles), each from the metal skeleton at 1.75 m tall. Each node's origin at its
+       middle, its long axis along +X (glTF), the side that carries the credit facing +Z, its top +Y.
 rifle: the assault rifle at 0.9 m, node 'rifle', origin in the middle of the pistol grip, barrel along +Z (glTF), top up (+Y).
 Every output: Draco geometry, WebP maps at most 1024 px.
 """
@@ -397,53 +399,93 @@ def bike(src, out):
     export(objs, out)
 
 
-# ---------------------------------------------------------------------------------------------- the skeleton
-def bones(src, out):
+# ---------------------------------------------------------------------------------------------- the relics
+def relics(src, out):
     m = load(src)
     V = co(m)
-    s = 1.75 / np.ptp(V[:, 2]); V *= s; V[:, 2] -= V[:, 2].min(); V[:, :2] -= V[:, :2].mean(0) * [1, 0]; set_co(m, V)
-    decimate(m, 16000)
-    V = co(m)
+    V *= 1.75 / np.ptp(V[:, 2]); V[:, 2] -= V[:, 2].min(); set_co(m, V)
+    parts = []
+
+    def piece(name, mask_fn, place):
+        """A copy of the skeleton cut to the faces mask_fn keeps, holes filled, moved by place(V) -> V."""
+        o = m.copy(); o.data = m.data.copy(); bpy.context.collection.objects.link(o)
+        keep_faces(o, mask_fn)
+        bm = bmesh.new(); bm.from_mesh(o.data)
+        bmesh.ops.holes_fill(bm, edges=bm.edges, sides=0); bm.to_mesh(o.data); bm.free()
+        o.name = o.data.name = name
+        return o
+
+    # The skull, from the neck up (the face is -Y in Blender, +Z in glTF).
+    skull = piece('skull', lambda C: C[:, 2] > 1.47, None)
+    # The right forearm and hand (+X), hanging; then three claws along the hand from the knuckles.
+    arm = piece('claws', lambda C: (C[:, 0] > 0.215) & (C[:, 2] > 0.57) & (C[:, 2] < 1.08), None)
+    A = co(arm)
+    tip = A[A[:, 2].argmin()]
+    hand = A[A[:, 2] < tip[2] + 0.2]
+    wrist = hand[hand[:, 2] > tip[2] + 0.15].mean(0)
+    knuck = hand[(hand[:, 2] > tip[2] + 0.06) & (hand[:, 2] < tip[2] + 0.1)].mean(0)
+    dirv = Vector(tip - wrist).normalized()
     claws = []
-    for side in (1, -1):
-        arm = V[(V[:, 0] * side > 0.2) & (V[:, 2] > 0.5) & (V[:, 2] < 1.1)]
-        tip = arm[arm[:, 2].argmin()]  # the fingertips (the hands hang at his sides)
-        hand = arm[arm[:, 2] < tip[2] + 0.2]
-        wrist = hand[hand[:, 2] > tip[2] + 0.15].mean(0)
-        knuck = hand[(hand[:, 2] > tip[2] + 0.06) & (hand[:, 2] < tip[2] + 0.1)].mean(0)
-        dirv = Vector(tip - wrist).normalized()
-        print('HAND', side, tip.round(3), knuck.round(3), wrist.round(3))
-        for j in (-1, 0, 1):
-            bm = bmesh.new()
-            L, w, t = 0.30, 0.014, 0.004
-            prof = [(-w / 2, -t / 2), (w / 2, -t / 2), (w / 2, t / 2), (-w / 2, t / 2)]
-            base = [bm.verts.new((x, y, 0)) for x, y in prof]
-            mid = [bm.verts.new((x, y, L * 0.85)) for x, y in prof]
-            pt = bm.verts.new((0, 0, L))
-            for i in range(4):
-                bm.faces.new((base[i], base[(i + 1) % 4], mid[(i + 1) % 4], mid[i]))
-                bm.faces.new((mid[i], mid[(i + 1) % 4], pt))
-            bm.faces.new(list(reversed(base)))
-            me = bpy.data.meshes.new('claw'); bm.to_mesh(me); bm.free()
-            o = bpy.data.objects.new('claw', me); bpy.context.collection.objects.link(o)
-            # Along the hand, from the knuckles, the three side by side across the knuckle line (front to back).
-            rot = Vector((0, 0, 1)).rotation_difference(dirv).to_matrix().to_4x4()
-            o.matrix_world = Matrix.Translation(Vector(knuck) + Vector((0, j * 0.022, 0)) - dirv * 0.03) @ rot
-            claws.append(o)
-    silver = pbr('adamantium', None, metallic=1.0, roughness=0.3, color=(0.78, 0.8, 0.84))
-    for o in [m] + claws:
-        o.data.materials.clear(); o.data.materials.append(silver)
+    for j in (-1, 0, 1):
+        bm = bmesh.new()
+        L, w, t = 0.30, 0.014, 0.004
+        prof = [(-w / 2, -t / 2), (w / 2, -t / 2), (w / 2, t / 2), (-w / 2, t / 2)]
+        base = [bm.verts.new((x, y, 0)) for x, y in prof]
+        mid = [bm.verts.new((x, y, L * 0.85)) for x, y in prof]
+        pt = bm.verts.new((0, 0, L))
+        for i in range(4):
+            bm.faces.new((base[i], base[(i + 1) % 4], mid[(i + 1) % 4], mid[i]))
+            bm.faces.new((mid[i], mid[(i + 1) % 4], pt))
+        bm.faces.new(list(reversed(base)))
+        me = bpy.data.meshes.new('claw'); bm.to_mesh(me); bm.free()
+        o = bpy.data.objects.new('claw', me); bpy.context.collection.objects.link(o)
+        rot = Vector((0, 0, 1)).rotation_difference(dirv).to_matrix().to_4x4()
+        o.matrix_world = Matrix.Translation(Vector(knuck) + Vector((0, j * 0.022, 0)) - dirv * 0.03) @ rot
+        claws.append(o)
     for o in bpy.context.selected_objects: o.select_set(False)
-    for o in [m] + claws: o.select_set(True)
-    bpy.context.view_layer.objects.active = m
+    for o in [arm] + claws: o.select_set(True)
+    bpy.context.view_layer.objects.active = arm
     bpy.ops.object.join(); bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
-    m.name = m.data.name = 'bones'
-    V = co(m)
-    foot = V[(V[:, 0] < -0.03) & (V[:, 2] < 0.14) & (V[:, 2] > 0.08)].mean(0)  # his right ankle (-X)
-    g = bpy.data.objects.new('grip', None); bpy.context.collection.objects.link(g)
-    g.location = Vector(foot); g.parent = m
-    export([m, g], out)
+    A = co(arm); c = (A.max(0) + A.min(0)) / 2
+    # Fingers and claws to +X, the back of the hand (+X, hanging) to the camera (-Y), front-to-back to up.
+    set_co(arm, np.stack([-(A[:, 2] - c[2]), -(A[:, 0] - c[0]), A[:, 1] - c[1]], 1))
+    S = co(skull); set_co(skull, S - (S.max(0) + S.min(0)) / 2)
+
+    # The femur: a shaft flaring to its ends, two condyles at the knee, the neck, head and trochanter at the hip.
+    bits = []
+    def add(op, loc, rot=(0, 0, 0), scale=(1, 1, 1), **kw):
+        op(location=loc, rotation=rot, **kw); o = bpy.context.active_object; o.scale = scale; bits.append(o)
+    cyl, cone, ball = bpy.ops.mesh.primitive_cylinder_add, bpy.ops.mesh.primitive_cone_add, bpy.ops.mesh.primitive_uv_sphere_add
+    R = (0, math.pi / 2, 0)
+    add(cyl, (0, 0, 0), R, radius=0.0165, depth=0.32, vertices=24)
+    add(cone, (0.165, 0, 0), R, radius1=0.0165, radius2=0.03, depth=0.05, vertices=24)
+    add(cone, (-0.165, 0, 0), (0, -math.pi / 2, 0), radius1=0.0165, radius2=0.025, depth=0.05, vertices=24)
+    add(ball, (0.2, 0.004, 0.022), scale=(1.1, 1, 1), radius=0.029)
+    add(ball, (0.2, 0.004, -0.022), scale=(1.1, 1, 1), radius=0.027)
+    add(ball, (0.195, 0.0, 0), scale=(1, 0.8, 1.3), radius=0.026)
+    add(cyl, (-0.205, 0, 0.022), (0, math.radians(40), 0), radius=0.016, depth=0.06, vertices=20)
+    add(ball, (-0.228, 0, 0.045), radius=0.026)
+    add(ball, (-0.2, 0.002, -0.016), scale=(1.3, 1, 1), radius=0.022)
+    for o in bpy.context.selected_objects: o.select_set(False)
+    for o in bits: o.select_set(True)
+    bpy.context.view_layer.objects.active = bits[0]
+    bpy.ops.object.join(); femur = bpy.context.active_object
+    bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
+    r = femur.modifiers.new('r', 'REMESH'); r.mode = 'VOXEL'; r.voxel_size = 0.0025
+    sm = femur.modifiers.new('s', 'SMOOTH'); sm.factor = 0.8; sm.iterations = 6
+    bpy.ops.object.modifier_apply(modifier='r'); bpy.ops.object.modifier_apply(modifier='s')
+    F = co(femur); set_co(femur, F - (F.max(0) + F.min(0)) / 2)
+    femur.name = femur.data.name = 'femur'
+
+    for o, n in ((femur, 5000), (skull, 9000), (arm, 7000)):
+        decimate(o, n)
+        o.data.materials.clear()
+        for p in o.data.polygons: p.use_smooth = True
+        print('SIZE', o.name, np.ptp(co(o), 0).round(3))
+    bpy.data.objects.remove(m, do_unlink=True)
+    export([femur, skull, arm], out)
+
 
 
 clear()
-{'axe': axe, 'stormbreaker': stormbreaker, 'rifle': rifle, 'bike': bike, 'bones': bones}[KIND](*ARGS)
+{'axe': axe, 'stormbreaker': stormbreaker, 'rifle': rifle, 'bike': bike, 'relics': relics}[KIND](*ARGS)
