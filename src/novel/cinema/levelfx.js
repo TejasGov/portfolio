@@ -23,6 +23,9 @@ import { Pass } from 'postprocessing'
  *   COMIC  the picture goes to print (halftone dots), then five comic panels with ink borders and paper
  *          gutters slam onto the page one by one, a POW burst pops in the middle, and the panels slide
  *          off the page onto the next world, which prints back into colour.
+ *   LASER  a security grid: thin red beams sweep across the frame and multiply into a dense lattice in a
+ *          red haze until it is all there is; at the plateau a white flare blooms from the middle and
+ *          fills the frame, then opens from the middle onto the next world (the white vault).
  * Every mode is whole (independent of the picture under it) across the plateau, so the swap is hidden.
  * It runs after tone mapping, on display-ready colour, so every colour below is what the screen shows.
  */
@@ -551,14 +554,72 @@ vec3 comic(vec2 uv, vec3 src) {
   return col;
 }
 
+// ---------------------------------------------------------------- laser
+const vec3 RED = vec3(1.0, 0.07, 0.05);
+const vec3 HOT = vec3(1.0, 0.62, 0.56);
+const vec3 VAULT = vec3(0.93, 0.96, 1.0); // the flare's white: cool, the vault's own
+// A beam's light at distance d (frame units) from its line: a hot core a pixel or two wide and its glow in the haze.
+vec3 beam(float d, float px) {
+  float core = exp(-d * d / (px * px * 1.6));
+  return RED * (core * 1.4 + exp(-abs(d) * 26.0) * 0.22) + HOT * core * 0.6;
+}
+vec3 laser(vec2 uv, vec3 src) {
+  float ph = uPhase;
+  float A = uRes.x / uRes.y;
+  vec2 c = (uv - 0.5) * vec2(A, 1.0);
+  float r = length(c) / length(vec2(A, 1.0) * 0.5);
+  float px = 1.4 * uScale / uRes.y;
+  // Going in: the light goes and the air fills with red haze as the beams multiply; by the plateau's
+  // start (0.44) the frame is all grid, whatever was under it.
+  float dark = ss(0.0, 0.44, ph);
+  float hz = n3(vec3(c * 0.5 + vec2(uTime * 0.01, 0.0), 0.41 + uTime * 0.006));
+  vec3 haze = vec3(0.09, 0.006, 0.012) * (0.6 + 0.8 * hz) * (0.5 + 1.5 * dark);
+  vec3 col = mix(src, src * 0.18 + haze, ss(0.0, 0.3, dark));
+  col = mix(col, haze, ss(0.25, 1.0, dark));
+  // Sweeping beams: each comes on at its own moment, crosses the frame at its own angle and keeps turning.
+  vec3 light = vec3(0.0);
+  float count = 1.0 + 13.0 * ss(0.02, 0.4, ph);
+  for (int k = 0; k < 14; k++) {
+    float fk = float(k);
+    float on = ss(fk, fk + 1.0, count);
+    if (on <= 0.0) break;
+    float h = hash(vec2(fk, 2.7)), h2 = hash(vec2(fk, 8.1));
+    float a = (h - 0.5) * 2.4 + sin(uTime * (0.3 + 0.3 * h2) + fk) * 0.25;
+    vec2 n = vec2(sin(a), cos(a));
+    float o = sin(uTime * (0.4 + 0.5 * h) + h2 * 6.28 + ph * 6.0) * 0.45;
+    light += beam(dot(c, n) - o, px) * on;
+  }
+  // ...and the lattice they become: two crossed families of parallel beams, closing in toward the plateau.
+  float dens = ss(0.12, 0.44, ph);
+  if (dens > 0.0) {
+    float sp = mix(0.3, 0.045, dens);
+    for (int k = 0; k < 2; k++) {
+      float a = k == 0 ? 0.42 : -0.42;
+      vec2 n = vec2(sin(a), cos(a));
+      float x = dot(c, n) / sp + uTime * (k == 0 ? 0.05 : -0.04) + ph * 2.0;
+      light += beam((fract(x) - 0.5) * sp, px) * dens * 0.8;
+    }
+  }
+  col += light * (1.0 - ss(0.47, 0.5, ph)); // the beams switch off under the flare
+  // The white flare: a burst from the middle across the plateau, the whole frame white by its middle.
+  float burst = ss(0.44, 0.5, ph) * 2.4 - r;
+  col = mix(col, VAULT, ss(0.0, 0.35, burst));
+  // Coming out: the white opens from the middle onto the world; the last of the flare lingers at the edges.
+  if (ph > 0.56) {
+    float open = ss(0.56, 0.95, ph) * 1.7 - r * 0.6;
+    col = mix(VAULT, src, ss(0.0, 0.9, open)) + VAULT * 0.25 * (1.0 - ss(0.56, 1.0, ph)) * ss(0.4, 1.0, r);
+  }
+  return col;
+}
+
 void main() {
   vec3 src = texture2D(inputBuffer, vUv).rgb;
   gl_FragColor = vec4(
     uMode < 0.5 ? cloud(vUv, src) : uMode < 1.5 ? tech(vUv) : uMode < 2.5 ? storm(vUv, src) : uMode < 3.5 ? flash(vUv, src)
-    : uMode < 4.5 ? whip(vUv, src) : uMode < 5.5 ? bats(vUv, src) : comic(vUv, src), 1.0);
+    : uMode < 4.5 ? whip(vUv, src) : uMode < 5.5 ? bats(vUv, src) : uMode < 6.5 ? comic(vUv, src) : laser(vUv, src), 1.0);
 }`
 
-const MODES = { cloud: 0, tech: 1, storm: 2, flash: 3, whip: 4, bats: 5, comic: 6 }
+const MODES = { cloud: 0, tech: 1, storm: 2, flash: 3, whip: 4, bats: 5, comic: 6, laser: 7 }
 
 export class LevelFxPass extends Pass {
   constructor(noise) {
@@ -577,7 +638,7 @@ export class LevelFxPass extends Pass {
     this.uniforms = this.fullscreenMaterial.uniforms
   }
 
-  /** kind: 'cloud' | 'tech' | 'storm' | 'flash' | 'whip' | 'bats' | 'comic'; phase 0..1 through the transition (0.5 = full cover). */
+  /** kind: 'cloud' | 'tech' | 'storm' | 'flash' | 'whip' | 'bats' | 'comic' | 'laser'; phase 0..1 through the transition (0.5 = full cover). */
   set(kind, phase, t) {
     this.uniforms.uMode.value = MODES[kind] ?? 0
     this.uniforms.uPhase.value = phase

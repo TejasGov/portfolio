@@ -6,7 +6,8 @@ import { loadTraveller, wearSuit, sky } from './films/kit'
  * Chapter Five, world 4: the chase (The Dark Knight, a fan's tribute). A night street of stone and glass
  * under elevated train tracks, wet asphalt carrying every light, sodium lamps in haze, burning wrecks and
  * drifting smoke. He rides the armoured bike (chase/bike.glb) in the armoured suit and cowl
- * (suits/bat.glb): toward a low camera, the twin guns flashing, through a shopping arcade in a burst of
+ * (suits/bat.glb), seated on it, hands on its grips and feet on its pegs (added
+ * here, the model has none), toward a low camera, the twin guns flashing, through a shopping arcade in a burst of
  * glass, up a wall and back down in a 180, and past a big articulated truck that flips end over end
  * behind him in slow motion and lands in a fireball (which the FLASH burns out from). No logos, signs or
  * lettering anywhere.
@@ -130,14 +131,64 @@ const TRUCK_X = -3.5, TRUCK_L = 18, TRUCK_H = 4.1
 
 // ---------------------------------------------------------------- his pose on the bike
 // Each bone's direction (from its head toward its child) in his own frame (facing +z, his left +x): low
-// and long over the tank, arms down to the side grips by the front wheel, knees in, feet back on the pegs.
+// and long over the tank, head up to the road. The limbs here are only a start for the IK in update(),
+// which closes his hands on the grips and sets his feet on the pegs every frame.
 const RIDE = {
-  Spine02: [0, 0.5, 0.86], Spine01: [0, 0.36, 0.93], Spine: [0, 0.3, 0.95], neck: [0, 0.5, 0.86], Head: [0, 0.82, 0.57],
-  LeftShoulder: [0.92, 0.05, 0.38], LeftArm: [0.38, -0.55, 0.74], LeftForeArm: [0.12, -0.6, 0.79], LeftHand: [0.05, -0.55, 0.83],
-  LeftUpLeg: [0.22, -0.82, 0.52], LeftLeg: [0.06, -0.35, -0.93], LeftFoot: [0.05, -0.75, -0.66], LeftToeBase: [0, -0.4, -0.9],
+  Spine02: [0, 0.14, 0.99], Spine01: [0, 0.22, 0.97], Spine: [0, 0.3, 0.95], neck: [0, 0.55, 0.83], Head: [0, 0.9, 0.44],
+  LeftShoulder: [0.92, 0.05, 0.38], LeftArm: [0.5, -0.45, 0.74], LeftForeArm: [0.1, -0.5, 0.86], LeftHand: [0, -0.45, 0.89],
+  LeftUpLeg: [0.3, -0.5, 0.81], LeftLeg: [0.05, -0.8, -0.6], LeftFoot: [0, -0.5, 0.87], LeftToeBase: [0, -0.3, 0.95],
 }
 for (const k of Object.keys(RIDE)) if (k.startsWith('Left')) { const [x, y, z] = RIDE[k]; RIDE['Right' + k.slice(4)] = [-x, y, z] }
-const SEAT = new THREE.Vector3(0, 0.98, -0.28) // where his hips sit, in the bike's own frame
+// In the bike's own frame (bike.glb: the deck tops out at y 0.69, the armoured cowl is 0.62 m wide at
+// z 0.1..0.4, the tail narrows to 0.36 m behind z -0.3).
+const SEAT = new THREE.Vector3(0, 0.73, -0.44) // his hips, low on the rear deck
+const GRIP = new THREE.Vector3(0.35, 0.655, 0.22) // the left grip's middle, out of the cowl's flank (x mirrored for the right)
+const PEG = new THREE.Vector3(0.27, 0.27, -0.32) // the left peg
+const WRIST = new THREE.Vector3(0, 0.035, -0.07) // his wrist from the grip: the mitt then wraps it
+const ANKLE = new THREE.Vector3(0, 0.07, -0.1) // his ankle from the peg: the ball of the foot on it
+const HAND_DIR = new THREE.Vector3(0, -0.5, 0.87), FOOT_DIR = new THREE.Vector3(0, -0.55, 0.84)
+const ELBOW = new THREE.Vector3(0.8, 0.45, -0.4), KNEE = new THREE.Vector3(0.45, 0, 1) // poles, left side
+
+// Two-bone IK, no allocation: scratch shared by every call.
+const _a = new THREE.Vector3(), _b = new THREE.Vector3(), _c = new THREE.Vector3(), _n = new THREE.Vector3()
+const _u = new THREE.Vector3(), _v = new THREE.Vector3(), _w = new THREE.Vector3(), _q = new THREE.Quaternion(), _pq = new THREE.Quaternion()
+/** Turn `bone` by the world rotation taking direction `from` to `to` (both unit), and refresh it and its children. */
+function turnBone(bone, from, to) {
+  _q.setFromUnitVectors(from, to)
+  bone.parent.getWorldQuaternion(_pq)
+  bone.quaternion.premultiply(_pq).premultiply(_q).premultiply(_pq.invert())
+  bone.updateMatrixWorld(true)
+}
+/** Turn `bone` by `angle` about a world `axis` (unit). */
+function spinBone(bone, axis, angle) {
+  if (!angle) return
+  bone.parent.getWorldQuaternion(_pq)
+  bone.quaternion.premultiply(_pq).premultiply(_q.setFromAxisAngle(axis, angle)).premultiply(_pq.invert())
+  bone.updateMatrixWorld(true)
+}
+/** Point a bone's own +y (this rig's bone axis) along world `dir`. */
+function aimBone(bone, dir) {
+  bone.getWorldQuaternion(_q)
+  turnBone(bone, _w.set(0, 1, 0).applyQuaternion(_q), dir)
+}
+/** Upper bone A, lower B, end C: C's head on world `target`, the bend toward world direction `pole`. */
+function twoBone(A, B, C, target, pole) {
+  A.getWorldPosition(_a)
+  B.getWorldPosition(_b)
+  C.getWorldPosition(_c)
+  const la = _a.distanceTo(_b), lb = _b.distanceTo(_c)
+  _n.subVectors(target, _a)
+  const d = THREE.MathUtils.clamp(_n.length(), Math.abs(la - lb) + 1e-3, la + lb - 1e-3)
+  _n.normalize()
+  const ca = (la * la + d * d - lb * lb) / (2 * la * d), sa = Math.sqrt(Math.max(0, 1 - ca * ca))
+  _u.copy(pole).addScaledVector(_n, -pole.dot(_n)).normalize()
+  _u.multiplyScalar(la * sa).addScaledVector(_n, la * ca).add(_a) // the elbow (knee)
+  turnBone(A, _v.subVectors(_b, _a).normalize(), _w.subVectors(_u, _a).normalize())
+  B.getWorldPosition(_b)
+  C.getWorldPosition(_c)
+  _a.addScaledVector(_n, d) // the reachable target
+  turnBone(B, _v.subVectors(_c, _b).normalize(), _w.subVectors(_a, _b).normalize())
+}
 
 /** The pose as bone-local quaternions: each named bone turned so it points along its direction. */
 function aimPose(bones, rest, aims) {
@@ -169,7 +220,7 @@ const FADE = /* glsl */ `
   #endif`
 
 /**
- * A cool backlit rim on his suit and the bike: a view-angle term, so the cowl, cape, armour and tyres
+ * A cool backlit rim on him and the bike: a view-angle term, so his jacket, the armour and the tyres
  * stand out of the dark in every shot without a light that would also flare on the wet road.
  */
 function rimLit(m, rim) {
@@ -828,7 +879,7 @@ export function createChase(renderer, { loader, mobile = false }) {
     const pxScale = { value: 900 }, size = new THREE.Vector2()
     const clockU = { uT: { value: 0 } }
     const COOL = new THREE.Color(0.3, 0.4, 0.65), FIRE = new THREE.Color(1.6, 0.68, 0.2)
-    const rimBike = { value: COOL.clone() }, rimSuit = { value: COOL.clone() }, rimTruck = { value: new THREE.Color(0, 0, 0) }
+    const rimBike = { value: COOL.clone() }, rimRider = { value: COOL.clone() }, rimTruck = { value: new THREE.Color(0, 0, 0) }
     const SODIUM = [1, 0.55, 0.2]
     scene.fog = new THREE.FogExp2('#2c1b10', mobile ? 0.0105 : 0.0095)
     const dome = sky({ top: '#120f10', mid: '#2e211b', low: '#5a3520', sunDir: new THREE.Vector3(0, 1, 0), sun: '#000000' })
@@ -1302,7 +1353,7 @@ export function createChase(renderer, { loader, mobile = false }) {
     })
     await step()
 
-    // ------------------------------------------------------------ the bike, the suit, him
+    // ------------------------------------------------------------ the bike and him
     const bikeG = new THREE.Group()
     scene.add(bikeG)
     const bikeScene = (await bikeFile).scene
@@ -1322,6 +1373,26 @@ export function createChase(renderer, { loader, mobile = false }) {
     })
     for (const n of ['wheel_front', 'wheel_back']) wheels.push(bikeScene.getObjectByName(n))
     bikeG.add(bikeScene)
+    // Bars and grips out of the cowl's flanks, and foot pegs on brackets low on the tail: one mesh.
+    {
+      const parts = []
+      for (const s of [-1, 1]) {
+        parts.push(
+          box(0.07, 0.06, 0.08, s * 0.24, GRIP.y - 0.03, GRIP.z), // the clamp on the cowl
+          cyl(0.015, 0.2, s * 0.32, GRIP.y, GRIP.z, 10), // the bar
+          cyl(0.023, 0.12, s * GRIP.x, GRIP.y, GRIP.z, 12), // the grip
+          cyl(0.028, 0.02, s * (GRIP.x + 0.065), GRIP.y, GRIP.z, 12), // its bar end
+          box(0.04, 0.12, 0.05, s * 0.2, PEG.y + 0.05, PEG.z), // the peg's bracket
+          cyl(0.017, 0.12, s * PEG.x, PEG.y, PEG.z, 10), // the peg
+        )
+      }
+      const m = new THREE.MeshStandardMaterial({ color: '#141414', roughness: 0.6, metalness: 0.4, envMapIntensity: 0.55 })
+      rimLit(m, rimBike)
+      const fit = new THREE.Mesh(mergeGeometries(parts), m)
+      parts.forEach(g => g.dispose())
+      fit.castShadow = fit.receiveShadow = true
+      bikeG.add(fit)
+    }
     // Headlight, the guns' muzzles (flash sprites and their light), all on the bike.
     const headFlare = flareSprite(new THREE.Color(1, 0.95, 0.85).multiplyScalar(1.1), 1.5)
     headFlare.position.set(0, 0.62, 1.32)
@@ -1409,8 +1480,8 @@ export function createChase(renderer, { loader, mobile = false }) {
       const mat = m.material
       if (mat.map) mat.map.colorSpace = THREE.NoColorSpace
       mat.envMapIntensity = 1.1
-      rimLit(mat, rimSuit)
-      m.receiveShadow = true
+      rimLit(mat, rimRider)
+      m.castShadow = m.receiveShadow = true
     }
     bikeG.add(root)
     const bones = []
@@ -1418,12 +1489,57 @@ export function createChase(renderer, { loader, mobile = false }) {
     const restQ = new Map(bones.map(b => [b, b.quaternion.clone()]))
     const rideQ = aimPose(bones, restQ, RIDE)
     bones.forEach((b, i) => b.quaternion.copy(rideQ[i]))
-    const hips = you.bone('Hips'), head = you.bone('Head')
-    const headQ = head.quaternion.clone()
+    const hips = you.bone('Hips'), head = you.bone('Head'), neck = you.bone('neck'), spine = you.bone('Spine02')
     root.updateMatrixWorld(true)
     bikeG.updateMatrixWorld(true)
     const hipsAt = bikeG.worldToLocal(hips.getWorldPosition(new THREE.Vector3()))
-    root.position.copy(SEAT).sub(hipsAt)
+    const rootAt = SEAT.clone().sub(hipsAt)
+    root.position.copy(rootAt)
+    // Each limb: its three bones, its end's place on the bike, the end bone's aim, the bend's pole (all in
+    // the bike's frame, mirrored for the right), and world-space scratch the solve writes each frame.
+    const limbs = []
+    for (const [side, s] of [['Left', 1], ['Right', -1]]) {
+      const m = v => new THREE.Vector3(v.x * s, v.y, v.z)
+      limbs.push(
+        { bones: ['Arm', 'ForeArm', 'Hand'].map(n => you.bone(side + n)), at: m(GRIP).add(m(WRIST)), dir: HAND_DIR, pole: m(ELBOW) },
+        { bones: ['UpLeg', 'Leg', 'Foot'].map(n => you.bone(side + n)), at: m(PEG).add(m(ANKLE)), dir: FOOT_DIR, pole: m(KNEE) },
+      )
+    }
+    for (const l of limbs) Object.assign(l, { wAt: new THREE.Vector3(), wDir: new THREE.Vector3(), wPole: new THREE.Vector3() })
+    const fwdW = new THREE.Vector3(), rightW = new THREE.Vector3(), upW = new THREE.Vector3()
+    /** His ride, each frame: seated, leaning with the bike, tucking, hands on the grips, feet on the pegs. */
+    const ride = (p, roll, watch, onWall, still) => {
+      bones.forEach((b, i) => b.quaternion.copy(rideQ[i]))
+      // Into the glass and down off the wall he tucks low; the landing sinks him into the seat.
+      const bump = (c, w) => Math.exp(-(((p - c) / w) ** 2))
+      const tuck = 0.16 * (bump(BREAK[0], 0.012) + bump(BREAK[1], 0.012)) + 0.12 * onWall * (1 - ss(0.648, 0.668, p)) + 0.12 * bump(0.705, 0.008)
+      // Hanging off the inside of a turn (the bike's roll leans him with it; he goes a little further).
+      const hang = THREE.MathUtils.clamp(roll, -0.6, 0.6)
+      root.position.copy(rootAt)
+      root.position.x -= 0.06 * hang
+      root.position.y -= 0.035 * bump(0.705, 0.008) + (still ? 0 : 0.006 * Math.sin(clock * 9))
+      root.updateMatrixWorld(true)
+      const e = bikeG.matrixWorld.elements
+      fwdW.set(e[8], e[9], e[10]).normalize()
+      rightW.set(e[0], e[1], e[2]).normalize()
+      upW.set(e[4], e[5], e[6]).normalize()
+      // On the wall's pivot he turns his shoulders into the swing.
+      const pivot = ss(0.645, 0.66, p) * (1 - ss(0.682, 0.698, p))
+      spinBone(spine, rightW, tuck)
+      spinBone(spine, fwdW, 0.45 * hang)
+      spinBone(spine, upW, -0.25 * pivot)
+      // His head: kept nearer level than the bike, up out of a tuck, toward the truck as it passes.
+      spinBone(neck, rightW, -0.8 * tuck)
+      spinBone(head, fwdW, -0.7 * hang)
+      spinBone(head, upW, -0.9 * watch - 0.35 * pivot)
+      for (const l of limbs) {
+        l.wAt.copy(l.at).applyMatrix4(bikeG.matrixWorld)
+        l.wPole.copy(l.pole).transformDirection(bikeG.matrixWorld)
+        l.wDir.copy(l.dir).transformDirection(bikeG.matrixWorld)
+        twoBone(l.bones[0], l.bones[1], l.bones[2], l.wAt, l.wPole)
+        aimBone(l.bones[2], l.wDir)
+      }
+    }
     await step()
 
     // ------------------------------------------------------------ light
@@ -1448,7 +1564,8 @@ export function createChase(renderer, { loader, mobile = false }) {
     beam.position.set(0, 0.62, 1.32 + 4.5)
     beam.renderOrder = 2
     bikeG.add(beam)
-    scene.add(key, key.target, moon, ...glow, flash, new THREE.HemisphereLight('#34425e', '#4a2c14', 1.6))
+    const hemi = new THREE.HemisphereLight('#34425e', '#4a2c14', 1.6)
+    scene.add(key, key.target, moon, ...glow, flash, hemi)
     const lamps = lightPoints(lights, pxScale)
     scene.add(lamps)
     // Reflections: the static lights, then the headlight, two muzzles, the truck's lamps and the fireball.
@@ -1517,14 +1634,13 @@ export function createChase(renderer, { loader, mobile = false }) {
       // Wheels: their travel, plus a turn on the clock so a held frame still runs.
       const spin = distAt(p) / 0.344 + clock * (still ? 0 : 14) * (1 - 0.8 * slow)
       for (const w of wheels) w.rotation.x = -spin
-      // His head turns to watch the truck go by, and the bike shudders on the road.
-      const watch = ss(0.565, 0.585, p) * (1 - ss(0.6, 0.615, p))
-      head.quaternion.copy(headQ).multiply(qa.setFromAxisAngle(Yx, -0.9 * watch))
+      // The bike shudders on the road; he rides it (his head turns to watch the truck go by).
       if (!still && onWall < 0.5) {
         bikeG.position.y += Math.sin(clock * 37) * 0.006 + Math.sin(clock * 23.7) * 0.004
         bikeG.rotateZ(Math.sin(clock * 11) * 0.012)
       }
       bikeG.updateMatrixWorld(true)
+      ride(p, roll * (1 - onWall), ss(0.565, 0.585, p) * (1 - ss(0.6, 0.615, p)), onWall, still)
       here.copy(bikeAt).setY(bikeAt.y + 1)
 
       // ---- the guns: bursts of flashes in the guns' stretch; tracers ride the bike's line.
@@ -1631,8 +1747,13 @@ export function createChase(renderer, { loader, mobile = false }) {
         glow[2].distance = 45
       }
       rimTruck.value.copy(FIRE).multiplyScalar(0.35 * lit)
-      // His cowl and cape take the fire's warm rim at the wall and under the truck, so he stands off the bike.
-      rimSuit.value.lerpColors(COOL, FIRE, Math.max(ss(0.6, 0.625, p) * (1 - ss(0.71, 0.725, p)), lit))
+      // At the wall (fire behind him) a stronger cool rim, back light and shadow fill, so he, his hands on
+      // the grips and his seat read against the orange; under the truck his cowl and cape take the fire's warm rim.
+      const wall = ss(0.55, 0.6, p) * (1 - ss(0.72, 0.75, p))
+      rimBike.value.copy(COOL).multiplyScalar(1 + 1.6 * wall)
+      rimRider.value.copy(rimBike.value).lerp(FIRE, lit)
+      moon.intensity = 1.1 + 2.6 * wall
+      hemi.intensity = 1.6 + 0.9 * wall
 
       // ---- moving reflections
       mz.set(0, 0.62, 1.3).applyMatrix4(bikeG.matrixWorld)

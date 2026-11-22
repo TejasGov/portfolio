@@ -12,24 +12,26 @@ const EXIT = 'Epilogue · House lights' // from BACK the camera backs out of the
 
 /*
  * Chapter Five, "The Big Screen": after Four's game the projector starts a new reel and the camera
- * pushes back into the screen for six fan-tribute scenes in one scroll (cinema/movies.js): Spider-Man
+ * pushes back into the screen for seven fan-tribute scenes in one scroll (cinema/movies.js): Spider-Man
  * swinging through golden-hour Manhattan, Iron Man's dive and suit-up, Thor's landing with Stormbreaker,
- * the Dark Knight's bike chase, the 2022 final, and Deadpool's "Bye Bye Bye" fight-dance. The words live
+ * the Dark Knight's bike chase, the vault hang (Mission: Impossible), Deadpool's "Bye Bye Bye"
+ * fight-dance, and last the 2022 final, which plays on the screen as the camera backs out. The words live
  * here, set like a film's title cards. Progress starts as the chapter rises into view, so it picks up
  * exactly where Four's back-out leaves the hall. Every window below is in the chapter's P (movies.js lays
  * it out in svh; UNIT turns the three-world chapter's P lengths into today's, so edges keep their feel).
  */
 const S = p => chapterP('swing', p), D = p => chapterP('dive', p), L = p => chapterP('landing', p)
-const C = p => chapterP('chase', p), F = p => chapterP('final', p), X = p => chapterP('dance', p)
+const C = p => chapterP('chase', p), V = p => chapterP('vault', p), X = p => chapterP('dance', p), F = p => chapterP('final', p)
 // The slates name each scene as a fan's tribute; the final keeps its two factual captions. No lyric
 // lines anywhere: the dance's only words are its title phrase and the scene's sound effects.
 const SLATES = {
-  swing: { at: [S(0.03), S(0.15)], label: 'Scene one', text: 'Spider-Man', skip: true, top: true }, // top: on a phone it stays up, clear of his crouch on the finial
+  swing: { at: [S(0.03), S(0.15)], label: 'Scene one', text: 'Spider-Man', skip: true }, // on a phone every slate docks under the header (five.css)
   dive: { at: [D(0.265), D(0.355)], edge: 0.008 * UNIT, anchor: D(0.075), label: 'Scene two', text: 'Iron Man' }, // from the rim dive to 'Suit up' (both sit low on a phone): Spider-Man owns the pad landing; the ticket still lands on the pad wide
   landing: { at: [L(0.16), L(0.5)], label: 'Scene three', text: 'Thor' },
   chase: { at: [C(0.12), C(0.32)], label: 'Scene four', text: 'The Dark Knight' },
-  final: { at: [F(0.14), F(0.42)], label: 'Scene five', text: 'The final' },
+  vault: { at: [V(0.12), V(0.32)], anchor: V(0.39), label: 'Scene five', text: 'Mission: Impossible' }, // the ticket lands on the hold (p ~.45): him level on the wires, just above the tiles
   dance: { at: [X(0.1), X(0.3)], label: 'Scene six', text: 'Deadpool & Wolverine' },
+  final: { at: [F(0.14), F(0.42)], label: 'Scene seven', text: 'The final' },
 }
 const EDGE = 0.015 * UNIT
 const BEATS = [
@@ -93,7 +95,7 @@ export default function ChapterFive() {
               </div>
             ) : (
               // A title card: top-left, quiet, legible over a night city, a dusk ridge or floodlight.
-              <div key={k} ref={bind(k)} className={`five-slate ${b.top ? 'five-top' : ''} ${b.skip ? 'pointer-events-auto' : 'pointer-events-none'} col-start-1 row-start-1 max-w-[24rem] self-start rounded-sm bg-[rgb(6_10_20/0.85)] p-5 text-white opacity-0`}>
+              <div key={k} ref={bind(k)} className={`five-slate ${b.skip ? 'pointer-events-auto' : 'pointer-events-none'} col-start-1 row-start-1 max-w-[24rem] self-start rounded-sm bg-[rgb(6_10_20/0.85)] p-5 text-white opacity-0`}>
                 <p className="kicker text-[#8fc8ff]">{b.label}</p>
                 <p className="mt-2 font-display text-[1.9rem] leading-[1.05]">{b.text}</p>
                 {b.skip && <a href="#epilogue" className="kicker mt-3 inline-flex min-h-11 items-center text-white/85 underline-offset-4 hover:underline">Skip to contact ↓</a>}

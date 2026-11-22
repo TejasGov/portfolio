@@ -3,7 +3,8 @@
 README: how to rebuild public/cinema/suits/<name>.glb (Blender 5.2, run from E:/portfolio)
   B="C:/Program Files/Blender Foundation/Blender 5.2/blender.exe"
   "$B" -b --factory-startup --python scripts/cinema/suit_skin.py -- <name> <meshy suit.glb> public/cinema/traveller.glb public/cinema/suits/<name>.glb
-  name is spider | thor | bat | deadpool (the Meshy inputs are spider.glb, thor.glb, batsuit.glb, deadpool.glb).
+  name is spider | thor | bat | deadpool | stealth (the Meshy inputs are spider.glb, thor.glb, batsuit.glb, deadpool.glb,
+  stealth.glb).
   Check the result posed by his own clips with scripts/cinema/suit_check.py (renders a contact sheet).
 
 What it does
@@ -11,7 +12,7 @@ What it does
      measured off the mesh, his joints are carried into the suit by the same landmarks, and every vertex is
      warped by suit_fit.py's smooth blend of per-bone fits (segment suit joint -> his bone, scaled across the
      bone by his girth over the suit's, a little inflated so no skin pokes through).
-  2. Thor only: the Meshy head, hair and beard are cut off above the collar (his own head shows).
+  2. Thor and stealth: the Meshy head (and Thor's hair and beard) are cut off above the collar (his own head shows).
   3. Skin: vertex weights from his skinned body by Data Transfer (nearest face, interpolated), capes re-weighted
      to the spine with a falloff from the shoulders (so a cape follows the torso, not the legs), then smoothed,
      limited to 4 bones and normalised.
@@ -156,6 +157,14 @@ for n in names: SEG[n][4] = k
 ls, lt, i = Ds.argmin(0), Dt.argmin(0), names.index('Head')
 rs, rt = np.percentile(Ds[i][ls == i], 40), np.percentile(Dt[i][lt == i], 40)
 SEG['Head'][4] = SEG['neck'][4] = float(np.clip(1.04 * rt / rs, k, 1.3))
+if NAME == 'spider':
+    # A fitted mask, not a hood: scale the mask evenly by his head's girth (rather than stretching it up to the
+    # top of his hair into an egg), and give the neck its own, slimmer girth so it narrows under the jaw.
+    sa, sb, ba = SEG['Head'][0], SEG['Head'][1], SEG['Head'][2]
+    SEG['Head'][3] = ba + (SEG['Head'][3] - ba) / np.linalg.norm(SEG['Head'][3] - ba) * SEG['Head'][4] * np.linalg.norm(sb - sa)
+    j = names.index('neck')
+    if (ls == j).any() and (lt == j).any():
+        SEG['neck'][4] = float(np.clip(1.04 * np.percentile(Dt[j][lt == j], 40) / np.percentile(Ds[j][ls == j], 40), k, SEG['Head'][4]))
 print('GIRTH', {n: round(SEG[n][4], 2) for n in names})
 
 W = np.exp(-((Ds - Ds.min(0)) / 0.035) ** 2); W /= W.sum(0)
@@ -163,11 +172,22 @@ Vh = np.c_[V, np.ones(len(V))]
 NV = sum(W[i][:, None] * (Vh @ mapping(*SEG[n]).T)[:, :3] for i, n in enumerate(names))
 me.vertices.foreach_set('co', NV.astype(np.float32).ravel()); me.update()
 
-# ------------------------------------------------------------------ Thor: off with the Meshy head (his own shows)
-if NAME == 'thor':
+# ------------------------------------------------------------------ Thor, stealth: off with the Meshy head (his own shows)
+if NAME in ('thor', 'stealth'):
     bm = bmesh.new(); bm.from_mesh(me)
     cut = B['neck'][2] + 0.035
     head = [f for f in bm.faces if (c := f.calc_center_median()).z > cut and abs(c.x) < 0.13 and c.y < 0.09]
+    if NAME == 'stealth':
+        # No hood or cape: the whole head goes, and the Meshy neck's bare skin above the collar (any face that is not
+        # the black suit, by its base colour), so only his own neck shows over the collar.
+        img = next(n.image for n in me.materials[0].node_tree.nodes if n.type == 'TEX_IMAGE' and any(l.to_socket.name == 'Base Color' for l in n.outputs[0].links))
+        iw, ih = img.size; px = np.empty(iw * ih * 4, np.float32); img.pixels.foreach_get(px); px = px.reshape(ih, iw, 4)
+        uvl = bm.loops.layers.uv.active
+        def lum(f):
+            u = sum((l[uvl].uv for l in f.loops), Vector((0, 0))) / len(f.loops)
+            return px[int(u.y % 1 * (ih - 1)), int(u.x % 1 * (iw - 1)), :3].mean()
+        head = [f for f in bm.faces if (c := f.calc_center_median()).z > B['neck'][2] - 0.07 and abs(c.x) < 0.13
+                and (c.z > cut or lum(f) > 0.22)]
     bmesh.ops.delete(bm, geom=head, context='FACES')
     loose = [v for v in bm.verts if not v.link_faces]
     bmesh.ops.delete(bm, geom=loose, context='VERTS')
@@ -222,6 +242,13 @@ if NAME == 'deadpool':
     Wm = (1 - back[:, None]) * Wm + back[:, None] * Wk
     Wh = np.zeros_like(Wm); Wh[:, G['Spine']] = 0.8; Wh[:, G['Spine01']] = 0.2  # the hilts: rigid on the chest
     Wm = (1 - hilt[:, None]) * Wm + hilt[:, None] * Wh
+if NAME == 'spider':
+    # The mask is rigid on his head: from just under the Head joint up, all Head (his hair's neck and spine
+    # weights stretched the back of the mask into a hood whenever he looked down).
+    h = np.clip((V[:, 2] - (B['Head'][2] - 0.04)) / 0.06, 0, 1) * (np.abs(V[:, 0]) < Lt['chest'])
+    h = h * h * (3 - 2 * h)
+    Wr = np.zeros_like(Wm); Wr[:, G['Head']] = 1
+    Wm = (1 - h[:, None]) * Wm + h[:, None] * Wr
 top = np.argsort(-Wm, 1)[:, 4:]
 np.put_along_axis(Wm, top, 0, 1)
 Wm /= np.maximum(Wm.sum(1, keepdims=True), 1e-8)
@@ -239,6 +266,21 @@ mat = me.materials[0]; mat.name = 'suit_' + NAME
 bpy.data.objects.remove(body, do_unlink=True)
 for o in list(bpy.data.objects):
     if o not in (arm, suit): bpy.data.objects.remove(o, do_unlink=True)
+
+# Stealth: markers on his Hips bone for the vault's hang lines (bone-local; wearSuit copies meshes only, so a world
+# reads marker.position / quaternion and adds its own Object3D to his Hips bone). The harness is a sit harness:
+# its belt at z ~0.86 m; 'harness_ring' on the back of the belt (the lift point face down), 'harness_front' its
+# front belay loop.
+if NAME == 'stealth':
+    bpy.context.view_layer.update()
+    Vw = np.array([suit.matrix_world @ v.co for v in me.vertices])
+    band = Vw[(np.abs(Vw[:, 0]) < 0.03) & (np.abs(Vw[:, 2] - 0.86) < 0.02)]
+    for nm, y in (('harness_ring', band[:, 1].max()), ('harness_front', band[:, 1].min())):
+        e = bpy.data.objects.new(nm, None); bpy.context.collection.objects.link(e)
+        e.parent = arm; e.parent_type = 'BONE'; e.parent_bone = 'Hips'
+        bpy.context.view_layer.update()
+        e.matrix_world = Matrix.Translation((0, float(y), 0.86))
+        print('MARKER', nm, (0, round(float(y), 3), 0.86))
 
 # Maps: base colour 2048, the others 1024.
 for n in mat.node_tree.nodes:

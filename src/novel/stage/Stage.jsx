@@ -14,6 +14,7 @@ const reduced = () => matchMedia('(prefers-reduced-motion: reduce)').matches
  */
 export default function Stage() {
   const canvas = useRef(null)
+  const reel = useRef(null)
 
   useEffect(() => {
     let world
@@ -22,9 +23,30 @@ export default function Stage() {
     const mobile = matchMedia('(max-width: 760px)').matches
     const mouse = new THREE.Vector2()
     const lens = new THREE.Vector3()
-    const resize = () => world?.resize(innerWidth, innerHeight)
+    let poster = false // the last frame drawn was under the poster, which hides the booth: hold it
+    const resize = () => ((poster = false), world?.resize(innerWidth, innerHeight))
 
-    createCinema(canvas.current, { mobile }).then(async w => {
+    // The poster's lattice (hero/lattice.js) resolves over its first few seconds: the booth's startup (its
+    // noise volume, the bakes' uploads, its first compile: frames of 70-300 ms) waits until about when that
+    // is done, or until the reader scrolls or asks the box office. A scroll asks in the browser's idle time
+    // (at most 400 ms on), so the startup's first step doesn't land inside the reader's scroll frame.
+    let started = false, later = 0, asked = false
+    const start = () => {
+      if (started || !alive) return
+      started = true
+      clearTimeout(later)
+      removeEventListener('scroll', early)
+      removeEventListener('novel:warm', start)
+      boot()
+    }
+    const early = () => scrollY > 0 && !asked && ((asked = true), window.requestIdleCallback ? requestIdleCallback(start, { timeout: 400 }) : setTimeout(start, 100))
+    const onLoad = () => (later = setTimeout(start, reduced() ? 0 : 5500))
+    addEventListener('scroll', early, { passive: true })
+    addEventListener('novel:warm', start)
+    if (document.readyState === 'complete') onLoad()
+    else addEventListener('load', onLoad, { once: true })
+
+    const boot = () => createCinema(canvas.current, { mobile }).then(async w => {
       if (!alive) return
       world = w
       if (import.meta.env.DEV) window.__world = w
@@ -42,6 +64,7 @@ export default function Stage() {
       if (window.requestIdleCallback) requestIdleCallback(build, { timeout: 3000 })
       else setTimeout(build, 1000)
     })
+    if (scrollY > 0) start() // a reload part-way down: no poster to wait for
 
     // Adaptive resolution: if frames run long for about a second, render at 80% of the pixel ratio
     // (never below 0.7). Long gaps (a tab switch, a paper chapter) don't count.
@@ -70,12 +93,13 @@ export default function Stage() {
     // for a moment (the store can follow the scroll a frame late), wherever the chapter's own P was.
     // dir: which way the reader travels (1 down, -1 up), so Five prepares the world they are heading into.
     // It turns only after a quarter screen the other way, so a nudge doesn't swap what is kept.
-    let lastFrame = 0, gliding = false, lastY = scrollY, snapUntil = 0, jumped = false, dir = 1, turnY = scrollY
+    // landed: no scroll since the last jump (cleared by the reader's own scroll, unlike jumped).
+    let lastFrame = 0, gliding = false, lastY = scrollY, snapUntil = 0, jumped = false, landed = false, dir = 1, turnY = scrollY
     const glide = now => {
       const y = scrollY
-      if (Math.abs(y - lastY) > innerHeight) (snapUntil = now + 200), (jumped = true), (dir = 1), (turnY = y) // a jump lands to watch on
+      if (Math.abs(y - lastY) > innerHeight) (snapUntil = now + 200), (jumped = landed = true), (dir = 1), (turnY = y) // a jump lands to watch on
       else if (y !== lastY) {
-        jumped = false // the reader scrolls on from where the jump landed
+        jumped = landed = false // the reader scrolls on from where the jump landed
         if ((y - lastY) * dir > 0) turnY = y
         else if (Math.abs(y - turnY) > innerHeight / 4) (dir = -dir), (turnY = y)
       }
@@ -108,6 +132,8 @@ export default function Stage() {
         return
       }
       warmed = false
+      // Under the poster (opaque over the booth until its wipe begins, ~0.065): the frame drawn stands.
+      if (poster && view.prologue < 0.06 && section(view) === 'prologue') return
       govern(now)
       const k = reduced() ? 0 : 0.06
       mouse.x += (store.mouse.x - mouse.x) * k
@@ -136,17 +162,28 @@ export default function Stage() {
       // for the reader to scroll, rather than compiling over a scene that plays on the clock; or, once the
       // landed world is warm, for a second's pause, so a reader who watches first still finds the next warm.
       if (jumped && paused && world.isWarm(near[0]) && now - snapUntil > 1000) jumped = false
-      const run = sec === 'five' && jumped ? near.slice(0, 1) : todo
-      const after = sec === 'five' && !jumped ? five.LEVELS[lv + 2 * dir]?.name : null
-      if (after && !world.debug.built[after]) world.prepare(after) // a fresh world only builds: its models fetch and parse
+      // Then, until the reader scrolls, only the world on screen and the one they head into: the one after waits.
+      const run = sec === 'five' && jumped ? near.slice(0, 1) : sec === 'five' && landed ? near.slice(0, 2) : todo
+      // A world further ahead only builds (its models fetch and parse, nothing on the GPU) once what is
+      // nearer is built: Five's world after next; Four's level after next; from Three, Four's second level,
+      // so a fling through the arcade finds the village built, not held under its cloud while it loads.
+      const after = sec === 'five' ? (landed ? null : five.LEVELS[lv + 2 * dir]?.name) : sec === 'four' ? LEVELS[lv + 2]?.name : sec === 'three' ? LEVELS[1]?.name : null
+      if (after && !world.debug.built[after] && todo.every(n => world.debug.built[n])) world.prepare(after)
       world.still = paused
-      if (run && paused) for (const name of run) world.prepare(name)
+      if (run && paused && sec !== 'five') for (const name of run) world.prepare(name)
+      else if (run && paused) {
+        // Five's worlds play on the clock: one prepares at a time, and a second's rest follows each, so
+        // their builds and compiles (each within budget) never run back to back over a scene being watched.
+        if (spacing && world.isWarm(spacing)) (restUntil = now + 1000), (spacing = null)
+        const next = run.find(n => !world.isWarm(n))
+        if (next && (next === spacing || now >= restUntil)) world.prepare((spacing = next))
+      }
       if (paused) evict(sec, todo, now)
       // Five's worlds play on the clock, so a paused stall is seen too: there the next world prepares while
       // scrolling, its compile and uploads sliced a step a calm frame (world.js), never under a cover; and
       // what is no longer near is released, a world a calm frame (the one two behind, one on a phone).
       else if (sec === 'five') {
-        if (gap < 24 && !at.kind) {
+        if (world.calm && !at.kind) {
           for (const name of run) if (!world.isWarm(name)) world.prepare(name)
           if (tidy !== (lv + 1) * dir && evict(sec, todo, now)) tidy = (lv + 1) * dir
         }
@@ -157,14 +194,20 @@ export default function Stage() {
         requestIdleCallback(() => { idleAsk = false; if (alive) for (const name of todo) world.prepare(name) }, { timeout: 1500 })
       }
       world.render(st)
+      poster = sec === 'prologue' && view.prologue < 0.06
+      // A world reached before it was ready holds its seam's cover: after a moment, say so.
+      heldAt = world.held ? heldAt || now : 0
+      const wait = !!heldAt && now - heldAt > 300
+      if (wait !== waiting && reel.current) (waiting = wait), (reel.current.style.opacity = wait ? '1' : '0')
       lens.copy(LENS).project(world.camera)
       store.lens = [(lens.x * 0.5 + 0.5) * 100, (0.5 - lens.y * 0.5) * 100]
       store.takeover = { flood: st.flood, sweep: st.sweep }
       store.camDist = world.camera.position.distanceTo(LENS)
     }
 
-    // GPU memory: Five's six worlds are not all kept on the GPU (desktop estimates with world.debug.gpu(), MB:
-    // swing 61.5, dive 80.7, landing 96.4, chase 77, final 29.5, dance 80.7; journey 118, arcade 189). While the reader is in Four, Five or the epilogue, a Five world outside what that section prepares
+    // GPU memory: Five's seven worlds are not all kept on the GPU (desktop estimates with world.debug.gpu(), MB:
+    // swing 61.5, dive 80.7, landing 96.4, chase 77, vault (measure once built), dance 80.7, final 29.5;
+    // journey 118, arcade 189): at most four of them on a desktop, two on a phone. While the reader is in Four, Five or the epilogue, a Five world outside what that section prepares
     // (the world on screen, the next, on a desktop the one after it and the one behind; in Four the first one or two, in the epilogue the last one or two)
     // is released, one per paused frame (in Five also per calm scrolling frame), the furthest behind the
     // reader first, and prepared again on approach exactly as the first time; a box office jump asks for
@@ -182,9 +225,12 @@ export default function Stage() {
       const drop = n => !keep.has(n) && world.isWarm(n) && world.release(n)
       // Not in the push-in: Four's last world is still fading off the cinema's screen there.
       if (sec === 'epilogue' || (sec === 'five' && view.five >= five.LEVELS[0].walk[0])) for (const n of OLD) if (drop(n)) return false
+      // A phone lets the journey go once the arcade is behind (~120 MB): Three prepares it again on the way back.
+      if (mobile && sec === 'four' && levelAt(view.four).i > 0 && drop('journey')) return false
       for (const n of dir > 0 ? FWD : BWD) if (drop(n)) return false
       return true // nothing left to release
     }
+    let spacing = null, restUntil = 0 // Five, paused: the world being prepared, and the rest after it
     let tidy = null // Five, scrolling: the world and direction evict() last found nothing to release in
 
     // The warm-up contract (the box office): window 'novel:warm' with detail { worlds: [names] } prepares
@@ -210,12 +256,16 @@ export default function Stage() {
     const KNOWN = new Set(['journey', ...LEVELS.map(l => l.name), ...five.LEVELS.map(l => l.name)])
     addEventListener('novel:warm', onWarm)
 
-    let scrolled = 0, warmed = false, idleAsk = false
+    let scrolled = 0, warmed = false, idleAsk = false, heldAt = 0, waiting = false
     const onScroll = () => { scrolled = performance.now() }
     addEventListener('scroll', onScroll, { passive: true })
     addEventListener('resize', resize)
     return () => {
       alive = false
+      clearTimeout(later)
+      removeEventListener('scroll', early)
+      removeEventListener('novel:warm', start)
+      removeEventListener('load', onLoad)
       cancelAnimationFrame(raf)
       removeEventListener('scroll', onScroll)
       removeEventListener('novel:warm', onWarm)
@@ -224,5 +274,13 @@ export default function Stage() {
     }
   }, [])
 
-  return <canvas ref={canvas} className="fixed inset-0 h-svh w-screen opacity-0 transition-opacity duration-[1500ms]" aria-hidden="true" />
+  return (
+    <>
+      <canvas ref={canvas} className="fixed inset-0 h-svh w-screen opacity-0 transition-opacity duration-[1500ms]" aria-hidden="true" />
+      {/* Shown over a held cover (world.held): the white cloud or laser flare is a reel still loading, not a blank page. */}
+      <p ref={reel} aria-hidden="true" className="kicker pointer-events-none fixed bottom-[max(96px,14svh)] left-1/2 z-[2] -translate-x-1/2 rounded-sm bg-[rgb(6_10_20/0.82)] px-4 py-2 whitespace-nowrap text-white opacity-0 motion-safe:transition-opacity motion-safe:duration-300">
+        Loading reel…
+      </p>
+    </>
+  )
 }

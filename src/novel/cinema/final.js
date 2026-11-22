@@ -1,26 +1,29 @@
 import * as THREE from 'three'
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js'
+import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js'
 import { loadTraveller, alohaLinear, sky, holdIn } from './films/kit'
 
 /*
- * Chapter Five, world 3: the final. A packed night stadium, floodlights, smoke, a crowd in sky-blue and
- * white with flags and scarves waving. On the pitch a team in light-blue-and-white vertical stripes
- * (generic toon players: no faces of real people, no names, numbers, sponsor or federation marks)
- * gathers for the lift: one raises an original golden cup, the squad piles in and jumps together,
- * confetti and gold streamers burst, fireworks over the roof. He stands pitch-side in the crowd's
- * colours and joins the jump. It ends on the lifted cup in the confetti; at p = 1 it plays on the
- * cinema's screen while the camera backs out into the hall, and fades there as the epilogue rises.
- * Everything here is built in code but him: a two-tier bowl under a cantilevered roof ringed with
- * floodlight gantries, a crowd of instanced cards (they bounce, wave, hold scarves, flags and a card
- * stunt, and flash their phones), the squad as one instanced, shader-posed mesh, and the confetti,
- * streamers, cold-spark fountains and fireworks as instanced quads driven from p and t on the GPU.
+ * Chapter Five, world 7 (the last): the final. A packed night stadium, floodlights, smoke, a crowd in sky-blue and
+ * white with flags and scarves waving. On a stage on the pitch a team in light-blue-and-white stripes
+ * (generic Meshy footballers: no real person's face or likeness, no names, sponsor or federation marks)
+ * cheers round the captain, told apart by the 10 on his back, the armband, the black robe, his place
+ * centre stage under a spotlight and the cup: an original golden cup on a plinth, which he lifts at
+ * LIFT and holds up while the team jumps, confetti and gold streamers burst, fireworks over the roof;
+ * at the end he turns to the far stands so the last shot reads his 10. He stands pitch-side in the
+ * crowd's colours and joins the jump. At p = 1 it plays on the cinema's screen while the camera backs
+ * out into the hall, and fades there as the epilogue rises. Built in code but him and the footballers
+ * (public/cinema/final): a two-tier bowl under a cantilevered roof ringed with floodlight gantries, a
+ * crowd of instanced cards (they bounce, wave, hold scarves, flags and a card stunt, and flash their
+ * phones), and the confetti, streamers, cold-spark fountains and fireworks as instanced quads driven
+ * from p and t on the GPU.
  *
  * CONTRACT (world.js, timeline.js and movies.js rely on it; do not change the export or its signature)
  *   export function createFinal(renderer, { loader, normalize, mobile }) -> { scene, camera, update, built }
  *     loader: the shared GLTFLoader (Meshopt + Draco). normalize(root, size, yaw): a model's meshes as
  *     one centred group scaled to `size` metres. mobile: phone-sized screen, build lighter.
  *   update(state, t, aspect) is called once per rendered frame while this world is drawn.
- *     state.p         0..1, this world's own progress (movies.js: Five's P 0.68..0.93), driven by scroll:
+ *     state.p         0..1, this world's own progress (movies.js: Five's P 0.8703..0.9716), driven by scroll:
  *                     it scrubs both ways and can jump, so derive everything from p and t and keep no
  *                     one-way state. The FLASH cover resolves over p 0..0.1 (its camera flashes become the
  *                     crowd's: a crowd flashing there continues them); p 0.1..1 is seen clear. p stays at
@@ -189,9 +192,10 @@ const ROT = 'vec3 turn(vec3 v, vec3 ax, float a) { float c = cos(a), s = sin(a);
 
 /*
  * The camera, as keys [p, position, look-at]: a low crane pushing in from the near touchline to pitch level behind
- * his shoulder as the squad gathers, low for the lift, and still for the last shot (the cup up in the
- * confetti, him jumping at the left), which is also the picture on the cinema's screen. A phone's tall
- * frame stands behind him instead, so he and the cup stack in it.
+ * his shoulder as the squad gathers, a medium shot on the captain for the lift, a beat on him jumping,
+ * close behind the captain as he turns (the 10), and still for the last shot (the captain's back, the
+ * cup up over the far stands), which is also the picture on the cinema's screen. A phone's tall frame
+ * ends nearer: the captain centre frame in his spotlight, the 10 and the cup up.
  */
 const WIDE = [
   [0, 24, 9, 46, -2, 6, 22],
@@ -199,27 +203,32 @@ const WIDE = [
   [0.32, 14.5, 2.6, 41.5, 0, 2.6, 28],
   [0.46, 11, 1.6, 39.6, 0.6, 2.2, 29.2],
   [0.57, 9.5, 1.3, 38.8, 0.6, 2, 29.8],
-  [0.62, 2.5, 0.75, 38.6, 0.5, 2.5, 30.9], // the lift: pushed in low on the lifter, the cup against the floodlit roof
-  [0.68, -1.6, 0.8, 38.6, 0.5, 2.8, 30.9],
-  [0.74, -3.2, 0.85, 38.2, 0.5, 2.7, 30.9],
-  [0.8, 3.4, 1.4, 41.8, 6, 1.5, 37.5], // a beat on him mid-jump, close enough for the scarf
-  [0.86, 3.6, 1.4, 41.6, 5.6, 1.6, 37.4],
-  [0.94, 10.9, 1.3, 39.2, 0.8, 3, 30.2], // back to the wide for the back-out
-  [1, 10.9, 1.3, 39.2, 0.8, 3, 30.2],
+  [0.62, 2.9, 1.5, 33.9, 0.5, 1.9, 30.95], // the lift: a medium 3/4 on the captain, armband side, the cup against the floodlit roof
+  [0.68, 1.6, 1.5, 34.5, 0.5, 1.9, 30.95],
+  [0.74, 0, 1.5, 34.7, 0.5, 1.9, 30.95],
+  [0.8, 2.9, 1.45, 39.6, 6, 1.4, 37.5], // a beat on him mid-jump, close enough for the scarf (inside the near board, z 40.1)
+  [0.86, 3.1, 1.45, 39.5, 5.6, 1.5, 37.4],
+  [0.9, 4.6, 1.6, 36, 0.5, 1.9, 30.95],
+  [0.935, 4.3, 1.55, 33.2, 0.5, 1.9, 30.95], // close behind the captain as he turns: the 10 and the robe
+  [0.97, 5.3, 1.8, 35.3, 0.6, 1.9, 30.95], // the last shot: the captain centre frame in his pool, his back (the 10), the cup up over the far stands (he is behind the camera)
+  [1, 5.3, 1.8, 35.3, 0.6, 1.9, 30.95],
 ]
 const TALL = [
-  [0, 18, 8, 45, 0, 4, 25],
-  [0.16, 15, 5, 44, 0.5, 3, 27],
-  [0.32, 11.5, 3.2, 42.6, 0.8, 1.8, 29],
+  [0, 18, 8, 45, 0.5, 2.4, 30.9],
+  [0.16, 12.5, 4.4, 42.5, 0.5, 1.8, 30.9],
+  [0.32, 11.5, 3.2, 42.6, 0.8, 1.7, 30.6],
   [0.46, 8.9, 1.95, 42.6, 2.2, 1.7, 30.5],
-  [0.57, 8.4, 1.5, 41.4, 1.4, 1.7, 29.8],
-  [0.62, 2, 0.9, 40, 0.5, 2.4, 30.9],
-  [0.68, -0.6, 0.9, 39.9, 0.5, 2.6, 30.9],
-  [0.74, -2, 0.9, 39.6, 0.5, 2.5, 30.9],
-  [0.8, 4, 1.5, 42.5, 6, 1.4, 37.5],
-  [0.86, 4.2, 1.5, 42.3, 5.8, 1.5, 37.4],
-  [0.94, 10.2, 1.55, 42.2, 1.2, 2.9, 30],
-  [1, 10.2, 1.55, 42.2, 1.2, 2.9, 30],
+  [0.57, 7.6, 1.6, 39.3, 1.2, 1.5, 30.2],
+  // From the lift on, the look sits below his chest so he and the cup fill the upper frame and the caption (low) lies over the pitch.
+  [0.62, 4.25, 1.4, 37.45, 0.5, 0.9, 30.95],
+  [0.68, 2.82, 1.4, 38.08, 0.5, 0.9, 30.95],
+  [0.74, 1.29, 1.4, 38.41, 0.5, 0.9, 30.95],
+  [0.8, 3.3, 1.5, 39.7, 6, 1.2, 37.5], // inside the near board (z 40.1), so the pitch fills the lower frame
+  [0.86, 3.5, 1.5, 39.6, 5.8, 1.3, 37.4],
+  [0.9, 4.2, 1.8, 37, 0.5, 1.6, 30.95],
+  [0.935, 4.6, 1.7, 33.3, 0.5, 1.55, 30.95], // close behind him as he turns: the 10 reads
+  [0.97, 5.4, 2.1, 35.6, 0.5, 1.75, 30.95], // the last shot: the captain centre frame in his pool, the 10 and the cup up
+  [1, 5.4, 2.1, 35.6, 0.5, 1.75, 30.95],
 ]
 const cr = (a, b, c, d, u) => 0.5 * (2 * b + (c - a) * u + (2 * a - 5 * b + 4 * c - d) * u * u + (3 * b - a - 3 * c + d) * u * u * u)
 /** Catmull-Rom through the keys at p: the camera's position and where it looks. */
@@ -232,81 +241,6 @@ function track(keys, p, pos, look) {
   look.set(cr(a[4], b[4], c[4], d[4], u), cr(a[5], b[5], c[5], d[5], u), cr(a[6], b[6], c[6], d[6], u))
 }
 
-/*
- * A footballer, built once and drawn instanced: generic toon proportions, no face, no number, no marks.
- * aPart says which joint moves a vertex (0 torso and head, 1 and 2 the arms, 3 and 4 the left thigh and
- * shin, 5 and 6 the right), aKind how it is painted (0 its colour, 1 the striped shirt, 2 skin, 3 hair).
- * Facing +z, feet at y = 0, 1.78 m tall.
- */
-function playerGeometry() {
-  const parts = []
-  const add = (geo, part, kind, hex, x, y, z, sx = 1, sy = 1, sz = 1) => {
-    const g = bake(geo.scale(sx, sy, sz), hex, at(x, y, z))
-    const n = g.attributes.position.count
-    g.setAttribute('aPart', new THREE.BufferAttribute(new Float32Array(n).fill(part), 1))
-    g.setAttribute('aKind', new THREE.BufferAttribute(new Float32Array(n).fill(kind), 1))
-    parts.push(g)
-  }
-  const sph = (r, w = 12, h = 8) => new THREE.SphereGeometry(r, w, h)
-  const SHORTS = '#15171e'
-  for (const s of [1, -1]) {
-    const T = s > 0 ? 3 : 5
-    add(box(0.1, 0.075, 0.27), T + 1, 0, '#1a1a1f', s * 0.1, 0.04, 0.04)
-    add(cyl(0.052, 0.06, 0.44), T + 1, 0, '#eef0ee', s * 0.1, 0.3, 0)
-    add(sph(0.058), T + 1, 2, '#fff', s * 0.1, 0.5, 0.005)
-    add(cyl(0.083, 0.062, 0.26), T, 2, '#fff', s * 0.1, 0.62, 0)
-    add(cyl(0.11, 0.1, 0.26), T, 0, SHORTS, s * 0.1, 0.83, 0)
-  }
-  add(cyl(0.175, 0.17, 0.17), 0, 0, SHORTS, 0, 0.94, 0, 1, 1, 0.72)
-  const torso = [[0.001, 0.9], [0.165, 0.92], [0.172, 1.05], [0.19, 1.27], [0.198, 1.37], [0.168, 1.46], [0.07, 1.5], [0.001, 1.505]]
-  add(new THREE.LatheGeometry(torso.map(([r, y]) => new THREE.Vector2(r, y)), 16), 0, 1, '#fff', 0, 0, 0, 1, 1, 0.7)
-  add(cyl(0.048, 0.055, 0.11), 0, 2, '#fff', 0, 1.53, 0)
-  add(sph(0.104, 14, 10), 0, 2, '#fff', 0, 1.665, 0.008, 0.92, 1.06, 1)
-  add(new THREE.SphereGeometry(0.11, 14, 7, 0, TAU, 0, Math.PI * 0.5).rotateX(-0.55), 0, 3, '#fff', 0, 1.675, -0.012, 0.94, 1, 1.02) // swept back off the forehead
-  for (const s of [1, -1]) {
-    const A = s > 0 ? 1 : 2
-    add(sph(0.072, 10, 8), A, 1, '#fff', s * 0.225, 1.425, 0)
-    add(cyl(0.066, 0.056, 0.22), A, 1, '#fff', s * 0.24, 1.32, 0)
-    add(cyl(0.046, 0.036, 0.44), A, 2, '#fff', s * 0.245, 1.0, 0)
-    add(sph(0.048, 8, 6), A, 2, '#fff', s * 0.245, 0.77, 0.01)
-  }
-  return mergeGeometries(parts)
-}
-// The squad's pose, in the shader (iArm: left and right raise 0..1, spread, lean; iLeg: hip and knee,
-// left then right), mirrored in handOf() for the cup in the lifter's hands.
-const POSE_GLSL = /* glsl */ `
-attribute float aPart; attribute float aKind; attribute vec4 iArm; attribute vec4 iLeg; attribute vec3 iSkin; attribute vec3 iHair;
-varying float vKind; varying float vRestX; varying vec3 vSkin; varying vec3 vHair;
-mat3 rotX(float a) { float c = cos(a), s = sin(a); return mat3(1.0, 0.0, 0.0, 0.0, c, s, 0.0, -s, c); }
-mat3 rotZ(float a) { float c = cos(a), s = sin(a); return mat3(c, s, 0.0, -s, c, 0.0, 0.0, 0.0, 1.0); }
-void pose(inout vec3 p, inout vec3 n) {
-  int part = int(aPart + 0.5);
-  if (part >= 3) {
-    bool left = part <= 4;
-    float side = left ? 1.0 : -1.0;
-    vec3 H = vec3(0.1 * side, 0.94, 0.0), K = vec3(0.1 * side, 0.5, 0.0);
-    if (part == 4 || part == 6) { mat3 Rk = rotX(left ? iLeg.y : iLeg.w); p = Rk * (p - K) + K; n = Rk * n; }
-    mat3 Rh = rotX(-(left ? iLeg.x : iLeg.z)); p = Rh * (p - H) + H; n = Rh * n;
-  } else {
-    if (part >= 1) {
-      float side = part == 1 ? 1.0 : -1.0;
-      vec3 S = vec3(0.235 * side, 1.43, 0.0);
-      mat3 Ra = rotX(-(part == 1 ? iArm.x : iArm.y) * 3.14159265) * rotZ(side * iArm.z);
-      p = Ra * (p - S) + S; n = Ra * n;
-    }
-    vec3 T = vec3(0.0, 0.94, 0.0);
-    mat3 Rl = rotX(iArm.w); p = Rl * (p - T) + T; n = Rl * n;
-  }
-}`
-/** A hand of player `m` (instance matrix) in world space, as the shader poses it: side 1 left, -1 right. */
-function handOf(side, raise, spread, lean, m, out) {
-  out.set(side * 0.01, -0.64, 0).applyAxisAngle(Z, side * spread).applyAxisAngle(X, -raise * Math.PI)
-  out.x += side * 0.235
-  out.y += 1.43 - 0.94
-  out.applyAxisAngle(X, lean)
-  out.y += 0.94
-  return out.applyMatrix4(m)
-}
 
 // Billboards: quads at -1..1 turned to the camera in view space.
 const SOFT_FS = /* glsl */ `
@@ -367,7 +301,7 @@ export function createFinal(renderer, { loader, mobile = false }) {
     const PX = PW / 112, pc = document.createElement('canvas')
     pc.width = PW
     pc.height = PH
-    const pg = pc.getContext('2d')
+    const pg = pc.getContext('2d', { willReadFrequently: true }) // a CPU canvas: the grain's read-back below is a copy, not a GPU stall
     for (let i = 0; i < 16; i++) {
       pg.fillStyle = i % 2 ? '#3d9441' : '#48a64c'
       pg.fillRect((i * PW) / 16, 0, PW / 16 + 1, PH)
@@ -385,6 +319,7 @@ export function createFinal(renderer, { loader, mobile = false }) {
       if ((y & 63) === 63) await step()
     }
     pg.putImageData(img, 0, 0)
+    await step()
     {
       const M = x => PW / 2 + x * PX, N = z => PH / 2 + z * PX
       pg.strokeStyle = pg.fillStyle = 'rgba(244,248,244,0.92)'
@@ -443,7 +378,7 @@ export function createFinal(renderer, { loader, mobile = false }) {
       }
       glows.push([c0.x + face.x, c0.y + face.y, c0.z + face.z, 6.5, 6.5, 0, rnd(), 1, 0.9, 0.76])
       if (i % 3 === 0) glows.push([c0.x + face.x, c0.y + face.y, c0.z + face.z, 30, 0.5, 1, rnd(), 0.32, 0.3, 0.28])
-      if (i % 4 === 3) await step()
+      await step()
     }
     // Pitch-side boards (their faces are the LED strip, below) and the goals.
     const led = [sweep([[20.97, 11.4, 20.97, 12.8, '#ffffff']], { uv: true })]
@@ -475,13 +410,16 @@ export function createFinal(renderer, { loader, mobile = false }) {
     set.push(bake(box(SW, SH, SD), '#9aa3b8', at(SX, SH / 2, SZ)), bake(box(3.2, SH / 2, 0.6), '#9aa3b8', at(SX, SH / 4, SZ + SD / 2 + 0.3)))
     for (const z of [-1, 1]) lit.push(bake(box(SW + 0.04, 0.04, 0.05), '#ffc35a', at(SX, SH, SZ + (z * SD) / 2), 1.8))
     for (const x of [-1, 1]) lit.push(bake(box(0.05, 0.04, SD), '#ffc35a', at(SX + (x * SW) / 2, SH, SZ), 1.8))
+    await step()
     add(new THREE.Mesh(mergeGeometries(set), new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.82, metalness: 0.08, side: THREE.DoubleSide })))
+    await step()
     add(new THREE.Mesh(mergeGeometries(lit), new THREE.MeshBasicMaterial({ vertexColors: true, fog: false })))
     const netTex = canvasTexture(64, 64, g => {
       g.strokeStyle = 'rgba(255,255,255,1)'
       g.lineWidth = 3
       g.strokeRect(0, 0, 64, 64)
     }, [16, 16])
+    await step()
     add(new THREE.Mesh(mergeGeometries(nets), new THREE.MeshBasicMaterial({ color: '#cfd6d6', alphaMap: netTex, transparent: true, opacity: 0.55, side: THREE.DoubleSide, depthWrite: false })))
     // The club level's lit windows, between the tiers.
     const winTex = canvasTexture(256, 64, g => {
@@ -813,46 +751,66 @@ export function createFinal(renderer, { loader, mobile = false }) {
     await step()
 
     // ------------------------------------------------------------ the squad, the stage and the cup
-    const NS = 19
-    const sqG = playerGeometry()
-    const armA = new THREE.InstancedBufferAttribute(new Float32Array(NS * 4), 4).setUsage(THREE.DynamicDrawUsage)
-    const legA = new THREE.InstancedBufferAttribute(new Float32Array(NS * 4), 4).setUsage(THREE.DynamicDrawUsage)
-    const SKINS = [[0.88, 0.68, 0.54], [0.8, 0.58, 0.44], [0.62, 0.43, 0.31], [0.92, 0.74, 0.6], [0.7, 0.5, 0.36]], HAIRS = [[0.06, 0.05, 0.04], [0.16, 0.11, 0.07], [0.28, 0.19, 0.11], [0.04, 0.04, 0.05]]
-    const skinA = new Float32Array(NS * 3), hairA = new Float32Array(NS * 3)
-    for (let i = 0; i < NS; i++) skinA.set(SKINS[Math.floor(rnd() * SKINS.length)], i * 3), hairA.set(HAIRS[Math.floor(rnd() * HAIRS.length)], i * 3)
-    sqG.setAttribute('iArm', armA)
-    sqG.setAttribute('iLeg', legA)
-    sqG.setAttribute('iSkin', new THREE.InstancedBufferAttribute(skinA, 3))
-    sqG.setAttribute('iHair', new THREE.InstancedBufferAttribute(hairA, 3))
-    const squadMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.62 })
-    squadMat.onBeforeCompile = sh => {
-      sh.vertexShader = sh.vertexShader
-        .replace('#include <common>', '#include <common>\n' + POSE_GLSL)
-        .replace('#include <beginnormal_vertex>', 'vec3 objectNormal = vec3(normal); vec3 posed = vec3(position); pose(posed, objectNormal);\nvKind = aKind; vRestX = position.x; vSkin = iSkin; vHair = iHair;')
-        .replace('#include <begin_vertex>', 'vec3 transformed = posed;')
-      sh.fragmentShader = sh.fragmentShader
-        .replace('#include <common>', '#include <common>\nvarying float vKind; varying float vRestX; varying vec3 vSkin; varying vec3 vHair;')
-        .replace('#include <color_fragment>', /* glsl */ `
-          if (vKind > 0.5 && vKind < 1.5) diffuseColor.rgb = mix(vec3(0.96), vec3(0.45, 0.69, 0.91), step(0.5, fract(vRestX * 5.9 + 0.25)));
-          else if (vKind > 1.5 && vKind < 2.5) diffuseColor.rgb = vSkin;
-          else if (vKind > 2.5) diffuseColor.rgb = vHair;
-          else diffuseColor.rgb *= vColor.rgb;`)
+    // Meshy footballers on their own skeletons (public/cinema/final, scripts/cinema/footballer.py): one
+    // player cloned for the team-mates (geometry and maps shared), and the captain: the 10 on his back, the
+    // armband, the black robe. No real person's face: they are generic. Each poses from p and t: a cheer
+    // before the lift, a jump or a cheer after, weighted by p, with their clip times set from t.
+    const files = await Promise.all(['player', 'captain'].map(n => loader.loadAsync(`/cinema/final/${n}.glb`).catch(() => null)))
+    t0 = performance.now() // a new task after the load
+    const asPainted = g => g?.scene.traverse(o => { if (o.isMesh && o.material.map) o.material.map.colorSpace = THREE.NoColorSpace })
+    files.forEach(asPainted)
+    const [mateFile, capFile] = files
+    // Around the captain on the stage (x, z from the stage's centre): the front pair, the flanks, two rows behind.
+    const SPOTS = [[-1.3, 1.0], [1.4, 0.95], [-2.6, 0.55], [2.7, 0.5], [-0.7, 0.05], [0.75, 0.1], [-1.95, -0.45], [2.0, -0.4], [-3.8, -0.1], [3.9, -0.05]]
+    const CLIPS = ['Victory_Cheer', 'Cheer_with_Both_Hands', 'happy_jump_m', 'Cheer_with_Both_Hands_Up']
+    const clipOf = (g, n) => g.animations.find(c => c.name === n)
+    const players = [] // { root, mixer, a: before the lift, b: after, ra, rb: their rates, ph }
+    const playerAt = (g, x, z, yaw, sc, pre, post, rate) => {
+      const root = SkeletonUtils.clone(g.scene)
+      root.traverse(o => { if (o.isMesh) o.frustumCulled = false })
+      root.position.set(SX + x, SH, SZ + z)
+      root.rotation.y = yaw
+      root.scale.setScalar(sc)
+      const mixer = new THREE.AnimationMixer(root)
+      const a = mixer.clipAction(clipOf(g, pre)), b = mixer.clipAction(clipOf(g, post))
+      a.play()
+      b.play()
+      scene.add(root)
+      const P = { root, mixer, a, b, x, z, ra: rate * (0.9 + 0.2 * rnd()), rb: rate * (0.9 + 0.2 * rnd()), ph: rnd() * 20 }
+      players.push(P)
+      return P
     }
-    const squad = add(new THREE.InstancedMesh(sqG, squadMat, NS), false)
-    squad.instanceMatrix.setUsage(THREE.DynamicDrawUsage)
-    // Where each stands: gathered tight round the lifter (index 0) at the front, three rows deep; before
-    // that, spread out across the stage, facing every way, waving to the stands. The lifter walks in last.
-    const GATHER = [[0, 1.35], [-2.25, 1.0], [-1.5, 1.2], [1.5, 1.2], [2.25, 1.0]]
-    for (let i = 0; i < 7; i++) GATHER.push([-2.4 + i * 0.8 + (rnd() - 0.5) * 0.12, 0.38 + (rnd() - 0.5) * 0.15])
-    for (let i = 0; i < 7; i++) GATHER.push([-2.1 + i * 0.7 + (rnd() - 0.5) * 0.12, -0.42 + (rnd() - 0.5) * 0.15])
-    const SQUAD = GATHER.map(([gx, gz], i) => {
-      const sx = i ? THREE.MathUtils.clamp(gx * 2.2 + (rnd() - 0.5) * 0.8, -4.7, 4.7) : -4.3
-      const sz = i ? THREE.MathUtils.clamp(gz * 1.9 + (rnd() - 0.5) * 0.6, -2.1, 2.1) : 2.1
-      return {
-        sx, sz, gx, gz, dist: Math.hypot(gx - sx, gz - sz),
-        syaw: rnd() < 0.3 ? Math.PI + (rnd() - 0.5) : (rnd() - 0.5) * 2.4,
-        gyaw: i ? Math.atan2(8 - gx, 14) * 0.6 : 0.25,
-        rank: rnd(), ph: rnd() * TAU, sc: i ? 0.95 + rnd() * 0.1 : 1,
+    const mateMats = [] // shared by every clone
+    mateFile?.scene.traverse(o => { if (o.isMesh && !mateMats.includes(o.material)) mateMats.push(o.material) })
+    if (mateFile) {
+      for (const [i, [x, z]] of SPOTS.slice(0, mobile ? 6 : 10).entries()) {
+        const pre = CLIPS[i % 2], post = CLIPS[[2, 3, 0, 2, 3][i % 5]]
+        playerAt(mateFile, x, z, Math.atan2(-x * 0.5, 6) + (rnd() - 0.5) * 0.4, 0.96 + rnd() * 0.08, pre, post, 1)
+        await step()
+      }
+    }
+    // The captain, centre stage behind the cup's plinth: cheering, then the lift (his both-hands-up clip
+    // scrubbed by p to the top and held there, bobbing), and at the end he turns to the far stands so the
+    // seats read the 10 under the spotlight.
+    const CAP = { x: 0, z: 1.35, yaw: 0.25, turn: -2.1, up: 0.8 } // up: the clip's time with the cup highest; turn: his back to the last shot's camera
+    const CUP_S = 1.2 // the cup a touch heroic, so it reads from the cinema's seats; no taller, so held up by its handles it clears his face
+    const captain = capFile && playerAt(capFile, CAP.x, CAP.z, CAP.yaw, 1, 'Cheer_with_Both_Hands', 'Cheer_with_Both_Hands_Up', 1)
+    const capHands = captain && ['LeftHand', 'RightHand', 'LeftForeArm', 'RightForeArm'].map(n => captain.root.getObjectByName(n))
+    // His robe is painted into the one Meshy texture as low-saturation grey with khaki trim: read it as
+    // black satin with a warm-gold trim (and the yellow armband glowing a little) by colour, in the shader.
+    captain?.root.traverse(o => {
+      if (!o.isMesh) return
+      o.material.customProgramCacheKey = () => 'final-captain'
+      o.material.onBeforeCompile = s => {
+        s.fragmentShader = s.fragmentShader
+          .replace('#include <map_fragment>', `#include <map_fragment>
+            float robeK, trimK;
+            { vec3 c = diffuseColor.rgb; float mx = max(c.r, max(c.g, c.b)), sat = (mx - min(c.r, min(c.g, c.b))) / max(mx, 1e-3);
+              robeK = (1.0 - smoothstep(0.07, 0.14, sat)) * smoothstep(0.16, 0.24, mx) * (1.0 - smoothstep(0.6, 0.7, mx));
+              trimK = smoothstep(0.12, 0.2, sat) * smoothstep(0.55, 0.7, (c.g - c.b) / max(c.r - c.b, 1e-3)) * smoothstep(0.3, 0.45, mx);
+              diffuseColor.rgb = mix(c, c * 0.22, robeK); }`)
+          .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\nroughnessFactor = mix(roughnessFactor, 0.38, robeK);')
+          .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\ntotalEmissiveRadiance += vec3(1.0, 0.7, 0.28) * trimK * 0.9;')
       }
     })
     // An original cup: a stepped foot, a slender stem with a knot, a tall flared bowl with a rolled lip,
@@ -881,8 +839,66 @@ export function createFinal(renderer, { loader, mobile = false }) {
       }
     })
     envTex.mapping = THREE.EquirectangularReflectionMapping
-    const cup = add(new THREE.Mesh(cupG, new THREE.MeshStandardMaterial({ color: new THREE.Color().setRGB(1, 0.86, 0.5, THREE.LinearSRGBColorSpace), metalness: 1, roughness: 0.22, envMap: envTex, envMapIntensity: 1.8 })), false)
-    cup.scale.setScalar(1.65) // a touch heroic, so it reads from the cinema's seats
+    const cup = add(new THREE.Mesh(cupG, new THREE.MeshStandardMaterial({ color: new THREE.Color().setRGB(1, 0.86, 0.5, THREE.LinearSRGBColorSpace), metalness: 1, roughness: 0.26, envMap: envTex, envMapIntensity: 1 })), false)
+    cup.scale.setScalar(CUP_S)
+    // Where the cup sits in his hands: its handles at his palms, a little in front of him.
+    const HANDLE = 0.4 * CUP_S, GRIP = 0.17 * CUP_S, FWD = 0.17 // the handles' height and their loops' outer edge (x) in the cup's frame
+    const pa = new THREE.Vector3(), pb = new THREE.Vector3(), pf = new THREE.Vector3()
+    const palm = (hand, fore, out) => out.sub(fore.getWorldPosition(pf)).normalize().multiplyScalar(0.07).add(hand.getWorldPosition(pf))
+    const cupHeld = (yaw, out) => {
+      palm(capHands[0], capHands[2], capHands[0].getWorldPosition(pa))
+      palm(capHands[1], capHands[3], capHands[1].getWorldPosition(pb))
+      return out.addVectors(pa, pb).multiplyScalar(0.5).add(_w.set(Math.sin(yaw) * FWD, -HANDLE, Math.cos(yaw) * FWD))
+    }
+    // His hands onto the handles: a few CCD passes on each arm (forearm, then upper arm) bring the palm to
+    // its handle, blended over the clip's pose by w. Left hand (+x in his frame) to the cup's +x handle.
+    const arms = captain ? [['Left', 1], ['Right', -1]].map(([n, s]) => ({ s, arm: captain.root.getObjectByName(n + 'Arm'), fore: capHands[s > 0 ? 2 : 3], hand: capHands[s > 0 ? 0 : 1], q0: new THREE.Quaternion(), q1: new THREE.Quaternion() })) : []
+    // The captain's armband, worn over the robe's sleeve on his left upper arm, so it reads from the front too.
+    if (arms[0]?.arm) {
+      const fore = arms[0].fore.position, band = holdIn(arms[0].arm, new THREE.Group())
+      band.position.copy(fore).multiplyScalar(0.4)
+      band.quaternion.setFromUnitVectors(Y, _v.copy(fore).normalize())
+      band.add(new THREE.Mesh(cyl(0.082, 0.078, 0.075, 16), new THREE.MeshStandardMaterial({ color: '#ffd23a', emissive: '#ffb000', emissiveIntensity: 0.35, roughness: 0.6 })))
+    }
+    const ikT = new THREE.Vector3(), ikE = new THREE.Vector3(), ikB = new THREE.Vector3(), ikA = new THREE.Vector3(), ikQ = new THREE.Quaternion(), ikP = new THREE.Quaternion()
+    const reach = (A, w) => {
+      if (w <= 0.001 || !A.arm) return
+      A.q0.copy(A.arm.quaternion)
+      A.q1.copy(A.fore.quaternion)
+      ikT.set(A.s * GRIP, HANDLE, 0).applyAxisAngle(Y, cup.rotation.y).add(cup.position)
+      for (let it = 0; it < 4; it++) for (const B of [A.fore, A.arm]) {
+        palm(A.hand, A.fore, A.hand.getWorldPosition(ikE))
+        B.getWorldPosition(ikB)
+        ikE.sub(ikB).normalize()
+        ikA.subVectors(ikT, ikB).normalize()
+        B.parent.getWorldQuaternion(ikP)
+        ikQ.setFromUnitVectors(ikE, ikA).premultiply(_q.copy(ikP).invert()).multiply(ikP) // the world turn in the parent's frame
+        B.quaternion.premultiply(ikQ)
+        B.updateMatrixWorld(true)
+      }
+      if (w < 1) {
+        ikQ.copy(A.arm.quaternion); A.arm.quaternion.slerpQuaternions(A.q0, ikQ, w)
+        ikQ.copy(A.fore.quaternion); A.fore.quaternion.slerpQuaternions(A.q1, ikQ, w)
+        A.arm.updateMatrixWorld(true)
+      }
+    }
+    // The plinth the cup waits on, where his hands find it (his lift clip's first frame); it sinks into the
+    // stage once the cup is up.
+    const rest = new THREE.Vector3(SX + CAP.x + Math.sin(CAP.yaw) * 0.3, SH + 0.42, SZ + CAP.z + Math.cos(CAP.yaw) * 0.3)
+    if (captain) {
+      captain.a.setEffectiveWeight(0)
+      captain.b.setEffectiveWeight(1)
+      captain.b.time = 0
+      captain.mixer.update(0)
+      captain.root.updateMatrixWorld(true)
+      cupHeld(CAP.yaw, rest)
+    }
+    const PLH = Math.max(0.2, rest.y - SH)
+    const plinth = add(new THREE.Mesh(mergeGeometries([
+      bake(cyl(0.2, 0.24, PLH, 32), '#1a1b22', at(0, -PLH / 2, 0)),
+      bake(cyl(0.215, 0.215, 0.03, 32), '#ffc35a', at(0, -0.015, 0), 1.2),
+      bake(cyl(0.25, 0.25, 0.03, 32), '#ffc35a', at(0, -PLH + 0.015, 0), 1.2),
+    ]), new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.35, metalness: 0.6 })), false)
     // A glint on its lip and a star across it, once it is up.
     const glintP = new THREE.InstancedBufferAttribute(new Float32Array(6), 3).setUsage(THREE.DynamicDrawUsage)
     const glintG = instanced(QUAD, 2, { iS: [new Float32Array([0.9, 0.9, 0, 0.3, 7, 0.09, 1, 0.6]), 4], iC: [new Float32Array([1.6, 1.3, 0.8, 0.7, 0.6, 0.45]), 3] })
@@ -898,15 +914,35 @@ export function createFinal(renderer, { loader, mobile = false }) {
     })
     const blobMat = o => new THREE.MeshBasicMaterial({ map: blobTex, transparent: true, depthWrite: false, opacity: o, polygonOffset: true, polygonOffsetFactor: -2, color: '#000000' })
     const flat = new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2)
-    const blobs = add(new THREE.InstancedMesh(flat, blobMat(1), NS + 1), false), longs = add(new THREE.InstancedMesh(flat, blobMat(0.45), NS + 1), false)
-    blobs.instanceMatrix.setUsage(THREE.DynamicDrawUsage)
-    longs.instanceMatrix.setUsage(THREE.DynamicDrawUsage)
+    const blobs = add(new THREE.InstancedMesh(flat, blobMat(1), players.length + 1), false), longs = add(new THREE.InstancedMesh(flat, blobMat(0.45), players.length + 1), false)
     const SHADE = new THREE.Vector2(-0.5, -0.87) // away from the key light, on the ground
     const shadowAt = (i, x, y, z, k) => {
       blobs.setMatrixAt(i, _m.compose(_v.set(x, y + 0.012, z), _q.identity(), _s.set(0.85 * k, 1, 0.85 * k)))
       longs.setMatrixAt(i, _m.compose(_v.set(x + SHADE.x * 1.05, y + 0.01, z + SHADE.y * 1.05), _q.setFromAxisAngle(Y, Math.atan2(SHADE.x, SHADE.y)), _s.set(0.5 * k, 1, 2.3)))
     }
-    shadowAt(NS, HIM.x, 0, HIM.z, 1)
+    players.forEach((P, i) => shadowAt(i, P.root.position.x, SH, P.root.position.z, P.root.scale.x))
+    shadowAt(players.length, HIM.x, 0, HIM.z, 1)
+    // The captain's spotlight: a narrow beam from the far roof onto him, a pool of light on the stage, and
+    // the light itself (no shadow: the frame's one shadow budget is not spent here).
+    const CX = SX + CAP.x, CZ = SZ + CAP.z
+    const spotFrom = new THREE.Vector3(CX - 7, 36, CZ - 26)
+    const spot = new THREE.SpotLight('#fff1d6', 0, 0, 0.075, 0.6, 0)
+    spot.position.copy(spotFrom)
+    spot.target.position.set(CX, 1.2, CZ)
+    scene.add(spot, spot.target)
+    const spotBeam = add(new THREE.InstancedMesh(new THREE.CylinderGeometry(0.35, 2.2, 1, 24, 1, true).translate(0, -0.5, 0), beams.material.clone(), 1), false)
+    _v.set(CX, SH, CZ).sub(spotFrom)
+    spotBeam.setMatrixAt(0, _m.compose(spotFrom, _q.setFromUnitVectors(DOWN, _v.clone().normalize()), _s.set(1, _v.length(), 1)))
+    const poolTex = canvasTexture(128, 128, g => {
+      const r = g.createRadialGradient(64, 64, 0, 64, 64, 64)
+      r.addColorStop(0, 'rgba(255,255,255,1)'); r.addColorStop(0.55, 'rgba(255,255,255,0.55)'); r.addColorStop(1, 'rgba(255,255,255,0)')
+      g.fillStyle = r
+      g.fillRect(0, 0, 128, 128)
+    })
+    const poolMat = new THREE.MeshBasicMaterial({ map: poolTex, color: '#000000', transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, polygonOffset: true, polygonOffsetFactor: -3 })
+    const pool = add(new THREE.Mesh(new THREE.PlaneGeometry(3.4, 3.4).rotateX(-Math.PI / 2), poolMat))
+    pool.position.set(CX, SH + 0.015, CZ)
+    pool.updateMatrix()
     await step()
 
     // ------------------------------------------------------------ the celebration: confetti, streamers, sparks, fireworks
@@ -1086,7 +1122,7 @@ export function createFinal(renderer, { loader, mobile = false }) {
     })
 
     // ------------------------------------------------------------ each frame
-    const cam = new THREE.Vector3(), look = new THREE.Vector3(), handA = new THREE.Vector3(), handB = new THREE.Vector3()
+    const cam = new THREE.Vector3(), look = new THREE.Vector3()
     let lastT = null, lastP = -1, movedAt = -1, moving = 0
     run = (state, t, aspect) => {
       const p = state.p, portrait = !!state.portrait, still = !!state.still
@@ -1122,67 +1158,55 @@ export function createFinal(renderer, { loader, mobile = false }) {
       U.spark.value = ss(LIFT - 0.005, LIFT + 0.01, p) * (1 - 0.6 * ss(0.8, 0.9, p))
       U.rate.value = 0.07 + 0.25 * (1 - ss(0.02, 0.14, p)) + 0.04 * lift
 
-      // The squad: spread out and waving, then piling in round the lifter, crouching low together, and
-      // up as the cup goes up, jumping as one.
-      const crouch = ss(0.47, 0.56, p) * (1 - ss(LIFT - 0.015, LIFT + 0.015, p))
-      const party = ss(LIFT, LIFT + 0.04, p)
-      for (let i = 0; i < NS; i++) {
-        const P = SQUAD[i]
-        const k = i ? ss(0.27 + P.rank * 0.1, 0.4 + P.rank * 0.06, p) : ss(0.36, 0.5, p)
-        const walk = 4 * k * (1 - k) * moving
-        const stride = ((k * P.dist) / 0.65) * Math.PI, sw = Math.sin(stride)
-        const w1 = Math.max(0, Math.sin(t * (2.6 + P.ph * 0.2) + P.ph * 5)), w2 = Math.max(0, Math.sin(t * (2.3 + P.ph * 0.2) + P.ph * 3 + 1.7))
-        let rl, rr, sp
-        if (i) {
-          rl = lerp(0.6 + 0.38 * w1, lerp(0.3 + 0.12 * w1, 0.2, crouch), k) // gathered: arms half up, bouncing; crouched: hands to the knees
-          rr = lerp(0.6 + 0.38 * w2, lerp(0.3 + 0.12 * w2, 0.2, crouch), k)
-          sp = lerp(0.35, lerp(0.45, 0.18, crouch), k)
-          rl = lerp(rl, 0.08 - 0.12 * sw, walk)
-          rr = lerp(rr, 0.08 + 0.12 * sw, walk)
-          sp = lerp(sp, 0.1, walk)
-        } else {
-          rl = rr = lerp(0.36, 0.3, crouch) // the cup held at his chest
-          sp = 0.06
-        }
-        const hopNow = Math.abs(Math.sin(Math.PI * (t * 1.45 + P.ph * 0.012)))
-        rl = lerp(rl, i ? 0.95 + 0.04 * hopNow : 1, lift)
-        rr = lerp(rr, i ? 0.95 + 0.04 * hopNow : 1, lift)
-        sp = lerp(sp, i ? 0.3 : 0.05, lift)
-        const th = 0.85 * crouch + 0.4 * (1 - hopNow) ** 3 * party
-        const hipL = 0.45 * sw * walk + th, hipR = -0.45 * sw * walk + th
-        const kneeL = 2 * th + Math.max(0, Math.sin(stride + 0.5)) * 0.7 * walk, kneeR = 2 * th + Math.max(0, Math.sin(stride + 0.5 + Math.PI)) * 0.7 * walk
-        const lean = 0.7 * th + 0.04
-        const hop = i ? 0.1 * w1 ** 4 * (1 - k) : 0
-        const y = SH + hop + 0.45 * hopNow * party - 0.92 * (1 - Math.cos(th)) * P.sc
-        const x = SX + lerp(P.sx, P.gx, k), z = SZ + lerp(P.sz, P.gz, k)
-        let yaw = THREE.MathUtils.lerp(P.syaw + Math.sin(t * 0.5 + P.ph) * 0.3 * (1 - k), P.gyaw, ss(0.2, 0.9, k))
-        if (walk > 0.01) {
-          const head = Math.atan2(P.gx - P.sx, P.gz - P.sz)
-          yaw += (((head - yaw + Math.PI * 3) % TAU) - Math.PI) * Math.min(1, walk * 2)
-        }
-        armA.setXYZW(i, rl, rr, sp, lean)
-        legA.setXYZW(i, hipL, kneeL, hipR, kneeR)
-        _m.compose(_v.set(x, y, z), _q.setFromAxisAngle(Y, yaw), _s.setScalar(P.sc))
-        squad.setMatrixAt(i, _m)
-        shadowAt(i, x, SH, z, 1 - 0.35 * (y - SH))
-        if (!i) {
-          // The cup, between his hands, upright.
-          handOf(1, rl, sp, lean, _m, handA)
-          handOf(-1, rr, sp, lean, _m, handB)
-          cup.position.addVectors(handA, handB).multiplyScalar(0.5)
-          cup.position.y -= 0.2
-          cup.rotation.y = yaw
-          cup.updateMatrix()
-        }
+      // The team: cheering, then jumping and cheering once it is up; each on its own clip and phase.
+      const party = ss(LIFT, LIFT + 0.04, p), apart = ss(LIFT - 0.03, LIFT + 0.03, p)
+      for (let i = 0; i < mateMats.length; i++) mateMats[i].color.setScalar(1 - 0.3 * lift) // dimmed under his spotlight
+      for (let i = 0; i < players.length; i++) {
+        const P = players[i]
+        if (P === captain) continue
+        // They step back from him as it goes up, so he stands alone in the pool.
+        const dx = P.x - CAP.x, dz = P.z - CAP.z, k = (1.1 * apart) / Math.hypot(dx, dz)
+        P.root.position.set(SX + P.x + dx * k, SH, SZ + P.z + dz * k)
+        shadowAt(i, P.root.position.x, SH, P.root.position.z, P.root.scale.x)
+        P.a.time = (t * P.ra + P.ph) % P.a.getClip().duration
+        // After the lift, back and forth through the clip's middle, so no one settles into its rest pose at either end.
+        const d = P.b.getClip().duration, u = ((t * P.rb + P.ph) / (0.7 * d)) % 2
+        P.b.time = d * (0.15 + 0.7 * (u < 1 ? u : 2 - u))
+        P.a.setEffectiveWeight(1 - party)
+        P.b.setEffectiveWeight(party)
+        P.mixer.update(0)
       }
-      armA.needsUpdate = legA.needsUpdate = squad.instanceMatrix.needsUpdate = true
       blobs.instanceMatrix.needsUpdate = longs.instanceMatrix.needsUpdate = true
+      // The captain: cheering behind the plinth, his hands to the cup's handles, the lift scrubbed by p to
+      // the top, held up there bobbing, and the turn to the far stands at the end.
+      if (captain) {
+        const grip = ss(0.53, 0.58, p), k = ss(LIFT - 0.02, LIFT + 0.025, p)
+        const yaw = lerp(CAP.yaw, CAP.turn, ss(0.86, 0.935, p))
+        captain.root.rotation.y = yaw
+        captain.a.time = (t * captain.ra + captain.ph) % captain.a.getClip().duration
+        captain.b.time = CAP.up * k + (still ? 0 : 0.09 * Math.sin(t * 1.7) * ss(0.7, 1, k))
+        captain.a.setEffectiveWeight(1 - grip)
+        captain.b.setEffectiveWeight(grip)
+        captain.mixer.update(0)
+        captain.root.updateMatrixWorld(true)
+        cupHeld(yaw, _h).y += 0.28 * ss(0.3, 1, k) // at the top, above where the clip's hands are: his arms straighten into it, the cup over his head
+        cup.position.lerpVectors(rest, _h, ss(0, 0.25, k))
+        cup.rotation.y = yaw
+        cup.updateMatrix()
+        for (const A of arms) reach(A, grip)
+        plinth.position.set(rest.x, rest.y - (PLH + 0.03) * ss(LIFT + 0.04, LIFT + 0.12, p), rest.z)
+        plinth.updateMatrix()
+      }
+      const spotOn = 0.55 + 0.45 * lift // full from the lift to p = 1, so the back-out shows him in his pool
+      spot.intensity = 4.4 * spotOn
+      spotBeam.material.uniforms.uBeam.value = 0.2 * spotOn
+      poolMat.color.setScalar(0.85 * spotOn)
       const shine = 0.35 + 0.65 * lift
       cupLight.position.set(cup.position.x, cup.position.y + 0.6, cup.position.z + 0.7)
-      cupLight.intensity = 5 * shine
-      glint.value = lift * (0.75 + 0.25 * Math.sin(t * 2.3))
-      glintP.setXYZ(0, cup.position.x + 0.12, cup.position.y + 0.68, cup.position.z + 0.08)
-      glintP.setXYZ(1, cup.position.x, cup.position.y + 0.55, cup.position.z + 0.1)
+      cupLight.intensity = 2.4 * shine
+      glint.value = 0.45 * lift * (0.75 + 0.25 * Math.sin(t * 2.3))
+      glintP.setXYZ(0, cup.position.x + 0.073 * CUP_S, cup.position.y + 0.41 * CUP_S, cup.position.z + 0.05)
+      glintP.setXYZ(1, cup.position.x, cup.position.y + 0.33 * CUP_S, cup.position.z + 0.06)
       glintP.needsUpdate = true
 
       // Him: cheering with the stands, still as they crouch, and jumping with them once it is up.

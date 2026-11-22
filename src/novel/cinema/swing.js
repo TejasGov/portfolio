@@ -25,7 +25,7 @@ import { loadTraveller, alohaLinear, wearSuit } from './films/kit'
  *     loader: the shared GLTFLoader (Meshopt + Draco). normalize(root, size, yaw): a model's meshes as
  *     one centred group scaled to `size` metres. mobile: phone-sized screen, build lighter.
  *   update(state, t, aspect) is called once per rendered frame while this world is drawn.
- *     state.p         0..1, this world's own progress (movies.js: Five's P 0.0276..0.2366, 500 svh of
+ *     state.p         0..1, this world's own progress (movies.js: Five's P 0.0243..0.2085, 500 svh of
  *                     scroll), driven by scroll: it scrubs both ways and can jump, so derive everything
  *                     from p and t and keep no one-way state. p 0..0.945 is seen clear; the WHIP cover
  *                     (a fast pan, warm to night) rolls in over p 0.945..1, whole at p = 1, so the last
@@ -206,9 +206,9 @@ const PITCH = keyed([[0, 0], [0.185, 0], [0.205, -0.5], [0.23, -1.7], [0.27, -PI
 // rushing below; low under him against the western sky; over his right shoulder into the sunset; the
 // throw toward the tower.
 const CAM = keyed([
-  [0, 0, -8.1, -2.4, 2.5, -0.32, -0.5, -0.8, 0],
-  [0.13, 0, -7.4, -2.2, 2.4, -0.25, -0.4, -0.7, 0],
-  [0.17, 0, -6.6, -1.4, 2.4, 0.2, 0.2, -0.5, 0],
+  [0, 0, -2.65, -1.0, 2.65, 0.3, 0.35, -0.45, 0],
+  [0.13, 0, -2.4, -0.9, 2.45, 0.28, 0.35, -0.4, 0],
+  [0.17, 0, -3.0, -0.65, 2.5, 0.15, 0.3, -0.35, 0],
   [0.205, 0, -5.8, -1.0, 2.6, -0.9, 1.4, 1.2, 0],
   [0.222, 1, -0.6, -0.6, -4.0, 0, 0, 0, 0],
   [0.245, 1, 2.4, -0.4, -2.6, 0, 0, 0, 0.8],
@@ -239,9 +239,9 @@ const CAM = keyed([
 // frame over the dome; on the web, closer and centred on him (a tall frame is narrow), the wides from
 // right behind him, down the avenue into the western sky.
 const CAMP = keyed([
-  [0, 0, -8.1, -3.0, 3.9, -0.25, -0.35, -0.31, 0],
-  [0.13, 0, -7.4, -2.7, 3.6, -0.2, -0.25, -0.3, 0],
-  [0.17, 0, -5.6, -1.4, 3.0, 0.1, 0.2, -0.2, 0],
+  [0, 0, -5.0, -2.6, 4.4, 0.15, -0.55, -0.15, 0],
+  [0.13, 0, -4.6, -2.3, 4.0, 0.15, -0.45, -0.15, 0],
+  [0.17, 0, -4.6, -1.2, 3.4, 0.1, 0.2, -0.2, 0],
   [0.205, 0, -5.9, -0.6, 4.0, -0.9, 1.4, 1.2, 0],
   [0.222, 1, -1.2, -0.8, -5.2, 0, 0, 0, 0],
   [0.245, 1, 3.7, -0.6, -4.1, 0, -0.2, 0, 0.8],
@@ -295,14 +295,16 @@ const warp = p => {
 const v = (x, y, z) => new THREE.Vector3(x, y, z).normalize()
 const mirror = pose => Object.fromEntries(Object.entries(pose).map(([k, d]) => [k.replace(/^Left|^Right/, m => (m === 'Left' ? 'Right' : 'Left')), new THREE.Vector3(-d.x, d.y, d.z)]))
 const POSES = {
-  // The perch: a deep crouch on the finial, knees wide, his right hand down on the tip, the left over his knee.
+  // The perch: a deep, compact crouch on the balls of his feet on the finial's cap, hips dropped near his
+  // heels, knees high and wide, his chest forward between them so his weight sits over his feet; the right
+  // hand rests on the cap in front of his toes, the left forearm lies over the left knee, head up.
   crouch: {
-    pelvis: 0.55, Spine: v(0, 0.3, 0.95), Spine01: v(0, 0.34, 0.94), Spine02: v(0, 0.4, 0.92), neck: v(0, 0.8, 0.6), Head: v(0, 1, -0.04),
-    LeftUpLeg: v(0.42, 0.14, 0.9), RightUpLeg: v(-0.42, 0.14, 0.9), LeftLeg: v(-0.36, -0.62, -0.7), RightLeg: v(0.36, -0.62, -0.7),
-    LeftFoot: v(-0.05, -0.8, 0.6), RightFoot: v(0.05, -0.8, 0.6), LeftToeBase: v(0, -0.2, 1), RightToeBase: v(0, -0.2, 1),
-    // (the right arm is aimed at build so the hand lands on the knob between his feet)
-    RightShoulder: v(-0.9, -0.25, 0.36), RightArm: v(0.15, -0.95, 0.1), RightForeArm: v(0.1, -0.95, -0.2), RightHand: v(0.05, -0.75, 0.66),
-    LeftShoulder: v(0.9, -0.2, 0.38), LeftArm: v(0.3, -0.93, 0.2), LeftForeArm: v(-0.3, -0.85, 0.43), LeftHand: v(-0.15, -0.95, 0.25),
+    pelvis: 0.5, Spine: v(0, 0.5, 0.87), Spine01: v(0, 0.56, 0.83), Spine02: v(0, 0.66, 0.75), neck: v(0, 0.86, 0.5), Head: v(0, 1, 0.02),
+    LeftUpLeg: v(0.45, 0.42, 0.79), RightUpLeg: v(-0.45, 0.42, 0.79), LeftLeg: v(-0.45, -0.68, -0.58), RightLeg: v(0.45, -0.68, -0.58),
+    LeftFoot: v(0.05, -0.75, 0.66), RightFoot: v(-0.05, -0.75, 0.66), LeftToeBase: v(0.12, -0.05, 1), RightToeBase: v(-0.12, -0.05, 1),
+    // (both arms are aimed at build: the right hand onto the cap, the left forearm over the knee)
+    RightShoulder: v(-0.92, -0.1, 0.36), RightHand: v(0.05, -0.55, 0.83),
+    LeftShoulder: v(0.92, -0.1, 0.36), LeftHand: v(-0.1, -0.85, 0.5),
   },
   // The tip-over: he lets go backward, arched, arms thrown wide and up, legs long.
   leap: {
@@ -669,7 +671,7 @@ function birds(U, list) {
         vec3 right = normalize(cross(fwd, vec3(0.0, 1.0, 0.0)));
         vec3 up = cross(right, fwd);
         float flap = sin(uT * 13.0 + ph * 7.0) * step(0.0, sin(uT * 0.8 + ph * 3.0));
-        vec3 l = position * 1.6;
+        vec3 l = position * 1.6 * smoothstep(6.0, 12.0, distance(c, cameraPosition)); // none looms at the lens
         l.y += abs(l.x) * flap * 0.9;
         vec3 w = c + right * l.x + up * l.y + fwd * l.z - right * l.x * 0.0;
         vW = w;
@@ -1255,7 +1257,8 @@ export function createSwing(renderer, { loader, mobile = false }) {
         new THREE.ConeGeometry(0.5, 0.6, 24).translate(0, 225.51, 0),
         new THREE.SphereGeometry(0.19, 16, 10).translate(0, 226.0, 0),
         new THREE.CylinderGeometry(0.05, 0.08, 0.27, 10).translate(0, 226.28, 0),
-        new THREE.SphereGeometry(0.12, 14, 8).scale(1, 0.8, 1).translate(0, D.y - 0.09, 0),
+        // (the tip: a squat cap wide enough to stand both feet on, its top at D)
+        new THREE.SphereGeometry(0.17, 20, 10).scale(1, 0.55, 1).translate(0, D.y - 0.094, 0),
       ]
       const copper = new THREE.Mesh(mergeGeometries(cu.map(g => (g.index ? g.toNonIndexed() : g))), new THREE.MeshStandardMaterial({ map: copperTexture(), color: new THREE.Color(0.78, 0.8, 0.8), roughness: 0.72, metalness: 0.08 }))
       for (const m of [drum, copper]) {
@@ -1340,20 +1343,25 @@ export function createSwing(renderer, { loader, mobile = false }) {
       const toes = wp(you.bone('LeftToeBase')).add(wp(you.bone('RightToeBase'))).multiplyScalar(0.5).sub(root.position)
       HP.copy(hips.getWorldPosition(new THREE.Vector3()).sub(root.position)).sub(toes).add(new THREE.Vector3(0, 0.035, 0))
       FALL = fallKeys()
-      // His right arm, two bones with the elbow out and back, aimed so the heel of his hand lands on the knob
-      // just ahead of his toes (straight, if it cannot reach).
-      const S = wp(you.bone('RightArm')), E = wp(you.bone('RightForeArm')), a = S.distanceTo(E), b = E.distanceTo(wp(rightHand))
-      const u = toes.add(root.position).addScaledVector(F, 0.05).addScaledVector(Y, 0.1).sub(S)
-      const d = Math.min(u.length(), a + b - 1e-4)
-      u.normalize()
-      const h = new THREE.Vector3(-1, 0, -1).applyQuaternion(root.quaternion)
-      h.addScaledVector(u, -h.dot(u)).normalize()
-      const ca = (a * a + d * d - b * b) / (2 * a * d)
-      const upper = u.clone().multiplyScalar(ca).addScaledVector(h, Math.sqrt(Math.max(0, 1 - ca * ca)))
-      const fore = S.clone().addScaledVector(u, d).sub(E.copy(S).addScaledVector(upper, a)).normalize()
+      // Each arm two bones, the elbow bent toward `pole` (his frame), aimed so the wrist lands on `target`
+      // (straight, if it cannot reach): the right wrist just over the cap's front edge, the palm draped over
+      // it; the left wrist just past the left knee, the forearm lying across it.
       const iq = root.quaternion.clone().invert()
-      POSES.crouch.RightArm = upper.applyQuaternion(iq)
-      POSES.crouch.RightForeArm = fore.applyQuaternion(iq)
+      const reach = (side, target, pole) => {
+        const S = wp(you.bone(side + 'Arm')), E = wp(you.bone(side + 'ForeArm')), a = S.distanceTo(E), b = E.distanceTo(wp(you.bone(side + 'Hand')))
+        const u = target.clone().sub(S)
+        const d = Math.min(u.length(), a + b - 1e-4)
+        u.normalize()
+        const h = pole.clone().applyQuaternion(root.quaternion)
+        h.addScaledVector(u, -h.dot(u)).normalize()
+        const ca = (a * a + d * d - b * b) / (2 * a * d)
+        const upper = u.clone().multiplyScalar(ca).addScaledVector(h, Math.sqrt(Math.max(0, 1 - ca * ca)))
+        const fore = S.clone().addScaledVector(u, d).sub(E.copy(S).addScaledVector(upper, a)).normalize()
+        POSES.crouch[side + 'Arm'] = upper.applyQuaternion(iq)
+        POSES.crouch[side + 'ForeArm'] = fore.applyQuaternion(iq)
+      }
+      reach('Right', toes.clone().add(root.position).addScaledVector(F, 0.13).addScaledVector(Y, 0.0), new THREE.Vector3(-1, 0.2, -0.6))
+      reach('Left', wp(you.bone('LeftLeg')).addScaledVector(F, 0.17).addScaledVector(Y, 0.03), new THREE.Vector3(1, 0, -1))
       makePose(bones, restQ, POSES.crouch, restDir).forEach((q, i) => poseQ.crouch[i].copy(q))
     }
     const suitScene = (await suitFile).scene

@@ -925,6 +925,74 @@ section[tabindex='-1']:focus {
   width: 100%;
   height: 100%;
 }
+/* The house goes dark over the booth; the beam and its lattice (hero/lattice.js) fade up into it once drawn. */
+.hero-stage {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(120% 90% at 50% 8%, rgb(9 8 7 / 0.86), rgb(4 4 5 / 0.95) 72%);
+}
+.hero-gl {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  transition: opacity 1.8s ease;
+}
+.hero-stage.is-lit .hero-gl {
+  opacity: 1;
+}
+/* Film grain: a still noise tile, jumped about in steps (transform only). */
+.hero-grain {
+  position: absolute;
+  inset: -40px;
+  opacity: 0.075;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  animation: grain 0.9s steps(6) infinite;
+}
+@keyframes grain {
+  0% { transform: translate(0, 0); }
+  20% { transform: translate(-22px, 14px); }
+  40% { transform: translate(17px, -26px); }
+  60% { transform: translate(-9px, 31px); }
+  80% { transform: translate(29px, 6px); }
+  100% { transform: translate(-14px, -18px); }
+}
+/* Over the name: what he builds, the cool accent leading (the lattice's signal colour). */
+.hero-builds {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 0;
+  width: 0;
+  min-width: 100%; /* the title's measure, never wider */
+  margin-bottom: calc(var(--t) * 0.16);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgb(244 239 230 / 0.8);
+}
+.hero-builds-head {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin-right: 18px;
+  color: #6fd8ec;
+}
+.hero-builds-head::before {
+  content: "";
+  width: 18px;
+  height: 1px;
+  background: currentColor;
+  box-shadow: 0 0 8px #6fd8ec;
+}
+.hero-build:not(:last-child)::after {
+  content: "·"; /* trailing, so a wrapped line never starts on a dot */
+  padding: 0 0.7em;
+  color: var(--dim);
+}
 .hero :focus-visible {
   outline: 2px solid var(--amber);
   outline-offset: -3px;
@@ -1018,6 +1086,26 @@ section[tabindex='-1']:focus {
   line-height: 0.86;
   white-space: nowrap;
 }
+/* The AI role, the line read straight after the name. */
+.hero-role {
+  width: 0;
+  min-width: 100%; /* the title's measure, never wider */
+  margin-top: calc(var(--t) * 0.16);
+  font-family: var(--font-display);
+  font-size: clamp(18px, 1.9vw, 28px);
+  font-weight: 400;
+  line-height: 1.2;
+  letter-spacing: -0.005em;
+  color: var(--credit);
+  text-wrap: balance;
+}
+.hero-role > strong {
+  font-weight: 600; /* the role, by weight only */
+  color: var(--screen);
+}
+.hero-role > span {
+  color: #6fd8ec;
+}
 /* Poster credits: the role small above, the name in the condensed cut below; first flush left, last flush right. */
 .hero-billing {
   display: flex;
@@ -1025,8 +1113,8 @@ section[tabindex='-1']:focus {
   gap: 28px;
   width: 0;
   min-width: 100%; /* the title's measure, never wider */
-  margin-top: calc(var(--t) * 0.2);
-  padding-top: calc(var(--t) * 0.15);
+  margin-top: calc(var(--t) * 0.14);
+  padding-top: calc(var(--t) * 0.12);
   border-top: 1px solid rgb(244 239 230 / 0.26);
   white-space: nowrap;
 }
@@ -1163,6 +1251,13 @@ section[tabindex='-1']:focus {
   .hero-title {
     white-space: normal;
   }
+  .hero-builds {
+    font-size: 11px;
+    letter-spacing: 0.1em;
+  }
+  .hero-builds-head {
+    flex-basis: 100%;
+  }
   .hero-title > span {
     display: block;
   }
@@ -1171,8 +1266,12 @@ section[tabindex='-1']:focus {
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .hero-cue::after {
+  .hero-cue::after,
+  .hero-grain {
     animation: none;
+  }
+  .hero-gl {
+    transition: none;
   }
   .hero-nav :is(a, button)::after {
     transition: none;

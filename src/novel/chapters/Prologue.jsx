@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import { useBeats } from '../lib/Beats'
+import { store } from '../lib/store'
+import { reducedMotion } from '../lib/scroll'
 import { useProgress, useRunningHead } from '../lib/chapters'
 import { sound } from '../lib/sound'
 import { startTrail } from '../hero/trail'
-import { CONTACT, JOURNEY, RESUME, ROLES } from '../content'
+import { CONTACT, JOURNEY, LAB, RESUME, ROLES } from '../content'
 import { goTo, SoundIcon } from '../Book'
 import { DOOR, FrontDoor, openBoxOffice } from '../boxoffice/BoxOffice'
 
@@ -25,11 +27,54 @@ const BEATS = [
   { at: [0.63, 0.79], text: 'Roll the flashback.' },
 ]
 
-// The billing block, from the same data Chapter Three uses, newest job first: a recruiter needn't scroll for it.
+// The billing, from the same data Chapter Three uses, newest job first: a recruiter needn't scroll for it.
+// The AI role is the line under the name; the rest is the small billing block.
+const DAIWA = ROLES.find(r => r.org === 'Daiwa Capital Markets America')
 const CREDITS = [
-  ...ROLES.filter(r => ['Daiwa Capital Markets America', 'COA'].includes(r.org)).map(r => ({ role: r.role, name: r.org })),
+  ...ROLES.filter(r => r.org === 'COA').map(r => ({ role: r.role, name: r.org })),
   { role: 'Computer Science, class of 2027', name: 'University at Buffalo' },
 ]
+// What he builds, over the name: Daiwa's multi-agent workflows (workData), then the lab's AI repos (content.js LAB).
+const BUILDS = ['Multi-agent workflows', ...['agent-harness', 'llm-router', 'gpt-from-scratch'].map(id => LAB.find(p => p.id === id)?.title).filter(Boolean)]
+
+/** The poster's 3D (hero/lattice.js): loaded after the page, paused off the poster, kept (compiled) through the
+ *  door and the booth so a trip back to the top reuses it, disposed once the reader is into Chapter Two. */
+function useLattice(host, phone) {
+  useEffect(() => {
+    let ctl = null, loading = false, dead = false, again = false
+    const want = p => p < 0.1
+    const ensure = () => {
+      if (ctl || loading || dead) return
+      loading = true
+      import('../hero/lattice')
+        .then(m => {
+          loading = false
+          if (dead || !want(store.prologue)) return
+          ctl = m.startLattice(host.current, { phone, still: reducedMotion(), resolved: again })
+          again = true
+          ctl.setActive(true)
+        })
+        .catch(() => (loading = false)) // no WebGL: the poster stands on its own
+    }
+    const onStore = (key, p) => {
+      if (key === 'work' && p > 0) return ctl && (ctl.dispose(), (ctl = null))
+      if (key !== 'prologue') return
+      if (want(p)) return ctl ? ctl.setActive(true) : ensure()
+      ctl?.setActive(false)
+    }
+    store.listeners.add(onStore)
+    const go = () => want(store.prologue) && ensure()
+    const start = () => (window.requestIdleCallback ? requestIdleCallback(go, { timeout: 900 }) : setTimeout(go, 200))
+    if (document.readyState === 'complete') start()
+    else addEventListener('load', start, { once: true })
+    return () => {
+      dead = true
+      store.listeners.delete(onStore)
+      removeEventListener('load', start)
+      ctl?.dispose()
+    }
+  }, [host, phone])
+}
 
 export default function Prologue() {
   const ref = useRef(null)
@@ -40,6 +85,8 @@ export default function Prologue() {
   const hero = useRef(null)
   const fx = useRef(null)
   useEffect(() => startTrail(hero.current, fx.current), [])
+  const gl = useRef(null)
+  useLattice(gl, phone)
   const [audible, setAudible] = useState(sound.on)
   useEffect(() => sound.subscribe(setAudible), [])
 
@@ -48,7 +95,10 @@ export default function Prologue() {
       <div className="sticky top-0 h-svh">
         {/* The one-sheet. Visible from the first paint (no wait for WebGL); it wipes out with the first scroll. */}
         <div ref={el => bind(0)((hero.current = el))} className="hero opacity-0">
+          {/* A dark house over the booth, the beam and its lattice (hero/lattice.js), film grain, then the trail. */}
+          <div ref={gl} className="hero-stage" aria-hidden="true" />
           <div className="hero-scrim" aria-hidden="true" />
+          <div className="hero-grain" aria-hidden="true" />
           <canvas ref={fx} className="hero-fx" aria-hidden="true" />
           <p className="hero-kicker kicker" data-quiet>
             <span className="hero-lamp" aria-hidden="true" />
@@ -71,6 +121,12 @@ export default function Prologue() {
             </div>
           </nav>
           <div className="hero-sheet" data-quiet>
+            <p className="hero-builds">
+              <span className="hero-builds-head">Building AI systems</span>
+              {BUILDS.map(b => (
+                <span key={b} className="hero-build">{b}</span>
+              ))}
+            </p>
             <h1 className="hero-title display-title" aria-label="Tejas Govind">
               <span aria-hidden="true">
                 {[...'Tejas'].map((ch, k) => (
@@ -83,6 +139,7 @@ export default function Prologue() {
                 ))}
               </span>
             </h1>
+            <p className="hero-role"><strong>{DAIWA.role}</strong> <span aria-hidden="true">·</span> {DAIWA.org}</p>
             <ul className="hero-billing">
               {CREDITS.map(c => (
                 <li key={c.name}>
