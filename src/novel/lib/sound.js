@@ -1,5 +1,4 @@
 import { store } from './store'
-import { CUES, playCue } from './score'
 
 /*
  * The soundtrack of the cinema, synthesized live (no audio files): a projector's 24 fps sprocket
@@ -7,9 +6,10 @@ import { CUES, playCue } from './score'
  * Off until the reader turns it on (browsers only allow audio after a gesture). It reads the store
  * every frame: the projector gets louder the closer the camera is to the lens, and everything in the
  * cinema falls silent while a paper chapter covers the screen.
- * In the dance (cinema/dance.js) the score's dance cue (score.js) plays in step with the routine: it follows the
- * routine's clock (store.danceClock) while the reader scrolls it forward, starts where the routine is, re-syncs
- * when the two drift apart, and goes quiet when the scroll stops. ChapterFive.jsx's play button scrolls the
+ * In the dance (cinema/dance.js) the song plays in step with the routine (public/cinema/dance/byebyebye.mp3: the
+ * owner's clip's soundtrack from the routine's first beat, credited in ChapterFive.jsx; fetched the first time
+ * it is needed): it follows the routine's clock (store.danceClock) while the reader scrolls it forward, starts
+ * where the routine is, re-syncs when the two drift apart, and goes quiet when the scroll stops. ChapterFive.jsx's play button scrolls the
  * routine in real time, so then the two never drift at all.
  */
 let ctx, master, proj, room, rush, rushFilter, music, raf
@@ -92,7 +92,25 @@ function build() {
   music.connect(master)
 }
 
-// The dance cue, kept in step with the routine's clock.
+// The song, kept in step with the routine's clock: its second 0 is the routine's.
+const SONG = '/cinema/dance/byebyebye.mp3'
+let song = null // the decoded song, the promise of it, or false if it could not load
+function playSong(from) {
+  const g = gain(0)
+  g.connect(music)
+  const s = new AudioBufferSourceNode(ctx, { buffer: song })
+  s.connect(g)
+  const t0 = ctx.currentTime + 0.02
+  s.start(t0, from)
+  g.gain.setTargetAtTime(1, t0, 0.015)
+  return {
+    get t() { return from + ctx.currentTime - t0 },
+    stop(fade) {
+      g.gain.setTargetAtTime(0, ctx.currentTime, fade / 3)
+      s.stop(ctx.currentTime + fade + 0.05)
+    },
+  }
+}
 const dance = { player: null, lastT: -1, moved: 0, synced: 0 }
 function follow(now) {
   const c = store.danceClock
@@ -104,12 +122,14 @@ function follow(now) {
     if (dance.player) dance.player.stop(0.3), (dance.player = null)
     return
   }
+  if (song === null) song = fetch(SONG).then(r => r.arrayBuffer()).then(b => ctx.decodeAudioData(b)).then(b => (song = b), () => (song = false)) // a failed fetch: no song this visit
+  if (!(song instanceof AudioBuffer)) return
   const drift = dance.player ? Math.abs(dance.player.t - c.T) : Infinity
   // Start where the routine is; re-sync on a drift a listener would hear, at most every 0.6 s (a fast scroll
   // re-syncs in steps rather than stuttering every frame).
   if (drift > 0.25 && now - dance.synced > 600) {
     dance.player?.stop(0.06)
-    dance.player = playCue(ctx, music, CUES.bye, c.T)
+    dance.player = playSong(c.T)
     dance.synced = now
   }
 }

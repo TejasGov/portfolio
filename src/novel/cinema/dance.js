@@ -9,12 +9,13 @@ import { store } from '../lib/store'
  * the film's graveside fight, printed like a comic: trampled snow, an open grave with its mound and a plain
  * unmarked headstone, snow-laden pines fading into a pale overcast halftone sky, snow falling. In the
  * red-and-black suit (public/cinema/suits/deadpool.glb, katanas on his back) he dances the "Bye Bye Bye"
- * routine and its fight, bare-handed (public/cinema/dance/routine.glb: scripts/cinema/pose_splice.py joins the
- * owner's clip's shots on the music's beat, pose_retarget.py makes the clip), through a crowd of twelve generic
- * masked henchmen, who charge in from the trees and get knocked flying in
+ * routine and its fight, the claws in his right fist (public/cinema/dance/routine.glb: scripts/cinema/pose_splice.py
+ * joins the owner's clip's shots on the music's beat, pose_retarget.py makes the clip), through a crowd of twelve
+ * generic masked henchmen, who charge in from the trees and get knocked flying in
  * spinning arcs to land in puffs of snow. Each hit pops a sound-effect word in a comic starburst; the title
  * phrase "Bye Bye Bye" pops in a caption box on each of the routine's "bye" pushes and over the last pose.
- * Words on the page: only the title phrase and sound-effect words, never a lyric line.
+ * As in the film's opening credits, relics fly past the lens with a credit on each (a femur, a skull, a boot's sole).
+ * Words on the page: the title phrase, sound-effect words and the credits, never a lyric line.
  * The routine's hits, "bye" beats and end come with the clip (its animation extras), so a routine tracked
  * from the owner's own clip re-times the henchmen, the words and the camera by itself.
  * Everything else is built here: the henchmen are one instanced, shader-posed mesh (with an instanced ink
@@ -387,6 +388,7 @@ export function createDance(renderer, { loader, mobile = false }) {
     const traveller = loadTraveller(loader)
     const suitFile = loader.loadAsync('/cinema/suits/deadpool.glb')
     const routineFile = loader.loadAsync('/cinema/dance/routine.glb')
+    const relicsFile = loader.loadAsync('/cinema/dance/relics.glb')
     const fonts = document.fonts?.load('900 100px "Archivo Variable"').catch(() => {})
     const U = { cell: { value: 5 }, ink: { value: 0.55 }, t: { value: 0 } }
     const add = (o, shadow = true) => {
@@ -804,8 +806,145 @@ export function createDance(renderer, { loader, mobile = false }) {
     words.geometry.attributes.iR.needsUpdate = true
     await step()
 
+    // ------------------------------------------------------------ the relics
+    // The film's opening credits ride on its props as they fly past the lens; this tribute's ride on three of
+    // them (public/cinema/dance/relics.glb, from scripts/cinema/props.py 'relics'; the boot's sole is built
+    // here), lettered in red on the side that faces the lens. And the claws (Logan's forearm and hand, three
+    // claws out over the knuckles), held in his right fist through the whole fight.
+    const relicSet = (await relicsFile).scene
+    const RED = '#b3121c'
+    // Planar uvs over the relic's x-y box (its +Z side faces the lens) and the credit painted to match, in metres.
+    // lines: { x, y, w (widest, m), parts: [[text, cap height (m)], ...] in a row }; paint(g, k): the ground's detail.
+    const credit = (geo, key, { ground, rough, metal, lines, paint }) => {
+      geo.computeBoundingBox()
+      const { min, max } = geo.boundingBox, bw = max.x - min.x, bh = max.y - min.y
+      const pos = geo.attributes.position, uv = new Float32Array(pos.count * 2)
+      for (let i = 0; i < pos.count; i++) uv.set([(pos.getX(i) - min.x) / bw, (pos.getY(i) - min.y) / bh], i * 2)
+      geo.setAttribute('uv', new THREE.BufferAttribute(uv, 2))
+      const W = mobile ? 1024 : 2048, H = Math.round((W * bh) / bw), k = W / bw
+      const font = (g, cap) => {
+        g.font = `900 ${(cap * k) / 0.72}px "Archivo Variable", "Arial Black", sans-serif`
+        if ('fontStretch' in g) g.fontStretch = 'condensed'
+      }
+      const letter = (g, fill, stroke) => {
+        g.textBaseline = 'alphabetic'
+        g.lineJoin = 'round'
+        for (const l of lines) {
+          const gaps = l.parts.map(([, cap], j) => (j ? cap * k * 0.45 : 0))
+          const ws = l.parts.map(([text, cap]) => (font(g, cap), g.measureText(text).width))
+          const total = ws.reduce((a, b) => a + b, 0) + gaps.reduce((a, b) => a + b, 0)
+          const fit = Math.min(1, (l.w * k) / total), capMax = Math.max(...l.parts.map(p => p[1]))
+          let x = (l.x - min.x) * k - (total * fit) / 2
+          const base = (max.y - l.y) * k + (capMax * k * fit) / 2
+          l.parts.forEach(([text, cap], j) => {
+            x += gaps[j] * fit
+            font(g, cap * fit)
+            if (stroke) {
+              g.lineWidth = cap * k * fit * 0.14
+              g.strokeStyle = stroke
+              g.strokeText(text, x, base)
+            }
+            g.fillStyle = fill
+            g.fillText(text, x, base)
+            x += ws[j] * fit
+          })
+        }
+      }
+      const map = canvasTexture(W, H, g => {
+        g.fillStyle = ground
+        g.fillRect(0, 0, W, H)
+        paint?.(g, k, x => (x - min.x) * k, y => (max.y - y) * k)
+        letter(g, RED, INK)
+      })
+      const rm = canvasTexture(W, H, g => { // g: roughness, b: metalness (the paint is matte)
+        g.fillStyle = `rgb(0,${Math.round(rough * 255)},${Math.round(metal * 255)})`
+        g.fillRect(0, 0, W, H)
+        letter(g, 'rgb(0,190,0)', 'rgb(0,190,0)')
+      })
+      const o = new THREE.Mesh(geo, printed(new THREE.MeshStandardMaterial({ map, roughnessMap: rm, metalnessMap: rm, roughness: 1, metalness: 1, envMapIntensity: 1.3 }), U, 'relic-' + key))
+      outline(o, { ink: INK, width: 0.0035 })
+      o.scale.setScalar(1e-5)
+      scene.add(o)
+      return o
+    }
+    const ADAMANTIUM = '#c3c9d2'
+    const femurGeo = relicSet.getObjectByName('femur').geometry
+    const skullGeo = relicSet.getObjectByName('skull').geometry
+    let shaftY = 0
+    {
+      const p = femurGeo.attributes.position
+      let n = 0
+      // The shaft's height, where it flares (its straight middle decimates to long triangles with no vertices in it).
+      for (let i = 0; i < p.count; i++) if (Math.abs(p.getX(i)) > 0.1 && Math.abs(p.getX(i)) < 0.15) shaftY += p.getY(i), n++
+      shaftY /= n
+    }
+    skullGeo.computeBoundingBox()
+    const crown = skullGeo.boundingBox.max.y
+    // The sole of a boot, tread to the lens: a toe, a ball, the waist of the arch and a heel, 0.3 m long.
+    const soleShape = new THREE.Shape()
+    soleShape.moveTo(0.15, 0.004)
+    soleShape.splineThru([[0.135, 0.042], [0.09, 0.055], [0.03, 0.049], [-0.03, 0.036], [-0.085, 0.039], [-0.132, 0.034], [-0.152, 0], [-0.132, -0.034], [-0.085, -0.039], [-0.03, -0.03], [0.03, -0.046], [0.09, -0.05], [0.136, -0.036], [0.15, 0.004]].map(([x, y]) => new THREE.Vector2(x, y)))
+    const soleGeo = new THREE.ExtrudeGeometry(soleShape, { depth: 0.034, bevelEnabled: true, bevelThickness: 0.006, bevelSize: 0.005, bevelSegments: 2, curveSegments: 40 }).translate(0, 0, -0.017)
+    const femur = credit(femurGeo, 'femur', {
+      ground: ADAMANTIUM, rough: 0.3, metal: 1,
+      lines: [{ x: 0, y: shaftY - 0.003, w: 0.3, parts: [['A FILM BY', 0.0085], ['TEJAS GOVIND', 0.017]] }],
+    })
+    const skull = credit(skullGeo, 'skull', {
+      ground: ADAMANTIUM, rough: 0.3, metal: 1,
+      lines: [
+        { x: 0, y: crown - 0.04, w: 0.1, parts: [['A FAN TRIBUTE TO', 0.0075]] },
+        { x: 0, y: crown - 0.06, w: 0.13, parts: [['DEADPOOL', 0.018]] },
+        { x: 0, y: crown - 0.083, w: 0.135, parts: [['& WOLVERINE', 0.014]] },
+      ],
+    })
+    const sole = credit(soleGeo, 'sole', {
+      ground: '#34333a', rough: 0.85, metal: 0,
+      // The tread: rows of chevron lugs, a heel block, a groove round the rim.
+      paint: (g, k, X, Y) => {
+        g.fillStyle = '#1d1c22'
+        for (let x = -0.13; x < 0.14; x += 0.022) {
+          for (const s of [1, -1]) {
+            g.beginPath()
+            g.moveTo(X(x), Y(0.004 * s))
+            g.lineTo(X(x + 0.01), Y(0.045 * s))
+            g.lineTo(X(x + 0.018), Y(0.045 * s))
+            g.lineTo(X(x + 0.008), Y(0.004 * s))
+            g.fill()
+          }
+        }
+        g.strokeStyle = '#1d1c22'
+        g.lineWidth = 0.006 * k
+        g.strokeRect(X(-0.142), Y(0.03), 0.062 * k, 0.06 * k)
+      },
+      lines: [
+        { x: 0.005, y: 0.028, w: 0.12, parts: [['MUSIC', 0.011]] },
+        { x: 0.005, y: 0.002, w: 0.24, parts: [['BYE BYE BYE', 0.024]] },
+        { x: 0.005, y: -0.026, w: 0.16, parts: [['*NSYNC · 2000', 0.011]] },
+      ],
+    })
+    // Each one's pass, in the routine's seconds (clear of the slate and the "bye" captions): its size as a share of
+    // the frame's width (landscape, portrait) and height, which way it goes, how high, its tumble.
+    const fliers = [
+      { o: femur, t0: 10.75, dur: 2.8, dir: -1, y: -0.3, fw: [0.62, 0.96], fh: 1, roll: [0.14, -0.08], yaw: 0.3, pitch: 0.25, grow: 0.06 },
+      { o: skull, t0: 14.4, dur: 3.0, dir: 1, y: 0.02, fw: [0.8, 0.8], fh: 0.52, roll: [-0.12, 0.1], yaw: 0.45, pitch: 0.12, grow: 0.08 },
+      { o: sole, t0: 22.0, dur: 2.6, dir: -1, y: -0.12, fw: [0.48, 0.92], fh: 0.5, roll: [-0.35, 0.2], yaw: 0.4, pitch: 0.3, grow: 0.25 },
+    ]
+    for (const f of fliers) {
+      const b = f.o.geometry.boundingBox
+      f.w = b.max.x - b.min.x
+      f.h = b.max.y - b.min.y
+    }
+    const claws = new THREE.Mesh(relicSet.getObjectByName('claws').geometry, printed(new THREE.MeshStandardMaterial({ color: ADAMANTIUM, metalness: 1, roughness: 0.28, envMapIntensity: 1.3 }), U, 'claws'))
+    outline(claws, { ink: INK, width: 0.004 })
+    claws.castShadow = true
+    scene.add(claws)
+    const foreR = you.bone('RightForeArm'), clawHand = new THREE.Vector3(1, 0, 0) // the hand bone's axis out of the back of his hand
+    await step()
+
     // ------------------------------------------------------------ each frame
     const strike = new THREE.Vector3(), pos = new THREE.Vector3(), tmp = new THREE.Vector3()
+    const cR = new THREE.Vector3(), cU = new THREE.Vector3(), cF = new THREE.Vector3(), cN = new THREE.Vector3(), _e = new THREE.Euler()
+    const TH = Math.tan(20 * D2R) // half the 40 degree fov
     const qa = new THREE.Quaternion(), qb = new THREE.Quaternion(), qc = new THREE.Quaternion(), mtx = new THREE.Matrix4()
     const size = new THREE.Vector2()
     const home = new THREE.Vector3() // where he stands at a moment (his hips' track), for a henchman's aim
@@ -854,6 +993,17 @@ export function createDance(renderer, { loader, mobile = false }) {
       you.mixer.update(0)
       you.root.updateMatrixWorld(true)
       hipsBone.getWorldPosition(here)
+
+      // The claws in his right fist: Logan's forearm along his, the bone hand over his knuckles, claws out past them.
+      fists[1].getWorldPosition(pos)
+      foreR.getWorldPosition(tmp)
+      cF.subVectors(pos, tmp).normalize() // his fingers' way
+      fists[1].getWorldQuaternion(qa)
+      cN.copy(clawHand).applyQuaternion(qa).addScaledVector(cF, -cN.dot(cF)).normalize()
+      cU.crossVectors(cN, cF)
+      mtx.makeBasis(cF, cU, cN)
+      claws.quaternion.setFromRotationMatrix(mtx)
+      claws.position.copy(pos).addScaledVector(cF, 0.04).addScaledVector(cN, 0.03)
 
       // The henchmen.
       let flash = 0, shook = 0, fist = 1
@@ -948,6 +1098,25 @@ export function createDance(renderer, { loader, mobile = false }) {
       shake.x = shook * 0.05 * Math.sin(t * 61)
       shake.y = shook * 0.04 * Math.sin(t * 47 + 1)
       place(state, aspect, T)
+      // The relics past the lens, held a set distance in front of it: quick in, a slow drift across the middle
+      // of the frame (long enough to read), quick out; a slow tumble that keeps the credit to the lens.
+      cR.set(1, 0, 0).applyQuaternion(camera.quaternion)
+      cU.set(0, 1, 0).applyQuaternion(camera.quaternion)
+      cF.set(0, 0, -1).applyQuaternion(camera.quaternion)
+      for (const f of fliers) {
+        const u = (T - f.t0) / f.dur
+        if (u <= 0 || u >= 1) {
+          f.o.scale.setScalar(1e-5)
+          continue
+        }
+        const v = 2 * u - 1, d = 1.2, hh = d * TH, hw = hh * aspect
+        const s = Math.min(((portrait ? f.fw[1] : f.fw[0]) * 2 * hw) / f.w, (f.fh * 2 * hh) / f.h) * (1 + f.grow * v)
+        const A = 1.1 + (s * f.w) / (2 * hw) // its middle a half-width off the frame's edge at either end
+        const x = f.dir * ((A - 0.35) * v * v * v + 0.35 * v)
+        f.o.position.copy(camera.position).addScaledVector(cF, d).addScaledVector(cR, x * hw).addScaledVector(cU, (f.y + 0.06 * v) * hh)
+        f.o.quaternion.copy(camera.quaternion).multiply(qb.setFromEuler(_e.set(f.pitch * v, f.yaw * v, lerp(f.roll[0], f.roll[1], u))))
+        f.o.scale.setScalar(s)
+      }
       // The caption: "Bye Bye Bye" on each push, beside him; then over the last pose, above him.
       right.set(Math.cos(camAz), 0, -Math.sin(camAz))
       // The hits' words: a starburst beside him on the blow's side of the frame; on his right (clear of the
