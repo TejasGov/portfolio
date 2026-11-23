@@ -1,6 +1,7 @@
 import * as THREE from 'three'
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js'
-import { loadTraveller, wearSuit, toon, outline } from './films/kit'
+import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js'
+import { loadTraveller, wearSuit, outline } from './films/kit'
 import { DANCE_SPAN } from './movies'
 import { store } from '../lib/store'
 
@@ -19,8 +20,8 @@ import { store } from '../lib/store'
  * Words on the page: the title phrase, the credits, and the lines in lyrics.json.
  * The routine's hits, "bye" beats and end come with the clip (its animation extras), so a routine tracked
  * from the owner's own clip re-times the henchmen, the words and the camera by itself.
- * Everything else is built here: the henchmen are one instanced, shader-posed mesh (with an instanced ink
- * shell), the puffs, words and glints instanced quads driven from the routine's time.
+ * The henchmen are one original armoured figure (public/cinema/dance/henchman.glb), cloned and played through a
+ * run in, a guard and the blow's fall; the puffs, words and glints are instanced quads driven from the routine's time.
  *
  * CONTRACT (world.js, timeline.js and movies.js rely on it; do not change the export or its signature)
  *   export function createDance(renderer, { loader, normalize, mobile }) -> { scene, camera, update, built }
@@ -177,76 +178,6 @@ function canvasTexture(w, h, draw, repeat) {
   return t
 }
 
-// ---------------------------------------------------------------- the henchmen
-// One merged body, posed in the shader (as final.js's squad): parts 0 torso and head, 1/2 left/right
-// arm, 3/4 left thigh/shin, 5/6 right thigh/shin. Dark fatigues, a vest, a black ski mask with two white
-// eye holes: generic, faceless.
-function henchGeometry() {
-  const parts = []
-  const add = (geo, part, hex, x, y, z, sx = 1, sy = 1, sz = 1) => {
-    geo.scale(sx, sy, sz).translate(x, y, z)
-    const g = geo.index ? geo.toNonIndexed() : geo
-    g.deleteAttribute('uv')
-    const n = g.attributes.position.count, c = new THREE.Color(hex), col = new Float32Array(n * 3)
-    for (let i = 0; i < n; i++) c.toArray(col, i * 3)
-    g.setAttribute('color', new THREE.BufferAttribute(col, 3))
-    g.setAttribute('aPart', new THREE.BufferAttribute(new Float32Array(n).fill(part), 1))
-    parts.push(g)
-  }
-  const cyl = (r1, r2, h, s = 12) => new THREE.CylinderGeometry(r1, r2, h, s)
-  const sph = (r, w = 14, h = 10) => new THREE.SphereGeometry(r, w, h)
-  const PANTS = '#465066', SHIRT = '#3c4456', VEST = '#23272f', BLACK = '#141418'
-  for (const s of [1, -1]) {
-    const T = s > 0 ? 3 : 5
-    add(new THREE.BoxGeometry(0.11, 0.09, 0.27), T + 1, BLACK, s * 0.1, 0.045, 0.04)
-    add(cyl(0.062, 0.07, 0.42), T + 1, PANTS, s * 0.1, 0.3, 0)
-    add(sph(0.07, 10, 8), T + 1, PANTS, s * 0.1, 0.51, 0.005)
-    add(cyl(0.092, 0.074, 0.4), T, PANTS, s * 0.1, 0.72, 0)
-  }
-  add(cyl(0.18, 0.17, 0.2), 0, PANTS, 0, 0.94, 0, 1, 1, 0.72)
-  add(new THREE.TorusGeometry(0.17, 0.022, 6, 20).rotateX(PI / 2), 0, BLACK, 0, 1.0, 0, 1, 1, 0.74)
-  const torso = [[0.001, 0.98], [0.168, 1.0], [0.18, 1.12], [0.2, 1.3], [0.205, 1.38], [0.17, 1.47], [0.07, 1.51], [0.001, 1.515]]
-  add(new THREE.LatheGeometry(torso.map(([r, y]) => new THREE.Vector2(r, y)), 16), 0, SHIRT, 0, 0, 0, 1, 1, 0.7)
-  const vest = [[0.186, 1.06], [0.205, 1.14], [0.222, 1.3], [0.214, 1.4], [0.18, 1.43]]
-  add(new THREE.LatheGeometry(vest.map(([r, y]) => new THREE.Vector2(r, y)), 16, 0, TAU), 0, VEST, 0, 0, 0, 1, 1, 0.74)
-  add(cyl(0.05, 0.056, 0.11), 0, BLACK, 0, 1.54, 0)
-  add(sph(0.108, 16, 12), 0, BLACK, 0, 1.67, 0.008, 0.92, 1.08, 1)
-  for (const s of [1, -1]) add(sph(0.026, 8, 6), 0, '#f4f1ea', s * 0.04, 1.69, 0.094, 1.2, 0.75, 0.5) // eye holes
-  for (const s of [1, -1]) {
-    const A = s > 0 ? 1 : 2
-    add(sph(0.075, 10, 8), A, SHIRT, s * 0.225, 1.425, 0)
-    add(cyl(0.068, 0.058, 0.24), A, SHIRT, s * 0.24, 1.31, 0)
-    add(cyl(0.05, 0.04, 0.42), A, SHIRT, s * 0.245, 1.0, 0)
-    add(sph(0.052, 8, 6), A, BLACK, s * 0.245, 0.77, 0.01)
-  }
-  return mergeGeometries(parts)
-}
-// The pose (iArm: left and right raise 0..1 (x PI about x), spread, lean; iLeg: hip and knee, left then
-// right) as final.js's squad.
-const POSE_GLSL = /* glsl */ `
-attribute float aPart; attribute vec4 iArm; attribute vec4 iLeg;
-mat3 rotX(float a) { float c = cos(a), s = sin(a); return mat3(1.0, 0.0, 0.0, 0.0, c, s, 0.0, -s, c); }
-mat3 rotZ(float a) { float c = cos(a), s = sin(a); return mat3(c, s, 0.0, -s, c, 0.0, 0.0, 0.0, 1.0); }
-void pose(inout vec3 p, inout vec3 n) {
-  int part = int(aPart + 0.5);
-  if (part >= 3) {
-    bool left = part <= 4;
-    float side = left ? 1.0 : -1.0;
-    vec3 H = vec3(0.1 * side, 0.94, 0.0), K = vec3(0.1 * side, 0.51, 0.0);
-    if (part == 4 || part == 6) { mat3 Rk = rotX(left ? iLeg.y : iLeg.w); p = Rk * (p - K) + K; n = Rk * n; }
-    mat3 Rh = rotX(-(left ? iLeg.x : iLeg.z)); p = Rh * (p - H) + H; n = Rh * n;
-  } else {
-    if (part >= 1) {
-      float side = part == 1 ? 1.0 : -1.0;
-      vec3 S = vec3(0.235 * side, 1.43, 0.0);
-      mat3 Ra = rotX(-(part == 1 ? iArm.x : iArm.y) * 3.14159265) * rotZ(side * iArm.z);
-      p = Ra * (p - S) + S; n = Ra * n;
-    }
-    vec3 T = vec3(0.0, 0.94, 0.0);
-    mat3 Rl = rotX(iArm.w); p = Rl * (p - T) + T; n = Rl * n;
-  }
-}`
-
 // ---------------------------------------------------------------- the words
 // One atlas of comic lettering, a row (2048 x 256) each: the lyric captions (public/cinema/dance/lyrics.json's
 // lines), each in its style, then last the title phrase "Bye Bye Bye" in a yellow box across the whole row.
@@ -384,6 +315,7 @@ export function createDance(renderer, { loader, mobile = false }) {
     const suitFile = loader.loadAsync('/cinema/suits/deadpool.glb')
     const routineFile = loader.loadAsync('/cinema/dance/routine.glb')
     const relicsFile = loader.loadAsync('/cinema/dance/relics.glb')
+    const henchFile = loader.loadAsync('/cinema/dance/henchman.glb')
     const fonts = document.fonts?.load('900 100px "Archivo Variable"').catch(() => {})
     const U = { cell: { value: 5 }, ink: { value: 0.55 }, t: { value: 0 } }
     const add = (o, shadow = true) => {
@@ -523,7 +455,7 @@ export function createDance(renderer, { loader, mobile = false }) {
     const rim = new THREE.DirectionalLight('#fff1dc', 1.2) // the low sun behind the cloud
     rim.position.set(5, 3, -9)
     scene.add(key, key.target, fill, rim, new THREE.HemisphereLight('#e2e9f4', '#8a95a4', 1.1))
-    const _m = new THREE.Matrix4(), _q = new THREE.Quaternion(), HS = new THREE.Vector3(0.93, 0.93, 0.93), _v = new THREE.Vector3(), _w = new THREE.Vector3()
+    const _m = new THREE.Matrix4(), _q = new THREE.Quaternion(), _v = new THREE.Vector3(), _w = new THREE.Vector3()
     const Yax = new THREE.Vector3(0, 1, 0), Xax = new THREE.Vector3(1, 0, 0), Zax = new THREE.Vector3(0, 0, 1)
 
     // ------------------------------------------------------------ the pines round the clearing, snow on every tier
@@ -654,44 +586,33 @@ export function createDance(renderer, { loader, mobile = false }) {
     const byes = extras.byes ?? []
     byeTimes = byes
     const NF = Math.min(FOES, hits.length)
-    const hg = henchGeometry()
-    const armA = new THREE.InstancedBufferAttribute(new Float32Array(FOES * 4), 4).setUsage(THREE.DynamicDrawUsage)
-    const legA = new THREE.InstancedBufferAttribute(new Float32Array(FOES * 4), 4).setUsage(THREE.DynamicDrawUsage)
-    hg.setAttribute('iArm', armA)
-    hg.setAttribute('iLeg', legA)
-    const henchMat = printed(toon({ vertexColors: true }), U, 'hench')
-    const prevHench = henchMat.onBeforeCompile
-    henchMat.onBeforeCompile = (sh, r) => {
-      sh.vertexShader = sh.vertexShader
-        .replace('#include <common>', '#include <common>\n' + POSE_GLSL)
-        .replace('#include <beginnormal_vertex>', 'vec3 objectNormal = vec3(normal); vec3 posed = vec3(position); pose(posed, objectNormal);')
-        .replace('#include <begin_vertex>', 'vec3 transformed = posed;')
-      prevHench(sh, r)
+    // The henchmen: one original armoured figure (public/cinema/dance/henchman.glb: Meshy-made and rigged, slimmed by
+    // scripts/cinema/footballer.py --tris 9000), cloned with a mixer each: the run in, the guard, the blow, the fall.
+    const henchGltf = await henchFile
+    const clipOf = n => henchGltf.animations.find(c => c.name === n)
+    const HC = { run: clipOf('run_fast_2_inplace'), guard: clipOf('Combat_Stance'), face: clipOf('Face_Punch_Reaction'), down: clipOf('Knock_Down'), blown: clipOf('Shot_and_Blown_Back') }
+    henchGltf.scene.traverse(o => {
+      if (!o.isMesh) return
+      if (o.material.map) o.material.map.colorSpace = THREE.NoColorSpace // as painted (the contract's colour note)
+      printed(o.material, U, 'hench')
+    })
+    const men = []
+    for (let i = 0; i < NF; i++) {
+      const root = SkeletonUtils.clone(henchGltf.scene)
+      const meshes = []
+      root.traverse(o => o.isMesh && meshes.push(o)) // gathered first: an outline adds a mesh, which a live traverse would outline again
+      for (const o of meshes) {
+        o.frustumCulled = false
+        o.geometry.computeBoundingBox()
+        outline(o, { ink: INK, width: 0.012 * ((o.geometry.boundingBox.max.y - o.geometry.boundingBox.min.y) / 1.8) }) // an ink line round him too, in the mesh's own units
+      }
+      const mixer = new THREE.AnimationMixer(root)
+      const acts = Object.fromEntries(Object.entries(HC).map(([k, c]) => [k, mixer.clipAction(c)]))
+      for (const a of Object.values(acts)) a.play().setEffectiveWeight(0)
+      scene.add(root)
+      men.push({ root, mixer, acts })
+      await step()
     }
-    const crew = new THREE.InstancedMesh(hg, henchMat, FOES)
-    crew.instanceMatrix.setUsage(THREE.DynamicDrawUsage)
-    crew.frustumCulled = false
-    crew.castShadow = false
-    const shell = new THREE.InstancedMesh(hg, new THREE.ShaderMaterial({
-      uniforms: THREE.UniformsUtils.merge([THREE.UniformsLib.fog, { uInk: { value: new THREE.Color(INK) } }]),
-      vertexShader: /* glsl */ `
-        ${POSE_GLSL}
-        varying float vDepth;
-        void main() {
-          vec3 n = normal; vec3 p = position; pose(p, n);
-          p += normalize(n) * 0.022;
-          vec4 mv = modelViewMatrix * instanceMatrix * vec4(p, 1.0);
-          vDepth = -mv.z;
-          gl_Position = projectionMatrix * mv;
-        }`,
-      fragmentShader: /* glsl */ `
-        uniform vec3 uInk; uniform vec3 fogColor; uniform float fogDensity; varying float vDepth;
-        void main() { gl_FragColor = vec4(mix(uInk, fogColor, 1.0 - exp(-fogDensity * fogDensity * vDepth * vDepth)), 1.0); }`,
-      side: THREE.BackSide, fog: true,
-    }), FOES)
-    shell.instanceMatrix = crew.instanceMatrix
-    shell.frustumCulled = false
-    scene.add(crew, shell)
     // Each one's part in it: where he waits in the dark, which way he comes at him, where he flies.
     seed = 23
     const ANGLE = { fore: -38, back: -95, kick: 12, slam: 28, spin: 140, front: 15, left: 60, right: -60 }
@@ -974,10 +895,6 @@ export function createDance(renderer, { loader, mobile = false }) {
       const f = Math.min(n - 1, Math.max(0, Math.round((T / clip.duration) * (n - 1))))
       return v.set(hipsTrack.values[f * 3] * scaleHips, 0, hipsTrack.values[f * 3 + 2] * scaleHips)
     }
-    const pose = (i, armL, armR, spread, lean, hl, kl, hr, kr) => {
-      armA.setXYZW(i, armL, armR, spread, lean)
-      legA.setXYZW(i, hl, kl, hr, kr)
-    }
     const puffAt = (k, x, y, z, age, big) => {
       const live = age > 0 && age < 0.9
       pP[k * 3] = x; pP[k * 3 + 1] = y; pP[k * 3 + 2] = z
@@ -1025,51 +942,50 @@ export function createDance(renderer, { loader, mobile = false }) {
       claws.quaternion.setFromRotationMatrix(mtx)
       claws.position.copy(pos).addScaledVector(cF, 0.04).addScaledVector(cN, 0.03)
 
-      // The henchmen.
+      // The henchmen: waiting in the dark, a run at him, squared up in guard, then the blow: a snap back from the
+      // punch and down (a kick or a slam blows him clean off his feet), sliding a little away from him; they stay down.
       let flash = 0, shook = 0, fist = 1
       for (let i = 0; i < FOES; i++) {
         if (i >= NF) {
           mtx.makeScale(0, 0, 0)
-          crew.setMatrixAt(i, mtx)
           blobs.setMatrixAt(i, mtx)
           continue
         }
-        const f = foes[i]
-        const tHit = f.t, tGo = tHit - 3.0, tSet = tHit - 0.4
+        const f = foes[i], M = men[i], A = M.acts
+        const tHit = f.t, tGo = tHit - 3.0, tSet = tHit - 0.45
         hipsAt(tHit, home)
         strike.set(home.x + Math.sin(f.a) * f.reach, 0, home.z + Math.cos(f.a) * f.reach)
-        let yaw = 0, flat = 0, cy = 0
+        let yaw, down = 0
+        const big = f.kind === 'kick' || f.kind === 'slam' || f.kind === 'spin' || i % 3 === 2 // every third blow blows him clean off his feet
+        const fall = big ? A.blown : A.down
         if (T < tHit) {
-          // Waiting in the dark, then a run at him, then the wind-up.
           const k = ss(tGo, tSet, T)
           pos.set(lerp(f.spawn[0], strike.x, k), 0, lerp(f.spawn[1], strike.z, k))
           hipsAt(T, tmp)
           yaw = Math.atan2(tmp.x - pos.x, tmp.z - pos.z)
-          const running = k > 0 && k < 1 ? Math.min(1, Math.sin(k * PI) * 2.5) : 0
-          const ph = f.ph + Math.hypot(pos.x - f.spawn[0], pos.z - f.spawn[1]) * f.run
-          const sw = Math.sin(ph) * running
-          const wind = ss(tSet - 0.15, tHit - 0.05, T)
-          const idle = still ? 0 : Math.sin(t * 2.2 + f.ph) * 0.04
-          pos.y = Math.abs(Math.cos(ph)) * 0.06 * running
-          pose(i, lerp(0.3 + sw * 0.35, 0.92, wind) + idle, lerp(0.3 - sw * 0.35, 0.75, wind) - idle, 0.2 + 0.2 * wind, 0.18 * running + 0.1 * wind,
-            0.12 + sw * 0.7, 0.2 + Math.max(0, -sw) * 1.1, 0.12 - sw * 0.7, 0.2 + Math.max(0, sw) * 1.1)
+          const run = T > tGo ? 1 - ss(tSet - 0.2, tSet + 0.05, T) : 0
+          A.run.time = (Math.max(0, T - tGo) * 1.1) % HC.run.duration
+          A.guard.time = (T + f.ph) % HC.guard.duration
+          A.run.setEffectiveWeight(run)
+          A.guard.setEffectiveWeight(1 - run)
+          A.face.setEffectiveWeight(0)
+          A.down.setEffectiveWeight(0)
+          A.blown.setEffectiveWeight(0)
         } else {
-          // Hit: flung in a spinning arc, a bounce, a slide, then flat on his back.
-          const u = clamp01((T - tHit) / f.dur), land = tHit + f.dur
-          const slide = ss(land, land + 0.55, T)
-          const fx = f.land[0] - strike.x, fz = f.land[1] - strike.z, dist = Math.hypot(fx, fz)
-          const travel = (dist - 0.7) * (u * (1 - 0.15 * u)) / 0.85 + 0.7 * slide
-          pos.set(strike.x + (fx / dist) * travel, 0, strike.z + (fz / dist) * travel)
-          cy = lerp(0.95, 0.16, u) + f.apex * 4 * u * (1 - u) + (T > land ? 0.14 * Math.sin(PI * clamp01((T - land) / 0.3)) : 0)
-          // From facing him to his back towards where he flies, as the blow turns him.
-          const y0 = f.a + PI, y1 = Math.atan2(-fx, -fz)
-          yaw = y0 + ((((y1 - y0) % TAU) + TAU + PI) % TAU - PI) * ss(0, 0.35, u)
-          flat = (PI / 2 + TAU * f.turns) * Math.min(1, u * 1.05)
-          const flail = 1 - slide
-          const w = still ? 0.5 : Math.sin(T * 17 + f.ph)
-          pose(i, 0.55 + 0.4 * w * flail + 0.35 * (1 - flail), 0.6 - 0.4 * w * flail + 0.35 * (1 - flail), 0.6 + 0.5 * flail, -0.3 * flail,
-            0.5 * w * flail + 0.1, 0.9 * flail, -0.5 * w * flail + 0.1, 0.7 * flail)
+          const u = T - tHit
+          // Facing him as the blow lands, the fall carries him backward, away; a short slide on the snow.
+          yaw = f.a + PI
+          const away = 0.25 + 0.55 * ss(0, 0.7, u)
+          pos.set(strike.x + Math.sin(f.a) * away, 0, strike.z + Math.cos(f.a) * away)
+          down = ss(0.35, 0.9, u)
+          A.run.setEffectiveWeight(0)
+          A.guard.setEffectiveWeight(0)
+          A.face.setEffectiveWeight(big ? 0 : 1 - ss(0.25, 0.45, u))
+          A.face.time = Math.min(u, HC.face.duration - 1e-3)
+          for (const x of [A.down, A.blown]) x.setEffectiveWeight(x === fall ? (big ? 1 : ss(0.25, 0.45, u)) : 0)
+          fall.time = Math.min(big ? u : Math.max(0, u - 0.25), fall.getClip().duration - 1e-3)
           // The puffs: a burst where the blow lands, dust where he hits the floor.
+          const land = tHit + (big ? 0.7 : 1.0)
           const hitAge = Tfx - tHit, landAge = Tfx - land
           for (let k = 0; k < PUFFS; k++) {
             const a = (k / PUFFS) * TAU + f.ph
@@ -1080,31 +996,14 @@ export function createDance(renderer, { loader, mobile = false }) {
           if (hitAge < 0.25) shook = Math.max(shook, 1 - hitAge / 0.25)
         }
         if (T < tHit) for (let k = 0; k < 2 * PUFFS; k++) puffAt(i * 2 * PUFFS + k, 0, 0, 0, -1, 0)
-        // Turn: face him (yaw), then the tumble about his own side axis, round his middle.
-        qa.setFromAxisAngle(Yax, yaw)
-        qb.setFromAxisAngle(Xax, -flat)
-        qa.multiply(qb)
-        qb.setFromAxisAngle(Zax, f.roll * Math.min(1, flat))
-        qa.multiply(qb)
-        if (T < tHit) {
-          mtx.compose(pos, qa, HS)
-        } else {
-          tmp.set(0, -0.88, 0).applyQuaternion(qa)
-          pos.y = cy
-          pos.add(tmp)
-          mtx.compose(pos, qa, HS)
-        }
-        crew.setMatrixAt(i, mtx)
-        // His shadow: under his middle, smaller and fainter the higher he is.
-        tmp.set(0, 0.95, 0).applyQuaternion(qa).add(pos)
-        const hgt = Math.max(0, tmp.y - 0.95)
-        const sz = (flat > 0.8 ? 1.9 : 1.0) / (1 + hgt * 0.6)
-        mtx.compose(_v.set(tmp.x, 0.01, tmp.z), qc.setFromAxisAngle(Yax, yaw), _w.set(sz * 0.8, 1, sz * (flat > 0.8 ? 1.3 : 0.8)))
+        M.root.position.copy(pos)
+        M.root.rotation.y = yaw
+        M.mixer.update(0)
+        // His shadow: under him, long and flat once he is down.
+        mtx.compose(_v.set(pos.x, 0.01, pos.z), qc.setFromAxisAngle(Yax, yaw), _w.set(0.8 + 0.4 * down, 1, 0.8 + 1.0 * down))
         blobs.setMatrixAt(i, mtx)
       }
-      crew.instanceMatrix.needsUpdate = true
       blobs.instanceMatrix.needsUpdate = true
-      armA.needsUpdate = legA.needsUpdate = true
       puffs.geometry.attributes.iP.needsUpdate = puffs.geometry.attributes.iS.needsUpdate = true
 
       // Fist glints: only the fist that lands, as it lands.
