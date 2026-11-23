@@ -16,8 +16,8 @@ import { CLEAR, DANCE_SPAN, LEVELS, chapterP } from '../cinema/movies'
  */
 export const ALL = LEVELS.map(l => l.name)
 // Seconds one whole walk through a world (its own p 0..1) takes; the dance's is its routine's, one second a second.
-const WALK = { swing: 45, dive: 40, landing: 24, chase: 28, vault: 28, final: 26 }
-const SEAM = 2.4 // seconds through a transition between two worlds
+const WALK = { swing: 15, dive: 13, landing: 8, chase: 9, vault: 9, final: 9 }
+const SEAM = 1 // seconds through a transition between two worlds
 const walkSeconds = name => (name === 'dance' ? (store.danceClock?.end ?? 34.4) / (DANCE_SPAN[1] - DANCE_SPAN[0]) : WALK[name])
 
 /** The legs of a play: [name, P from, P to, seconds]; a transition belongs to the world it leads into. */

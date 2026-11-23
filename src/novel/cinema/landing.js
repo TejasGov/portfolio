@@ -955,7 +955,7 @@ export function createLanding(renderer, { loader, mobile = false }) {
         stance.setEffectiveWeight(ws)
         you.mixer.update(0)
         // The raise: the right arm straight up, the axe to the sky.
-        const k = ss(RAISE[0], RAISE[1], p), kp = ss(0.25, 0.3, p) * (1 - ss(0.6, 0.7, p)), kh = ss(0.6, 0.68, p) * (1 - ss(0.76, 0.83, p))
+        const k = ss(RAISE[0], RAISE[1], p), kp = ss(0.25, 0.3, p) * (1 - ss(0.6, 0.7, p)), kh = ss(0.6, 0.68, p) * (1 - k) // the axe hangs at his side through the stance, until the raise takes it (no swing through the crossfade)
         if (k > 0 || kp > 0 || kh > 0) you.root.updateMatrixWorld(true)
         if (kp > 0) aim(bones.RightHand, axe.end, PLANT, kp)
         if (kh > 0) aim(bones.RightHand, axe.end, HANG, kh)

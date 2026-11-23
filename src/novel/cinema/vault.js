@@ -646,9 +646,10 @@ export function createVault(renderer, { loader, mobile = false }) {
           mixL(pole.LH, L.x + 0.4, L.y - 0.2, -0.3, cup)
         }
         const tap = still ? 0 : 1
-        const tl = 0.012 * Math.max(0, Math.sin(t * 17)) * tap, tr = 0.012 * Math.max(0, Math.sin(t * 15 + 2)) * tap
-        mixW(tgt.LH, KEYS.x - 0.075 + Math.sin(t * 3.1) * 0.025 * tap, KEYS.y + 0.035 + tl, KEYS.z + 0.03, work)
-        mixW(tgt.RH, KEYS.x + 0.075 + Math.sin(t * 2.3 + 1) * 0.025 * tap, KEYS.y + 0.035 + tr, KEYS.z + 0.03, work)
+        // typing: a slow, small rise and fall over the keys (a fast tap read as a twitch), the hands just above them
+        const tl = 0.004 * (1 + Math.sin(t * 4.2)) * tap, tr = 0.004 * (1 + Math.sin(t * 3.7 + 2)) * tap
+        mixW(tgt.LH, KEYS.x - 0.075 + Math.sin(t * 1.3) * 0.008 * tap, KEYS.y + 0.05 + tl, KEYS.z + 0.03, work)
+        mixW(tgt.RH, KEYS.x + 0.075 + Math.sin(t * 1.1 + 1) * 0.008 * tap, KEYS.y + 0.05 + tr, KEYS.z + 0.03, work)
         mixL(pole.LH, L.x + 0.5, L.y, -0.6, work)
         mixL(pole.RH, Rr.x - 0.5, Rr.y, -0.6, work)
         const reach = ss(0.815, 0.84, p) * (1 - ss(0.865, 0.895, p))
