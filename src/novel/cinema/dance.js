@@ -343,7 +343,7 @@ export function createDance(renderer, { loader, mobile = false }) {
   const cam = new THREE.Vector3(), look = new THREE.Vector3(), right = new THREE.Vector3()
   let end = 34.7 // the routine's last pose (seconds), from its extras once loaded
   const timeAt = p => end * clamp01((p - P0) / (P1 - P0))
-  // The routine's clock for the music (sound.js keeps its cue in step with T) and the play button (ChapterFive.jsx).
+  // The routine's clock for the music (sound.js keeps its cue in step with T) and the scene player (lib/autoplay.js).
   const clock = (store.danceClock = { T: 0, end, seen: 0 })
   // The camera from his place (here), the routine's time and p; shake from the hits (none when still).
   const shake = { x: 0, y: 0 }

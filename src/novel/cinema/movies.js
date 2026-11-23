@@ -29,7 +29,7 @@ import { PLATEAU, coverAt } from './levels'
  *   dance 0.081..0.919, final 0.100..1. Each world's p reaches 1 a little before its seam's middle and
  *   holds there under the full cover; the next starts at 0 just after it.
  */
-/** The dance world's own p over which its routine plays (dance.js), so ChapterFive.jsx's play button can drive it in real time. */
+/** The dance world's own p over which its routine plays (dance.js), so the scene player (lib/autoplay.js) can play it in real time. */
 export const DANCE_SPAN = [0.075, 0.93]
 const HALL = 66, GAP = 22, HALF = 38.5, OUT = 77 // svh: the push-in, the gap between two walks, half a seam, the back-out
 const PLAN = [['swing', 500], ['dive', 460], ['landing', 264], ['chase', 300], ['vault', 300], ['dance', 340], ['final', 275]]

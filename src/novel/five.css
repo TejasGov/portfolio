@@ -22,12 +22,12 @@
 .five-fan {
   text-shadow: 0 4px 50px rgb(3 5 11 / 0.95), 0 1px 3px rgb(3 5 11 / 0.8);
 }
-/* A phone: the title stays low, under the tower's crown and blade; the caption clears the folio pill.
+/* A phone: the title stays low, under the tower's crown and blade; the caption clears the scene player.
    Every scene's slate docks just under the header as a compact two-line card (the name on one line, the
    swing's skip link beside it), so the worlds keep the lower and middle frame for their subject. */
 @media (max-width: 760px) and (orientation: portrait) {
   .five-caption {
-    margin-bottom: 40px;
+    margin-bottom: 64px; /* over the scene player's row (44px) */
   }
   .five-slate {
     margin-top: calc(74px - 13svh); /* the grid's top padding is 13svh: this sits 74px from the top, under the header */

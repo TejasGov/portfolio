@@ -3,6 +3,7 @@ import { reducedMotion } from '../lib/scroll'
 import { store } from '../lib/store'
 import { PROGRAMME } from '../content'
 import { goTo, goToId } from '../Book'
+import { autoplay, ALL } from '../lib/autoplay'
 import './boxoffice.css'
 
 /*
@@ -41,6 +42,10 @@ function jump(go) {
   if (go.chapter) goTo(go, 'instant')
   else if (document.getElementById(go.id)) goToId(go.id, 'instant')
   else if (go.or) goTo(go.or, 'instant') // a scene anchor not placed yet: its chapter
+  // A film's ticket plays it (lib/autoplay.js): one of the Big Screen's scenes, or the whole feature.
+  const scene = go.id?.startsWith('scene-') && go.id.slice(6)
+  const names = scene && ALL.includes(scene) ? [scene] : go.chapter === 'five' ? ALL : null
+  if (names) requestAnimationFrame(() => autoplay.play(names))
 }
 
 /** One pick at a time: { id, phase: 'print' | 'admit' } while a ticket prints, and `cancel` for a closed dialog. */
