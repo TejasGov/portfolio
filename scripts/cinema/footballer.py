@@ -1,8 +1,10 @@
 """The final's footballers (Meshy-rigged, with their own skeleton and 4 clips) for the web, Blender 5.2, from E:/portfolio:
   blender -b --factory-startup --python scripts/cinema/footballer.py -- <in player_anim.glb> public/cinema/final/player.glb
   blender -b --factory-startup --python scripts/cinema/footballer.py -- <in captain_anim.glb> public/cinema/final/captain.glb --ten
+  blender -b --factory-startup --python scripts/cinema/footballer.py -- <in hench_anim.glb> public/cinema/dance/henchman.glb --tris 9000
 Keeps the armature, the one skinned mesh and its clips (Victory_Cheer, Cheer_with_Both_Hands_Up, happy_jump_m,
 Cheer_with_Both_Hands); drops the importer's bone-shape icosphere; maps at most 1024 px; Draco + WebP.
+--tris N decimates the mesh to about N triangles (the skin weights carry over), for a figure many times in view.
 --ten paints a white block "10" on the back of his shirt in the base colour (projected from behind onto the faces that
 face backward, so it also lies on the sheer robe's back over the shirt).
 """
@@ -10,6 +12,7 @@ import bpy, sys, numpy as np
 
 a = sys.argv[sys.argv.index('--') + 1:]
 SRC, OUT, TEN = a[0], a[1], '--ten' in a
+TRIS = int(a[a.index('--tris') + 1]) if '--tris' in a else 0
 for o in list(bpy.data.objects): bpy.data.objects.remove(o, do_unlink=True)
 bpy.ops.import_scene.gltf(filepath=SRC)
 for o in list(bpy.data.objects):
@@ -62,6 +65,17 @@ if TEN:
         painted += int(hit.sum())
     img.pixels.foreach_set(px.ravel()); img.update(); img.pack()
     print('TEN texels', painted)
+
+if TRIS:
+    m = next(o for o in bpy.data.objects if o.type == 'MESH')
+    n = sum(len(p.vertices) - 2 for p in m.data.polygons)
+    if n > TRIS:
+        for o in bpy.context.selected_objects: o.select_set(False)
+        bpy.context.view_layer.objects.active = m; m.select_set(True)
+        d = m.modifiers.new('d', 'DECIMATE'); d.ratio = TRIS / n
+        bpy.ops.object.modifier_move_to_index(modifier='d', index=0)  # before the armature: the rest mesh is decimated
+        bpy.ops.object.modifier_apply(modifier='d')
+    print('TRIS', n, '->', sum(len(p.vertices) - 2 for p in m.data.polygons))
 
 for o in bpy.data.objects: o.select_set(True)
 bpy.ops.export_scene.gltf(

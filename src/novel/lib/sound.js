@@ -8,11 +8,10 @@ import { LEVELS, BACK, levelAt } from '../cinema/movies'
  * Off until the reader turns it on (browsers only allow audio after a gesture). It reads the store
  * every frame: the projector gets louder the closer the camera is to the lens, and everything in the
  * cinema falls silent while a paper chapter covers the screen.
- * In the dance (cinema/dance.js) the song plays in step with the routine (public/cinema/dance/byebyebye.mp3: the
- * owner's clip's soundtrack from the routine's first beat, credited in ChapterFive.jsx; fetched the first time
- * it is needed): it follows the routine's clock (store.danceClock) while the reader scrolls it forward, starts
- * where the routine is, re-syncs when the two drift apart, and goes quiet when the scroll stops. The scene player (autoplay.js) scrolls the
- * routine in real time, so then the two never drift at all.
+ * In the dance (cinema/dance.js) the song plays (public/cinema/dance/byebyebye.mp3: the owner's clip's soundtrack
+ * from the routine's first beat, credited in ChapterFive.jsx; fetched the first time it is needed): it starts where
+ * the routine is as the dance comes on screen and then plays through at its own pace, whatever the scroll does,
+ * until the dance leaves the screen. The scene player (autoplay.js) scrolls at the song's pace, so they stay in step.
  * The other fan worlds of Chapter Five each loop their theme (score.js) while they are on screen: Spider-Man's
  * swing, the Avengers over the dive and the landing, the Dark Knight's chase, Mission: Impossible's vault; a change
  * of world crossfades, and leaving the worlds fades it out.
@@ -116,27 +115,20 @@ function playSong(from) {
     },
   }
 }
-const dance = { player: null, lastT: -1, moved: 0, synced: 0 }
+const dance = { player: null }
 function follow(now) {
   const c = store.danceClock
-  const live = on && c && now - c.seen < 250 && c.T > 0.05 && c.T < c.end - 0.05
-  if (live && c.T !== dance.lastT) dance.moved = now
-  if (live) dance.lastT = c.T
-  const moving = live && now - dance.moved < 350 // scrolled within the last third of a second
-  if (!moving) {
-    if (dance.player) dance.player.stop(0.3), (dance.player = null)
+  const here = on && c && now - c.seen < 250 // the dance is on screen
+  if (!here) {
+    if (dance.player) dance.player.stop(0.6), (dance.player = null)
     return
   }
+  // Once it starts, the song plays through at its own pace: a scroll (or a stop, or a nudge in the middle of the
+  // scene player) never pauses, jumps or speeds it. It starts where the routine is as the dance comes on screen.
+  if (dance.player || c.T >= c.end - 0.5) return
   if (song === null) song = fetch(SONG).then(r => r.arrayBuffer()).then(b => ctx.decodeAudioData(b)).then(b => (song = b), () => (song = false)) // a failed fetch: no song this visit
   if (!(song instanceof AudioBuffer)) return
-  const drift = dance.player ? Math.abs(dance.player.t - c.T) : Infinity
-  // Start where the routine is; re-sync on a drift a listener would hear, at most every 0.6 s (a fast scroll
-  // re-syncs in steps rather than stuttering every frame).
-  if (drift > 0.25 && now - dance.synced > 600) {
-    dance.player?.stop(0.06)
-    dance.player = playSong(c.T)
-    dance.synced = now
-  }
+  dance.player = playSong(Math.max(0, c.T))
 }
 
 // Each world's theme, looping while that world is on screen (the dance has its song, the final its crowd).
