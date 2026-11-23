@@ -123,7 +123,7 @@ export const PROGRAMME = [
     ],
   },
   {
-    id: 'screen', screen: 'Screen 5', time: '7 min', title: 'The Big Screen', line: 'A fan’s tribute: the scenes I’d jump into.', go: FIVE, worlds: ['swing'],
+    id: 'screen', screen: 'Screen 5', time: '4 min', title: 'The Big Screen', line: 'A fan’s tribute: the scenes I’d jump into.', go: FIVE, worlds: ['swing'],
     showings: [
       { id: 'swing', time: '1 min', title: 'Spider-Man', line: 'Golden hour on a copper dome. One leap, then the swing.', go: { id: 'scene-swing', or: FIVE }, worlds: ['swing'] },
       { id: 'dive', time: '1 min', title: 'Iron Man', line: 'Off the tower’s landing pad and into the suit.', go: { id: 'scene-dive', or: FIVE }, worlds: ['dive'] },

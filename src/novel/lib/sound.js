@@ -11,7 +11,7 @@ import { LEVELS, BACK, levelAt } from '../cinema/movies'
  * In the dance (cinema/dance.js) the song plays in step with the routine (public/cinema/dance/byebyebye.mp3: the
  * owner's clip's soundtrack from the routine's first beat, credited in ChapterFive.jsx; fetched the first time
  * it is needed): it follows the routine's clock (store.danceClock) while the reader scrolls it forward, starts
- * where the routine is, re-syncs when the two drift apart, and goes quiet when the scroll stops. ChapterFive.jsx's play button scrolls the
+ * where the routine is, re-syncs when the two drift apart, and goes quiet when the scroll stops. The scene player (autoplay.js) scrolls the
  * routine in real time, so then the two never drift at all.
  * The other fan worlds of Chapter Five each loop their theme (score.js) while they are on screen: Spider-Man's
  * swing, the Avengers over the dive and the landing, the Dark Knight's chase, Mission: Impossible's vault; a change
