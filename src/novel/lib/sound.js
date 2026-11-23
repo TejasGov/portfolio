@@ -1,4 +1,6 @@
 import { store } from './store'
+import { CUES, playCue } from './score'
+import { LEVELS, BACK, levelAt } from '../cinema/movies'
 
 /*
  * The soundtrack of the cinema, synthesized live (no audio files): a projector's 24 fps sprocket
@@ -11,6 +13,9 @@ import { store } from './store'
  * it is needed): it follows the routine's clock (store.danceClock) while the reader scrolls it forward, starts
  * where the routine is, re-syncs when the two drift apart, and goes quiet when the scroll stops. ChapterFive.jsx's play button scrolls the
  * routine in real time, so then the two never drift at all.
+ * The other fan worlds of Chapter Five each loop their theme (score.js) while they are on screen: Spider-Man's
+ * swing, the Avengers over the dive and the landing, the Dark Knight's chase, Mission: Impossible's vault; a change
+ * of world crossfades, and leaving the worlds fades it out.
  */
 let ctx, master, proj, room, rush, rushFilter, music, raf
 let on = false
@@ -134,6 +139,18 @@ function follow(now) {
   }
 }
 
+// Each world's theme, looping while that world is on screen (the dance has its song, the final its crowd).
+const THEMES = { swing: 'web', dive: 'assemble', landing: 'assemble', chase: 'knight', vault: 'vault' }
+const theme = { key: null, player: null }
+function score() {
+  const P = store.five
+  const key = on && store.night && P > LEVELS[0].walk[0] && P < BACK ? THEMES[levelAt(P).level] ?? null : null
+  if (key === theme.key) return
+  theme.player?.stop(1.2)
+  theme.key = key
+  theme.player = key ? playCue(ctx, music, CUES[key]) : null
+}
+
 const clamp01 = x => Math.min(1, Math.max(0, x))
 
 function tick() {
@@ -147,6 +164,7 @@ function tick() {
   rush.gain.setTargetAtTime(night * Math.sin(Math.PI * clamp01(flood * 0.85 + sweep * 0.4)) * 0.32, t, 0.06)
   rushFilter.frequency.setTargetAtTime(250 + 5200 * flood * flood, t, 0.06)
   follow(performance.now())
+  score()
 }
 
 export const sound = {
@@ -170,6 +188,8 @@ export const sound = {
       cancelAnimationFrame(raf)
       dance.player?.stop(0.15)
       dance.player = null
+      theme.player?.stop(0.15)
+      theme.key = theme.player = null
       setTimeout(() => !on && ctx.suspend(), 600)
     }
     listeners.forEach(fn => fn(on))
