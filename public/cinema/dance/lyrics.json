@@ -1,0 +1,4 @@
+{
+  "_format": "Comic captions for the dance (cinema/dance.js). Each line: t = the second of byebyebye.mp3 it is sung at (the routine's own second), d = seconds on screen, text = the words (wrap a word in *stars* to set it bigger, in red), style = 'pop' (bare lettering), 'back' (big, behind him) or 'box' (a comic caption box); with no style the lines take pop, back, box in turn. A line that is just the title phrase shows as the yellow banner.",
+  "lines": []
+}

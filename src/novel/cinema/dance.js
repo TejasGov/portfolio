@@ -12,10 +12,11 @@ import { store } from '../lib/store'
  * routine and its fight, the claws in his right fist (public/cinema/dance/routine.glb: scripts/cinema/pose_splice.py
  * joins the owner's clip's shots on the music's beat, pose_retarget.py makes the clip), through a crowd of twelve
  * generic masked henchmen, who charge in from the trees and get knocked flying in
- * spinning arcs to land in puffs of snow. Each hit pops a sound-effect word in a comic starburst; the title
- * phrase "Bye Bye Bye" pops in a caption box on each of the routine's "bye" pushes and over the last pose.
+ * spinning arcs to land in puffs of snow. The song's lines pop up as it sings them, in comic caption boxes, from
+ * public/cinema/dance/lyrics.json (the owner's to fill: no lyric is written in this code); the title phrase in a
+ * yellow banner when it is sung (or, with no lines, on the routine's "bye" pushes) and over the last pose.
  * As in the film's opening credits, relics fly past the lens with a credit on each (a femur, a skull, a boot's sole).
- * Words on the page: the title phrase, sound-effect words and the credits, never a lyric line.
+ * Words on the page: the title phrase, the credits, and the lines in lyrics.json.
  * The routine's hits, "bye" beats and end come with the clip (its animation extras), so a routine tracked
  * from the owner's own clip re-times the henchmen, the words and the camera by itself.
  * Everything else is built here: the henchmen are one instanced, shader-posed mesh (with an instanced ink
@@ -80,7 +81,6 @@ const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647
 // The routine plays over p 0.075..0.93 (it starts as the comic panels slide off) and holds its last pose.
 const [P0, P1] = DANCE_SPAN
 const FOES = 12
-const WORDS = ['THWACK', 'SNIKT', 'POW', 'CRACK', 'WHAM', 'BOOM', 'KRAK', 'BAM', 'SNIKT', 'THWACK', 'POW', 'CRUNCH']
 const INK = '#0b0710'
 const GRAVE = [-3.0, 0, -5.6] // the headstone's foot, behind him and to his right (camera left)
 
@@ -248,64 +248,59 @@ void pose(inout vec3 p, inout vec3 n) {
 }`
 
 // ---------------------------------------------------------------- the words
-// One atlas of comic lettering: the sound effects in starbursts (4 x 4 cells of 512 x 256), the caption
-// "Bye Bye Bye" in a yellow box across a whole row (cell 12, 2048 x 256). Archivo, upright, heavy.
-const CELLS = 16
-function lettering() {
-  const W = 2048, H = 1024, cw = 512, ch = 256
-  const fills = ['#ffe23a', '#ffffff', '#ff4a3a', '#7ef0ff', '#ffe23a', '#ff8a2a', '#ffffff', '#ffe23a', '#ff4a3a', '#7ef0ff', '#ffe23a', '#ff8a2a']
-  const bursts = ['#e8202a', '#ffd21a', '#ffffff', '#ff2f8e', '#1a1a1a', '#ffe23a', '#e8202a', '#2a7dff', '#ffd21a', '#e8202a', '#ff2f8e', '#ffffff']
+// One atlas of comic lettering, a row (2048 x 256) each: the lyric captions (public/cinema/dance/lyrics.json's
+// lines), each in its style, then last the title phrase "Bye Bye Bye" in a yellow box across the whole row.
+// Styles: 'box' a white comic caption box, black caps; 'pop' and 'back' bare lettering, white with a heavy ink
+// outline and a hard drop shadow ('back' is set behind him in the scene). *Starred* words are the emphasis:
+// bigger, in Deadpool red. Archivo, upright, heavy.
+const ROW = 256
+const RED = '#e3202a'
+const parts = text => text.split(/(\*[^*]+\*)/).filter(Boolean).map(s => (s[0] === '*' ? { s: s.slice(1, -1).toUpperCase(), big: true } : { s: s.toUpperCase(), big: false }))
+function lettering(entries) {
+  const W = 2048, ch = ROW, H = ch * (entries.length + 1)
   return canvasTexture(W, H, g => {
     g.clearRect(0, 0, W, H)
-    let s = 5
-    const r = () => (s = (s * 16807) % 2147483647) / 2147483647
-    // The bursts' halftone as one pattern fill each: thousands of separate dot fills cost ~300 ms in the GPU process.
-    const tile = document.createElement('canvas')
-    tile.width = 14
-    tile.height = 28
-    const tg = tile.getContext('2d')
-    tg.fillStyle = 'rgba(255,255,255,0.28)'
-    tg.beginPath()
-    for (const [x, y] of [[0, 0], [14, 0], [0, 28], [14, 28], [7, 14]]) { tg.moveTo(x + 3.2, y); tg.arc(x, y, 3.2, 0, TAU) }
-    tg.fill()
-    const dots = g.createPattern(tile, 'repeat')
-    const word = (text, x, y, w, h, size, fill) => {
-      g.font = `900 ${size}px "Archivo Variable", "Arial Black", sans-serif`
-      g.textAlign = 'center'
-      g.textBaseline = 'middle'
-      const k = Math.min(1, (w * 0.86) / g.measureText(text).width)
-      g.save()
-      g.translate(x, y)
-      g.scale(k, k)
-      g.lineJoin = 'round'
-      g.lineWidth = size * 0.16
-      g.strokeStyle = '#0b0710'
-      g.strokeText(text, 0, size * 0.05)
-      g.fillStyle = fill
-      g.fillText(text, 0, size * 0.05)
-      g.restore()
-    }
-    for (let i = 0; i < 12; i++) {
-      const cx = (i % 4) * cw + cw / 2, cy = Math.floor(i / 4) * ch + ch / 2
-      // A jagged starburst behind the word, ink-outlined, a lighter halftone inside.
-      g.beginPath()
-      const spikes = 14 + (i % 3) * 2
-      for (let k = 0; k <= spikes * 2; k++) {
-        const a = (k / (spikes * 2)) * TAU, rr = k % 2 ? 0.62 + r() * 0.12 : 0.97 - r() * 0.08
-        g.lineTo(cx + Math.cos(a) * rr * (cw / 2 - 8), cy + Math.sin(a) * rr * (ch / 2 - 8))
+    entries.forEach(({ text, style }, i) => {
+      const y0 = i * ch, box = style === 'box', size = box ? 100 : 118, mid = y0 + ch / 2 + 6
+      const segs = parts(text), font = big => `900 ${big ? size * 1.4 : size}px "Archivo Variable", "Arial Black", sans-serif`
+      const widths = segs.map(p => ((g.font = font(p.big)), g.measureText(p.s).width))
+      const total = widths.reduce((a, b) => a + b, 0)
+      const k = Math.min(1, (W - (box ? 260 : 120)) / total), w = total * k
+      if (box) {
+        const bw = w + 110, x0 = (W - bw) / 2
+        g.fillStyle = '#0b0710'
+        g.fillRect(x0 + 18, y0 + 46, bw, ch - 70)
+        g.fillStyle = '#fffdf4'
+        g.fillRect(x0, y0 + 28, bw, ch - 70)
+        g.lineWidth = 10
+        g.strokeStyle = '#0b0710'
+        g.strokeRect(x0, y0 + 28, bw, ch - 70)
       }
-      g.closePath()
-      g.fillStyle = bursts[i]
-      g.fill()
-      g.lineWidth = 9
-      g.strokeStyle = '#0b0710'
-      g.stroke()
-      g.fillStyle = dots
-      g.fill()
-      word(WORDS[i], cx, cy, cw * 0.78, ch * 0.7, 150, fills[i])
-    }
-    // The caption: a yellow box with an ink border and a drop shadow, the title phrase in black caps.
-    const y0 = 3 * ch
+      g.textBaseline = 'middle'
+      g.textAlign = 'left'
+      g.lineJoin = 'round'
+      let x = (W - w) / 2
+      segs.forEach((p, j) => {
+        g.save()
+        g.translate(x, mid)
+        g.scale(k, k)
+        g.font = font(p.big)
+        const sz = p.big ? size * 1.4 : size
+        if (!box) {
+          g.fillStyle = '#0b0710' // the hard shadow, down and right
+          g.fillText(p.s, sz * 0.07, sz * 0.07)
+          g.lineWidth = sz * 0.2
+          g.strokeStyle = '#0b0710'
+          g.strokeText(p.s, 0, 0)
+        }
+        g.fillStyle = p.big ? RED : box ? '#0b0710' : '#fffdf4'
+        g.fillText(p.s, 0, 0)
+        g.restore()
+        x += widths[j] * k
+      })
+    })
+    // The title phrase: a yellow box with an ink border and a drop shadow, in black caps.
+    const y0 = entries.length * ch
     g.fillStyle = '#0b0710'
     g.fillRect(60, y0 + 42, W - 100, ch - 66)
     g.fillStyle = '#ffd92e'
@@ -657,7 +652,6 @@ export function createDance(renderer, { loader, mobile = false }) {
     const found = extras.hits?.length ? extras.hits : [3, 6, 12, 14, 16, 17, 21, 22, 23, 28, 29, 33].map(t => ({ t, side: 'right' }))
     const hits = found.length <= FOES ? found : Array.from({ length: FOES }, (_, i) => found[Math.round((i * (found.length - 1)) / (FOES - 1))])
     const byes = extras.byes ?? []
-    const SLATE_T = timeAt(0.32) // the routine's time as the top-left slate (ChapterFive.jsx: p 0.1..0.3) has gone
     byeTimes = byes
     const NF = Math.min(FOES, hits.length)
     const hg = henchGeometry()
@@ -719,7 +713,7 @@ export function createDance(renderer, { loader, mobile = false }) {
         apex: kind === 'slam' ? 1.1 : kind === 'kick' ? 1.6 : 2.2 + rnd() * 0.9,
         dur: kind === 'slam' ? 0.7 : 0.85 + rnd() * 0.2,
         turns: kind === 'slam' ? 0 : 1 + (rnd() < 0.5 ? 1 : 0),
-        roll: (rnd() - 0.5) * 2.4, run: 2.8 + rnd() * 0.6, ph: rnd() * TAU, word: i % WORDS.length,
+        roll: (rnd() - 0.5) * 2.4, run: 2.8 + rnd() * 0.6, ph: rnd() * TAU,
       })
     }
     // Blob shadows under everyone (him last), and the dust puffs from the hits and the landings.
@@ -759,19 +753,39 @@ export function createDance(renderer, { loader, mobile = false }) {
     await step()
 
     // ------------------------------------------------------------ the words
+    // The lyric captions: public/cinema/dance/lyrics.json, { "lines": [{ "t": second of the song (= of the routine),
+    // "d": seconds shown, "text": "...", "style": "pop" | "back" | "box" }] }, the owner's to fill; *starred* words
+    // are set bigger, in red; with no style the lines take pop, back, box in turn. A line that is the title phrase
+    // shows as the yellow banner; with none, the banner pops on the routine's own "bye" pushes. Words on the page
+    // come only from that file.
+    const sheet = await fetch('/cinema/dance/lyrics.json').then(r => (r.ok ? r.json() : {})).catch(() => ({}))
+    const lines = (Array.isArray(sheet.lines) ? sheet.lines : []).filter(l => Number.isFinite(l.t) && typeof l.text === 'string' && l.text.trim())
+    const isTitle = text => /^\s*bye,?\s+bye,?\s+bye\W*$/i.test(text)
+    const entries = [], keyOf = e => e.style + '|' + e.text
+    const caps = lines.map((l, i) => {
+      if (isTitle(l.text)) return { t: l.t, d: l.d > 0 ? l.d : 2.5, cell: -1, style: 'banner' }
+      const e = { text: l.text.trim(), style: ['pop', 'back', 'box'].includes(l.style) ? l.style : ['pop', 'back', 'box'][i % 3] }
+      let cell = entries.findIndex(x => keyOf(x) === keyOf(e))
+      if (cell < 0) cell = entries.push(e) - 1
+      return { t: l.t, d: l.d > 0 ? l.d : 2.5, cell, style: e.style }
+    })
+    if (!caps.some(c => c.cell < 0)) caps.push(...byes.map(t => ({ t, d: 2.6, cell: -1, style: 'banner' })))
+    caps.sort((a, b) => a.t - b.t)
+    const backs = caps.filter(c => c.style === 'back'), fronts = caps.filter(c => c.style !== 'back')
     if (fonts) await fonts
-    const letters = lettering()
+    const letters = lettering(entries)
     const wInset = { value: 0 } // the words' margin from the frame's sides, in NDC (0 on the cinema screen)
-    const NW = NF + byes.length + 1
+    const NW = fronts.length + 1, NC = fronts.length, NB = Math.max(1, backs.length)
     const wP = new Float32Array(NW * 3), wS = new Float32Array(NW * 3), wR = new Float32Array(NW * 4)
-    const words = new THREE.Mesh(instanced(QUAD, NW, { iP: [wP, 3], iS: [wS, 3], iR: [wR, 4] }), new THREE.ShaderMaterial({
-      uniforms: { uMap: { value: letters }, uInset: wInset, uTop: { value: 1 - 2 * 0.12 } }, // tops below 12% of the frame
+    const bP = new Float32Array(NB * 3), bS = new Float32Array(NB * 3), bR = new Float32Array(NB * 4)
+    const wordMat = new THREE.ShaderMaterial({
+      uniforms: { uMap: { value: letters }, uInset: wInset, uTop: { value: 1 - 2 * 0.12 }, uAtlas: { value: 2048 / (ROW * (entries.length + 1)) } }, // tops below 12% of the frame
       vertexShader: /* glsl */ `
-        attribute vec3 iP; attribute vec3 iS; attribute vec4 iR; uniform float uInset; uniform float uTop; varying vec2 vUv; varying float vA;
+        attribute vec3 iP; attribute vec3 iS; attribute vec4 iR; uniform float uInset; uniform float uTop; uniform float uAtlas; varying vec2 vUv; varying float vA;
         void main() {
           vec4 mv = modelViewMatrix * vec4(iP, 1.0);
           float c = cos(iS.z), s = sin(iS.z);
-          vec2 half_ = vec2(iS.x * iR.z / iR.w, iS.x * 0.5); // a cell's width over its height is twice its uv ratio (2048 x 1024)
+          vec2 half_ = vec2(iS.x * 0.5 * uAtlas * iR.z / iR.w, iS.x * 0.5); // a cell's own width over height (the atlas is 2048 wide, a row 256 high)
           float fit = 1.0;
           if (uInset > 0.0 && mv.z < 0.0) {
             // Shrink a word to the frame's width and keep it uInset (NDC) inside both edges.
@@ -793,17 +807,22 @@ export function createDance(renderer, { loader, mobile = false }) {
         uniform sampler2D uMap; varying vec2 vUv; varying float vA;
         void main() { vec4 c = texture2D(uMap, vUv); if (c.a < 0.02 || vA <= 0.0) discard; gl_FragColor = vec4(c.rgb, c.a * vA); }`,
       transparent: true, depthWrite: false, depthTest: false,
-    }))
+    })
+    const words = new THREE.Mesh(instanced(QUAD, NW, { iP: [wP, 3], iS: [wS, 3], iR: [wR, 4] }), wordMat)
     words.frustumCulled = false
     words.renderOrder = 10
-    scene.add(words)
-    // Atlas rects (u, v, w, h; v from the bottom) and each word's moment.
-    for (let i = 0; i < NW; i++) {
-      const caption = i >= NF
-      const c = caption ? 0 : foes[i].word
-      wR.set(caption ? [0, 0, 1, 0.25] : [(c % 4) * 0.25, 0.75 - Math.floor(c / 4) * 0.25, 0.25, 0.25], i * 4)
-    }
-    words.geometry.attributes.iR.needsUpdate = true
+    // The 'back' lines: in the scene's depth, so he (and the henchmen) pass in front of them.
+    const backWords = new THREE.Mesh(instanced(QUAD, NB, { iP: [bP, 3], iS: [bS, 3], iR: [bR, 4] }), wordMat.clone())
+    backWords.material.depthTest = true
+    backWords.material.uniforms = wordMat.uniforms
+    backWords.frustumCulled = false
+    scene.add(words, backWords)
+    // Atlas rects (u, v, w, h; v from the bottom): a lyric's row, or the title banner (the last row, at the bottom).
+    const rows = entries.length + 1
+    const rect = cell => (cell < 0 ? [0, 0, 1, 1 / rows] : [0, 1 - (cell + 1) / rows, 1, 1 / rows])
+    for (let i = 0; i < NW; i++) wR.set(rect(i < NC ? fronts[i].cell : -1), i * 4)
+    backs.forEach((c, i) => bR.set(rect(c.cell), i * 4))
+    words.geometry.attributes.iR.needsUpdate = backWords.geometry.attributes.iR.needsUpdate = true
     await step()
 
     // ------------------------------------------------------------ the relics
@@ -965,15 +984,16 @@ export function createDance(renderer, { loader, mobile = false }) {
       pS[k * 2] = live ? (0.25 + 0.55 * Math.sqrt(age / 0.9)) * big : 0
       pS[k * 2 + 1] = live ? 1 - ss(0.45, 0.9, age) : 0
     }
-    const word = (i, T0, T, x, y, z, s, rot, life) => {
+    const wordIn = (P, S) => (i, T0, T, x, y, z, s, rot, life) => {
       const age = T - T0
       const live = age > 0 && age < life
       const pop = live ? (age < 0.1 ? (age / 0.1) * 1.25 : age < 0.2 ? lerp(1.25, 1, (age - 0.1) / 0.1) : 1) : 0
-      wP[i * 3] = x; wP[i * 3 + 1] = y; wP[i * 3 + 2] = z
-      wS[i * 3] = s * pop
-      wS[i * 3 + 1] = live ? 1 - ss(life - 0.25, life, age) : 0
-      wS[i * 3 + 2] = rot
+      P[i * 3] = x; P[i * 3 + 1] = y; P[i * 3 + 2] = z
+      S[i * 3] = s * pop
+      S[i * 3 + 1] = live ? 1 - ss(life - 0.25, life, age) : 0
+      S[i * 3 + 2] = rot
     }
+    const word = wordIn(wP, wS), backWord = wordIn(bP, bS)
     let lastT = null
     run = (state, t, aspect) => {
       const p = state.p ?? 0, still = !!state.still, portrait = !!state.portrait
@@ -1117,23 +1137,28 @@ export function createDance(renderer, { loader, mobile = false }) {
         f.o.quaternion.copy(camera.quaternion).multiply(qb.setFromEuler(_e.set(f.pitch * v, f.yaw * v, lerp(f.roll[0], f.roll[1], u))))
         f.o.scale.setScalar(s)
       }
-      // The caption: "Bye Bye Bye" on each push, beside him; then over the last pose, above him.
+      // The captions, as the song sings them: a lyric in a white box above him and to his right (a comic's
+      // caption, tilted a touch, alternating), the title phrase in the yellow banner beside him; then the banner
+      // over the last pose, above him. A phone sees only the middle: keep them over him.
       right.set(Math.cos(camAz), 0, -Math.sin(camAz))
-      // The hits' words: a starburst beside him on the blow's side of the frame; on his right (clear of the
-      // top-left slate) while the slate is up. A phone sees only the middle: keep the word near him.
-      for (let i = 0; i < NF; i++) {
-        const f = foes[i]
-        hipsAt(f.t, home)
-        const s = f.t < SLATE_T || Math.sin(f.a) * right.x + Math.cos(f.a) * right.z >= 0 ? 1 : -1
-        const wx = portrait ? 0.5 : 1.5
-        word(i, f.t, Tfx, home.x + right.x * s * wx, (portrait ? 2.3 : 1.5) + (i % 3) * 0.15, home.z + right.z * s * wx, portrait ? 0.68 : 0.8, ((i % 5) - 2) * 0.09, 0.95)
+      for (let i = 0; i < NC; i++) {
+        const c = fronts[i]
+        if (c.cell < 0) {
+          const bx = portrait ? 0 : 1.25
+          word(i, c.t, T, here.x + right.x * bx, portrait ? 2.0 : 1.95, here.z + right.z * bx, portrait ? 0.26 : 0.3, -0.04, c.d)
+        } else {
+          // on his right (the scene's slate holds the top left), stacked over the banner: a box above it, tilted a
+          // touch; bare lettering larger and higher still, tilted the other way
+          const box = c.style === 'box', bx = portrait ? 0 : box ? 0.9 : 1.0
+          word(i, c.t, T, here.x + right.x * bx, portrait ? 2.6 : box ? 2.55 : 2.9, here.z + right.z * bx, portrait ? 0.27 : box ? 0.26 : 0.32, box ? (i % 2 ? 0.025 : -0.025) : 0.06, c.d)
+        }
       }
-      for (let b = 0; b < byes.length; b++) {
-        const bx = portrait ? 0 : 1.25
-        word(NF + b, byes[b], T, here.x + right.x * bx, portrait ? 2.0 : 2.15, here.z + right.z * bx, portrait ? 0.26 : 0.3, -0.04, 2.6)
-      }
+      // The 'back' lines: big, behind him (two metres past him from the lens), at his chest, so he dances in front of them.
+      cF.set(here.x - camera.position.x, 0, here.z - camera.position.z).normalize()
+      for (let i = 0; i < backs.length; i++) backWord(i, backs[i].t, T, here.x + cF.x * 2.2, portrait ? 1.35 : 1.2, here.z + cF.z * 2.2, portrait ? 0.5 : 0.68, i % 2 ? 0.035 : -0.035, backs[i].d)
+      if (backs.length) backWords.geometry.attributes.iP.needsUpdate = backWords.geometry.attributes.iS.needsUpdate = true
       const fx = portrait ? 0 : 1.2
-      word(NF + byes.length, end - 0.4, T, here.x + right.x * fx, portrait ? 3.05 : 2.7, here.z + right.z * fx, portrait ? 0.3 : 0.4, -0.03, 99)
+      word(NC, end - 0.4, T, here.x + right.x * fx, portrait ? 3.05 : 2.7, here.z + right.z * fx, portrait ? 0.3 : 0.4, -0.03, 99)
       words.geometry.attributes.iP.needsUpdate = words.geometry.attributes.iS.needsUpdate = true
 
       out.dream = still ? 0 : 0.25 * ss(P1, 1, p)
