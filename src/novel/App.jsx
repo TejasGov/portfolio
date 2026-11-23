@@ -1,6 +1,7 @@
 import { Component, Suspense, lazy, useEffect } from 'react'
 import { ScrollTrigger, startScroll } from './lib/scroll'
 import Book from './Book'
+import Landing from './landing/Landing'
 import Prologue from './chapters/Prologue'
 import ChapterOne from './chapters/ChapterOne'
 import ChapterTwo from './chapters/ChapterTwo'
@@ -52,6 +53,7 @@ export default function App() {
       <Takeover />
       <Book />
       <main className="relative z-10">
+        <Landing />
         <Prologue />
         <ChapterOne />
         <ChapterTwo />

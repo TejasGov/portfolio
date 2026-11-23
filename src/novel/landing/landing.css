@@ -1,0 +1,71 @@
+/* The landing (Landing.jsx): everything scoped under #landing. Its palette is the poster's: projected white, one
+   amber, one cool cyan. */
+#landing {
+  --ld-screen: #f4efe6;
+  --ld-dim: #b4ac9d;
+  --ld-amber: #ffb23e;
+  --ld-cool: #6fd8ec;
+  --ld-edge: 28px;
+  position: relative;
+  height: 420svh;
+  background: #020204;
+  color: var(--ld-screen);
+}
+#landing .ld-stage { position: sticky; top: 0; height: 100svh; overflow: hidden; }
+#landing canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+
+/* The nav: the poster's actions, with it for as long as it is on screen. */
+#landing .ld-nav { position: absolute; z-index: 3; top: var(--ld-edge); left: var(--ld-edge); right: var(--ld-edge); display: flex; justify-content: space-between; align-items: center; gap: 16px; }
+#landing .ld-now { display: flex; align-items: center; gap: 10px; color: var(--ld-amber); white-space: nowrap; }
+#landing .ld-lamp { width: 6px; height: 6px; border-radius: 50%; background: var(--ld-amber); box-shadow: 0 0 10px var(--ld-amber); }
+#landing .ld-links { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; }
+#landing .ld-links :is(a, button) { display: inline-flex; align-items: center; min-height: 44px; padding: 0 10px; color: inherit; font: inherit; letter-spacing: inherit; text-transform: inherit; text-decoration: none; background: none; border: 0; cursor: pointer; }
+#landing .ld-links :is(a, button):hover, #landing .ld-links :is(a, button):focus-visible { color: var(--ld-amber); }
+#landing .ld-links :is(a, button):focus-visible { outline: 2px solid var(--ld-amber); outline-offset: -2px; }
+#landing .ld-links button[aria-pressed='true'] { color: var(--ld-amber); }
+
+/* The role and billing, top left, in once the name has landed (scene.js sets the opacity). */
+#landing .ld-sheet { position: absolute; inset: 0; pointer-events: none; }
+#landing .ld-bill { position: absolute; top: calc(var(--ld-edge) + 46px); left: var(--ld-edge); max-width: min(46%, 560px); margin: 0; color: var(--ld-dim); line-height: 1.8; text-shadow: 0 1px 12px rgb(2 2 4 / 0.9); }
+#landing .ld-bill b { display: block; color: var(--ld-screen); font-weight: 500; }
+#landing .ld-foot { position: absolute; left: var(--ld-edge); right: var(--ld-edge); bottom: var(--ld-edge); display: flex; justify-content: space-between; color: var(--ld-dim); }
+
+/* The threshold's hold-to-enter. */
+#landing .ld-enter { position: absolute; left: 50%; top: 48%; transform: translate(-50%, -50%); display: grid; justify-items: center; gap: 16px; padding: 12px; background: none; border: 0; color: #dcd5c7; opacity: 0; pointer-events: none; transition: opacity 0.9s; cursor: pointer; -webkit-tap-highlight-color: transparent; user-select: none; touch-action: none; }
+#landing .ld-enter.on { opacity: 1; pointer-events: auto; }
+#landing .ld-enter:focus-visible { outline: 1px solid var(--ld-cool); outline-offset: 6px; }
+#landing .ld-enter svg { width: 60px; height: 60px; overflow: visible; }
+#landing .ld-enter circle { fill: none; stroke-width: 1; }
+#landing .ld-enter .track { stroke: rgb(244 239 230 / 0.18); stroke-dasharray: 0.012 0.03; }
+#landing .ld-enter .arc { stroke: var(--ld-cool); stroke-dasharray: 1; stroke-dashoffset: calc(1 - var(--fill, 0)); transform: rotate(-90deg); transform-origin: center; filter: drop-shadow(0 0 6px var(--ld-cool)); }
+#landing .ld-enter .dot { fill: var(--ld-cool); stroke: none; animation: ld-beat 2.4s ease-in-out infinite; transform-origin: center; }
+@keyframes ld-beat { 50% { transform: scale(1.6); opacity: 0.5; } }
+
+/* The end of the landing: to black, into the booth. */
+#landing .ld-veil { position: absolute; inset: 0; z-index: 3; background: #000; opacity: 0; pointer-events: none; } /* over the nav too: the book's header takes over */
+
+/* The loader. */
+#landing .ld-loader { position: absolute; inset: 0; z-index: 4; display: grid; place-items: center; background: #020204; transition: opacity 1.1s cubic-bezier(0.65, 0, 0.35, 1), visibility 0s linear 1.1s; }
+#landing .ld-loader.done { opacity: 0; visibility: hidden; }
+#landing .ld-label { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -34px); color: var(--ld-dim); white-space: nowrap; }
+#landing .ld-glyph { position: absolute; top: 50%; left: 50%; width: 92px; transform: translate(-50%, calc(-100% - 58px)); overflow: visible; }
+#landing .ld-glyph path { fill: none; stroke: rgb(244 239 230 / 0.6); stroke-width: 1.3; stroke-linecap: round; stroke-dasharray: 0.01 3.4; }
+#landing .ld-glyph .rise { transform-box: fill-box; transform-origin: 50% 100%; transform: scaleY(calc(var(--p, 0) / 100)); }
+#landing .ld-line { position: absolute; top: 50%; left: 50%; width: min(220px, 50vw); height: 1px; transform: translateX(-50%); background: rgb(244 239 230 / 0.12); overflow: hidden; }
+#landing .ld-line i { display: block; height: 100%; width: calc(var(--p, 0) * 1%); background: var(--ld-cool); }
+#landing .ld-pct { position: absolute; left: var(--ld-edge); bottom: calc(var(--ld-edge) - 0.12em); font-family: var(--font-display); font-size: clamp(4.5rem, 12vw, 10rem); font-weight: 200; font-stretch: 112%; line-height: 1; font-variant-numeric: tabular-nums; }
+
+/* Without WebGL: the name and the actions over the dark, no hold. */
+#landing.is-plain { height: 100svh; }
+#landing .ld-plain-name { position: absolute; left: var(--ld-edge); right: var(--ld-edge); top: 50%; margin: 0; transform: translateY(-50%); font-family: var(--font-display); font-size: clamp(3rem, 9vw, 9rem); font-stretch: 125%; font-weight: 300; line-height: 0.9; text-transform: uppercase; }
+#landing .ld-plain-name b { font-weight: 800; }
+
+@media (max-width: 760px) {
+  #landing { --ld-edge: 18px; }
+  #landing .ld-links { flex-wrap: nowrap; }
+  #landing .ld-links :is(a, button):not(.keep) { display: none; }
+  #landing .ld-bill { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  #landing .ld-enter .dot { animation: none; }
+}

@@ -23,13 +23,12 @@ export default function Stage() {
     const mobile = matchMedia('(max-width: 760px)').matches
     const mouse = new THREE.Vector2()
     const lens = new THREE.Vector3()
-    let poster = false // the last frame drawn was under the poster, which hides the booth: hold it
-    const resize = () => ((poster = false), world?.resize(innerWidth, innerHeight))
+    const resize = () => world?.resize(innerWidth, innerHeight)
 
-    // The poster's lattice (hero/lattice.js) resolves over its first few seconds: the booth's startup (its
-    // noise volume, the bakes' uploads, its first compile: frames of 70-300 ms) waits until about when that
-    // is done, or until the reader scrolls or asks the box office. A scroll asks in the browser's idle time
-    // (at most 400 ms on), so the startup's first step doesn't land inside the reader's scroll frame.
+    // The landing (landing/scene.js) covers the booth and draws its own world: the booth's startup (its noise
+    // volume, the bakes' uploads, its first compile: frames of 70-300 ms) waits until the reader is past the
+    // landing's middle, on the way to black, or asks the box office. It asks in the browser's idle time (at most
+    // 400 ms on), so the startup's first step doesn't land inside the reader's scroll frame.
     let started = false, later = 0, asked = false
     const start = () => {
       if (started || !alive) return
@@ -39,8 +38,8 @@ export default function Stage() {
       removeEventListener('novel:warm', start)
       boot()
     }
-    const early = () => scrollY > 0 && !asked && ((asked = true), window.requestIdleCallback ? requestIdleCallback(start, { timeout: 400 }) : setTimeout(start, 100))
-    const onLoad = () => (later = setTimeout(start, reduced() ? 0 : 5500))
+    const early = () => (store.landing ?? 0) > 0.5 && !asked && ((asked = true), window.requestIdleCallback ? requestIdleCallback(start, { timeout: 400 }) : setTimeout(start, 100))
+    const onLoad = () => reduced() && (later = setTimeout(start, 0)) // reduced motion: the landing holds still, so nothing to wait for
     addEventListener('scroll', early, { passive: true })
     addEventListener('novel:warm', start)
     if (document.readyState === 'complete') onLoad()
@@ -64,7 +63,7 @@ export default function Stage() {
       if (window.requestIdleCallback) requestIdleCallback(build, { timeout: 3000 })
       else setTimeout(build, 1000)
     })
-    if (scrollY > 0) start() // a reload part-way down: no poster to wait for
+    if (scrollY > innerHeight * 1.6) start() // a reload part-way down: past the landing's middle (420svh, sticky: 0.5 is 1.6 screens)
 
     // Adaptive resolution: if frames run long for about a second, render at 80% of the pixel ratio
     // (never below 0.7). Long gaps (a tab switch, a paper chapter) don't count.
@@ -132,8 +131,6 @@ export default function Stage() {
         return
       }
       warmed = false
-      // Under the poster (opaque over the booth until its wipe begins, ~0.065): the frame drawn stands.
-      if (poster && view.prologue < 0.06 && section(view) === 'prologue') return
       govern(now)
       const k = reduced() ? 0 : 0.06
       mouse.x += (store.mouse.x - mouse.x) * k
@@ -194,7 +191,6 @@ export default function Stage() {
         requestIdleCallback(() => { idleAsk = false; if (alive) for (const name of todo) world.prepare(name) }, { timeout: 1500 })
       }
       world.render(st)
-      poster = sec === 'prologue' && view.prologue < 0.06
       // A world reached before it was ready holds its seam's cover: after a moment, say so.
       heldAt = world.held ? heldAt || now : 0
       const wait = !!heldAt && now - heldAt > 300

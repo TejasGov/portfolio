@@ -89,7 +89,7 @@ export default function Book() {
   const [night, setNight] = useState(store.night)
   const [bright, setBright] = useState(!!store.bright) // a bright 3D frame (Chapter Four's clouds, village): the stage publishes 'bright'
   const [audible, setAudible] = useState(sound.on)
-  // The first frame is a poster with its own actions (chapters/Prologue.jsx): the chrome waits until it leaves.
+  // The page opens on the landing, with its own actions (landing/Landing.jsx): the chrome waits until it has gone to black.
   const [landing, setLanding] = useState(true)
   const OFF = landing ? 'invisible opacity-0' : ''
   useEffect(() => sound.subscribe(setAudible), [])
@@ -107,7 +107,7 @@ export default function Book() {
     store.listeners.add(fn)
     let raf, land = true, pulse = 0
     const tick = () => {
-      if (land !== store.prologue < 0.09) setLanding((land = !land)) // once the poster has wiped out (Prologue.jsx BEATS[0])
+      if (land !== (store.landing ?? 0) < 0.97) setLanding((land = !land)) // once the landing has faded out (landing.css .ld-veil)
       // Scrolled down past the front door: one brass pulse on the header's Box office, where it lives from now on.
       if (pulse === 0 && store.prologue < DOOR[0]) pulse = 1
       else if (pulse === 1 && store.prologue > DOOR[1]) {
@@ -141,7 +141,7 @@ export default function Book() {
       {/* On a paper page, its text fades into paper before it reaches the pills, so nothing reads half-hidden between them. */}
       <div aria-hidden="true" className={`pointer-events-none fixed inset-x-0 top-0 z-[49] h-[88px] bg-gradient-to-b from-paper from-65% to-transparent transition-opacity duration-200 min-[380px]:h-[104px] md:h-[120px] ${sheet && !landing ? 'opacity-100' : 'opacity-0'}`} />
       <header className={`pointer-events-none fixed inset-x-0 top-0 z-50 flex items-start justify-between p-3 transition-[opacity,visibility] duration-300 min-[380px]:p-5 md:p-7 ${OFF}`}>
-        <a href="#prologue" className={`kicker pointer-events-auto ${TAP}`}>Tejas Govind</a>
+        <a href="#landing" className={`kicker pointer-events-auto ${TAP}`}>Tejas Govind</a>
         <p className={`kicker hidden min-h-11 items-center md:inline-flex ${PILL}`}>{label}</p>
         {/* Under 380px the four 12px pills need the tighter gutter and gap to fit. */}
         <div className="flex items-start gap-1 min-[380px]:gap-2 md:gap-3">
